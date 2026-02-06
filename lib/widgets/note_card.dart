@@ -316,7 +316,7 @@ class _NoteCardState extends State<NoteCard> with SingleTickerProviderStateMixin
                             const Spacer(),
                             
                             // Actions always visible on mobile, hover on desktop
-                            if (_isHovered || MediaQuery.of(context).size.width < 700) 
+                            if (_isHovered || MediaQuery.of(context).size.width < 1200) 
                               _buildActionButtons(theme, context, isEncrypted),
                           ],
                         ),
@@ -353,10 +353,17 @@ class _NoteCardState extends State<NoteCard> with SingleTickerProviderStateMixin
           ),
           const SizedBox(width: 4),
         ],
+        // Silme Butonu - Her zaman görünür
         _ActionButton(
-          icon: Icons.more_horiz_rounded, // More actions instead of crowded row
+          icon: Icons.delete_rounded,
+          onTap: widget.onDelete,
+          color: Colors.red,
+          tooltip: 'Sil',
+        ),
+        const SizedBox(width: 4),
+        _ActionButton(
+          icon: Icons.more_horiz_rounded,
           onTap: () {
-             // Show bottom sheet or menu
              widget.onExport?.call();
           },
           color: theme.disabledColor,
