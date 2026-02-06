@@ -68,7 +68,7 @@ Bu proje MIT Lisansi (MIT License) altinda lisanslanmistir. Detaylar icin asagid
 ```text
 MIT License
 
-Copyright (c) 2025 Ufuk Kartal
+Copyright (c) 2026 Ufuk Kartal
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
