@@ -186,8 +186,8 @@ class _NoteListScreenState extends State<NoteListScreen> {
           
   // 2. Center Panel: Editor with Password Handling Wrapper
   Expanded(
-    flex: 3,
-    child: _selectedNote != null || _isCreatingNewNote
+  flex: 3,
+  child: _selectedNote != null || _isCreatingNewNote
         ? Builder(
             builder: (context) {
                // We need a way to store the password for split view too.
@@ -207,7 +207,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
                return MarkdownEditor(
                     key: ValueKey(_selectedNote?.id ?? 'new_note_${DateTime.now()}'), 
                     note: _selectedNote,
-                    onSave: (savedNote) {
+                    onSave: (savedNote) async {
                        // Find if original note was encrypted to re-encrypt?
                        // Actually, we don't have the password here easily without state.
                        // For now, in split view, let's just save. 
@@ -229,11 +229,13 @@ class _NoteListScreenState extends State<NoteListScreen> {
                           }
                        }
                       
-                      setState(() {
-                        _selectedNote = savedNote;
-                        _isCreatingNewNote = false;
-                      });
-                      Provider.of<NoteProvider>(context, listen: false).loadNotes();
+                      await _handleSave(savedNote, null);
+                      if (mounted) {
+                        setState(() {
+                          _selectedNote = savedNote;
+                          _isCreatingNewNote = false;
+                        });
+                      }
                     },
                     onCancel: () {
                       setState(() {
@@ -687,10 +689,11 @@ class _NoteListScreenState extends State<NoteListScreen> {
           builder: (context) => Scaffold(
             body: MarkdownEditor(
               note: newNote, // Şablonlu notu editöre ver
-              onSave: (savedNote) {
-                _handleSave(savedNote, null);
-                Navigator.of(context).pop();
-                Provider.of<NoteProvider>(context, listen: false).loadNotes();
+              onSave: (savedNote) async {
+                await _handleSave(savedNote, null);
+                if (context.mounted) {
+                  Navigator.of(context).pop();
+                }
               },
               onCancel: () {
                 Navigator.of(context).pop();
@@ -756,15 +759,30 @@ class _NoteListScreenState extends State<NoteListScreen> {
     }
   }
 
-  // Handle saving logic centrally
-  void _handleSave(Note savedNote, String? encryptionPassword) {
+  // Handle saving logic centrally (yeni/not-olanı ayırt ederek)
+  Future<void> _handleSave(Note savedNote, String? encryptionPassword) async {
+    final noteProvider = Provider.of<NoteProvider>(context, listen: false);
+
+    // Şifreli kayıt gerekiyorsa, içeriği önce şifrele
+    Note noteToPersist;
     if (encryptionPassword != null) {
-      // Re-encrypt before saving
-      final encryptedContent = EncryptionService.encryptWithPassword(savedNote.content, encryptionPassword);
-      final encryptedNote = savedNote.copyWith(content: encryptedContent, isEncrypted: true);
-       Provider.of<NoteProvider>(context, listen: false).updateNote(encryptedNote);
+      final encryptedContent = EncryptionService.encryptWithPassword(
+        savedNote.content,
+        encryptionPassword,
+      );
+      noteToPersist = savedNote.copyWith(
+        content: encryptedContent,
+        isEncrypted: true,
+      );
     } else {
-       Provider.of<NoteProvider>(context, listen: false).updateNote(savedNote);
+      noteToPersist = savedNote;
+    }
+
+    // Yeni not mu, mevcut not mu?
+    if (noteToPersist.id == null) {
+      await noteProvider.addNote(noteToPersist);
+    } else {
+      await noteProvider.updateNote(noteToPersist);
     }
   }
 
