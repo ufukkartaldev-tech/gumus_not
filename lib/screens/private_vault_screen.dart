@@ -110,7 +110,10 @@ class _PrivateVaultScreenState extends State<PrivateVaultScreen> {
     if (storedPassword != null) {
       try {
         await EncryptionService.initialize(storedPassword);
-        setState(() => _isUnlocked = true);
+        setState(() {
+          _isUnlocked = true;
+          _recoveryKey = EncryptionService.getRecoveryKey();
+        });
         _loadPrivateNotes();
         _showSuccess('Giriş başarılı');
       } catch (e) {
@@ -171,20 +174,24 @@ class _PrivateVaultScreenState extends State<PrivateVaultScreen> {
     try {
       await EncryptionService.initialize(_passwordController.text);
       
+      final currentPassword = _passwordController.text;
+      _passwordController.clear(); // BELLEK GÜVENLİĞİ: Şifreyi hemen sil
+      
       // Başarılı giriş
       setState(() {
         _isUnlocked = true;
+        _recoveryKey = EncryptionService.getRecoveryKey();
       });
       _loadPrivateNotes();
       _showSuccess('Kasa başarıyla açıldı');
-      _passwordController.clear();
 
       // Biyometrik destekleniyor ama açık değilse teklif et
       if (_canUseBiometrics && !(await BiometricService.isBiometricEnabled())) {
-        _showBiometricOfferDialog(_passwordController.text);
+        _showBiometricOfferDialog(currentPassword);
       }
     } catch (e) {
-      _showError('Yanlış şifre');
+      _passwordController.clear();
+      _showError('Yanlış şifre veya bozuk kasa');
     }
   }
 
@@ -211,9 +218,11 @@ class _PrivateVaultScreenState extends State<PrivateVaultScreen> {
       setState(() {
         _isUnlocked = true;
         _isSettingPassword = false;
-        _newPasswordController.clear();
-        _confirmPasswordController.clear();
+        _recoveryKey = EncryptionService.getRecoveryKey();
       });
+      
+      _newPasswordController.clear(); // BELLEK GÜVENLİĞİ
+      _confirmPasswordController.clear();
       
       _showSuccess('Kasa şifresi başarıyla ayarlandı');
       
@@ -221,6 +230,8 @@ class _PrivateVaultScreenState extends State<PrivateVaultScreen> {
         _showBiometricOfferDialog(password);
       }
     } catch (e) {
+      _newPasswordController.clear();
+      _confirmPasswordController.clear();
       _showError('Şifre ayarlanamadı: $e');
     }
   }
@@ -336,6 +347,7 @@ class _PrivateVaultScreenState extends State<PrivateVaultScreen> {
             IconButton(
               icon: const Icon(Icons.lock),
               onPressed: () {
+                EncryptionService.clear(); // BELLEK GÜVENLİĞİ: Anahtarları temizle
                 setState(() {
                   _isUnlocked = false;
                   _privateNotes.clear();
@@ -438,6 +450,55 @@ class _PrivateVaultScreenState extends State<PrivateVaultScreen> {
               });
             },
             child: const Text('Yeni Şifre Belirle'),
+          ),
+          TextButton.icon(
+            onPressed: _showRecoveryInputPrompt,
+            icon: const Icon(Icons.emergency_share),
+            label: const Text('Anahtarı Kullanarak Kurtar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showRecoveryInputPrompt() {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Kurtarma Anahtarı'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Lütfen 24 karakterlik kurtarma anahtarınızı girin:'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                hintText: 'Örn: XXXXXX-XXXXXX...',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('İptal')),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              final success = await EncryptionService.initializeWithRecoveryKey(controller.text.trim());
+              if (success) {
+                setState(() {
+                  _isUnlocked = true;
+                  _recoveryKey = EncryptionService.getRecoveryKey();
+                });
+                _loadPrivateNotes();
+                _showSuccess('Kasa kurtarıldı! Lütfen hemen şifrenizi güncelleyin.');
+              } else {
+                _showError('Geçersiz kurtarma anahtarı');
+              }
+            },
+            child: const Text('Kurtar'),
           ),
         ],
       ),

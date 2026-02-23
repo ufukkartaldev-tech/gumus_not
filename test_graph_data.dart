@@ -1,4 +1,4 @@
-import 'lib/models/note_model.dart';
+uttewimport 'lib/models/note_model.dart';
 
 // Test için örnek not verileri - Graf yapısı oluşturmak için
 List<Note> createTestNotes() {
