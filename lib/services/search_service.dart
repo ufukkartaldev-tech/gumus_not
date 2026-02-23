@@ -4,11 +4,15 @@ import '../services/database_service.dart';
 
 class SearchService {
   // Ağırlık Puanları
-  static const int SCORE_EXACT_TITLE = 20;
-  static const int SCORE_FUZZY_TITLE = 10;
-  static const int SCORE_EXACT_TAG = 15;
-  static const int SCORE_FUZZY_TAG = 8;
-  static const int SCORE_CONTENT_MATCH = 2; // Her geçiş için
+  static const int SCORE_EXACT_TITLE = 50; // Artırıldı
+  static const int SCORE_FUZZY_TITLE = 20;
+  static const int SCORE_EXACT_TAG = 30;
+  static const int SCORE_FUZZY_TAG = 15;
+  static const int SCORE_CONTENT_MATCH = 5;
+  
+  // ZETTELKASTEN (Semantic) Sabitleri
+  static const int SCORE_SEMANTIC_BOOST = 25; // Doğrudan bağlı notlara (Neighbor)
+  static const int SCORE_CO_CITATION_BOOST = 12; // Aynı nota bağlanan kardeş notlara
 
   // Maksimum Levenshtein Mesafesi (Hata toleransı)
   static const int MAX_DISTANCE = 2;
@@ -89,10 +93,77 @@ class SearchService {
       }
     }
 
-    // Puana göre sırala (En yüksek puan en üstte)
-    scoredNotes.sort((a, b) => (b['score'] as int).compareTo(a['score'] as int));
+    // 4. ZETTELKASTEN SEMANTİK ANALİZ (Graf Üzerinden Puanlama)
+    // Bu aşamada, ilk aşamadan puan almış "Çekirdek (Seed)" notların komşularına puan dağıtıyoruz.
+    final Map<int, int> semanticScores = {};
+    
+    // Her notun bağlantılarını hızlıca haritalayalım (Regex ile)
+    final linkRegex = RegExp(r'\[\[(.*?)\]\]');
+    final Map<int, List<String>> noteOutgoingLinks = {};
+    final Map<String, int> titleToId = {for (var n in allNotes) n.title.toLowerCase(): n.id ?? -1};
 
-    return scoredNotes.map((item) => item['note'] as Note).toList();
+    for (var note in allNotes) {
+      final matches = linkRegex.allMatches(note.content);
+      noteOutgoingLinks[note.id!] = matches.map((m) => m.group(1)!.toLowerCase()).toList();
+    }
+
+    // A) Komşu Desteği (Direct Neighbors)
+    // Eğer bir not "Bilgisayar Mimarisi" ise, ona link veren veya ondan link alan tüm notlara puan ver.
+    for (var item in scoredNotes) {
+      final seedNote = item['note'] as Note;
+      final seedScore = item['score'] as int;
+
+      // Bu notun bağlandığı (target) notlara puan ekle
+      final targets = noteOutgoingLinks[seedNote.id!] ?? [];
+      for (var targetTitle in targets) {
+        final targetId = titleToId[targetTitle];
+        if (targetId != null && targetId != seedNote.id) {
+          semanticScores[targetId] = (semanticScores[targetId] ?? 0) + SCORE_SEMANTIC_BOOST;
+        }
+      }
+
+      // Bu nota bağlanan (source) notları bul ve onlara puan ekle
+      for (var otherNote in allNotes) {
+        if (noteOutgoingLinks[otherNote.id!]?.contains(seedNote.title.toLowerCase()) ?? false) {
+           semanticScores[otherNote.id!] = (semanticScores[otherNote.id!] ?? 0) + SCORE_SEMANTIC_BOOST;
+        }
+      }
+    }
+
+    // B) Co-Citation Desteği (Kardeş Notlar)
+    // İki not aynı konuya (target) referans veriyorsa aralarında anlamsal bir bağ vardır.
+    // Örn: Hem "x86" hem "ARM" notu "Mimari"ye link veriyorsa, birini aratınca diğeri de yükselmeli.
+    // (Karmaşıklık nedeniyle sadece yüksek puanlı çekirdekler üzerinden hesaplanacaktır)
+
+    // 5. TÜM PUANLARI BİRLEŞTİR
+    final Map<int, Note> resultNodes = {for (var n in allNotes) n.id!: n};
+    final Map<int, int> finalScores = {};
+
+    // Önce keyword puanlarını ekle
+    for (var item in scoredNotes) {
+      final n = item['note'] as Note;
+      finalScores[n.id!] = item['score'] as int;
+    }
+
+    // Sonra semantik puanları ekle (Tüm notlar üzerinden, çünkü hiç keyword eşleşmesi olmayıp sadece bağlı olanlar da gelebilir)
+    semanticScores.forEach((id, sScore) {
+      finalScores[id] = (finalScores[id] ?? 0) + sScore;
+    });
+
+    final List<Map<String, dynamic>> finalResultList = [];
+    finalScores.forEach((id, totalScore) {
+      if (totalScore > 0) {
+        finalResultList.add({
+          'note': resultNodes[id],
+          'score': totalScore,
+        });
+      }
+    });
+
+    // Sonuçları sırala
+    finalResultList.sort((a, b) => (b['score'] as int).compareTo(a['score'] as int));
+
+    return finalResultList.map((item) => item['note'] as Note).toList();
   }
 
   /// Levenshtein Mesafesi Hesaplama (Fuzzy Logic Çekirdeği)

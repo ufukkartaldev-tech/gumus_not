@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:sqflite/sqflite.dart';
 import '../services/database_service.dart';
+import '../services/search_service.dart';
 import '../models/note_model.dart';
 
 class SqlQueryConsole extends StatefulWidget {
@@ -96,6 +97,31 @@ SELECT * FROM notes ORDER BY updated_at DESC LIMIT 10;''';
     final stopwatch = Stopwatch()..start();
 
     try {
+      if (query.toUpperCase().startsWith('SMART_SEARCH')) {
+        // ZETTELKASTEN SMART SEARCH LOGIC
+        final searchTerm = RegExp(r"SMART_SEARCH\s+'(.*)'", caseSensitive: false).firstMatch(query)?.group(1);
+        if (searchTerm == null) throw Exception("Hata: SMART_SEARCH 'aranacak_kelime' formatında olmalıdır.");
+
+        final allNotes = await DatabaseService.getAllNotes();
+        final searchResults = await SearchService.searchNotes(searchTerm, allNotes);
+
+        final List<Map<String, dynamic>> finalMaps = searchResults.map((n) => {
+          'id': n.id,
+          'title': n.title,
+          'tags': n.tags.join(', '),
+          'matching': 'Semantic/Zettelkasten',
+          'updated_at': DateTime.fromMillisecondsSinceEpoch(n.updatedAt).toString(),
+        }).toList();
+
+        stopwatch.stop();
+        setState(() {
+          _results = finalMaps;
+          _executionTime = stopwatch.elapsedMilliseconds;
+          _isLoading = false;
+        });
+        return; // İşlem bitti
+      }
+
       final db = await DatabaseService.database;
       
       // Create backup for SELECT queries
@@ -612,6 +638,10 @@ SELECT * FROM notes ORDER BY updated_at DESC LIMIT 10;''';
   }
 
   static const List<Map<String, dynamic>> _queryExamples = [
+    {
+      'name': 'Smart (Semantic) Search',
+      'query': "SMART_SEARCH 'Bilgisayar Mimarisi';",
+    },
     {
       'name': 'Son 10 Not',
       'query': 'SELECT * FROM notes ORDER BY updated_at DESC LIMIT 10;',
