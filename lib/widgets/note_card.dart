@@ -71,259 +71,249 @@ class _NoteCardState extends State<NoteCard> with SingleTickerProviderStateMixin
         setState(() => _isHovered = false);
         _controller.reverse();
       },
-      child: AnimatedBuilder(
-        animation: _scaleAnimation,
-        builder: (context, child) => Transform.scale(
-          scale: _scaleAnimation.value,
-          child: child,
-        ),
-        child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-          decoration: BoxDecoration(
-            color: theme.cardTheme.color,
-            borderRadius: const BorderRadius.all(Radius.circular(20)), // Smoother corners
-            boxShadow: [
-              // Dynamic shadow based on hover state
-              BoxShadow(
-                color: accentColor.withValues(alpha: _isHovered ? 0.2 : 0.05),
-                blurRadius: _isHovered ? 16 : 6,
-                offset: Offset(0, _isHovered ? 8 : 4),
-                spreadRadius: _isHovered ? 1 : 0,
-              ),
-              // Subtle ambient shadow
-              if (!_isHovered)
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.04),
-                  blurRadius: 2,
-                  offset: const Offset(0, 1),
-                ),
-            ],
-            border: Border.all(
-              color: _isHovered ? accentColor.withValues(alpha: 0.5) : theme.dividerColor.withValues(alpha: isDark ? 0.2 : 0.6),
-              width: _isHovered ? 1.5 : 1,
-            ),
+      child: Hero(
+        tag: 'note_${widget.note.id ?? 'new_${widget.note.createdAt}'}',
+        child: AnimatedBuilder(
+          animation: _scaleAnimation,
+          builder: (context, child) => Transform.scale(
+            scale: _scaleAnimation.value,
+            child: child,
           ),
-          child: Material(
-            color: Colors.transparent,
-            borderRadius: BorderRadius.circular(20),
-            child: InkWell(
-              onTap: widget.onTap,
-              borderRadius: BorderRadius.circular(20),
-              splashColor: accentColor.withValues(alpha: 0.1),
-              hoverColor: Colors.transparent, 
-              child: Stack(
-                children: [
-                  // Decorative background gradient blend (Rich Glass Effect)
-                  if (noteColor != null)
-                  Positioned.fill(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            noteColor.withValues(alpha: isDark ? 0.15 : 0.1),
-                            noteColor.withValues(alpha: isDark ? 0.05 : 0.02),
-                            Colors.transparent,
-                          ],
-                          stops: const [0.0, 0.6, 1.0],
-                        ),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                    ),
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+            decoration: BoxDecoration(
+              color: theme.cardTheme.color,
+              borderRadius: const BorderRadius.all(Radius.circular(20)),
+              boxShadow: [
+                BoxShadow(
+                  color: accentColor.withValues(alpha: _isHovered ? 0.2 : 0.05),
+                  blurRadius: _isHovered ? 16 : 6,
+                  offset: Offset(0, _isHovered ? 8 : 4),
+                  spreadRadius: _isHovered ? 1 : 0,
+                ),
+                if (!_isHovered)
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.04),
+                    blurRadius: 2,
+                    offset: const Offset(0, 1),
                   ),
-                  
-                  // Encrypted Pattern Overlay
-                  if (isEncrypted)
+              ],
+              border: Border.all(
+                color: _isHovered ? accentColor.withValues(alpha: 0.5) : theme.dividerColor.withValues(alpha: isDark ? 0.2 : 0.6),
+                width: _isHovered ? 1.5 : 1,
+              ),
+            ),
+            child: Material(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(20),
+              child: InkWell(
+                onTap: widget.onTap,
+                borderRadius: BorderRadius.circular(20),
+                splashColor: accentColor.withValues(alpha: 0.1),
+                hoverColor: Colors.transparent, 
+                child: Stack(
+                  children: [
+                    if (noteColor != null)
                     Positioned.fill(
-                      child: Opacity(
-                        opacity: 0.03,
-                        child: CustomPaint(
-                          painter: GridPainter(color: accentColor),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              noteColor.withValues(alpha: isDark ? 0.15 : 0.1),
+                              noteColor.withValues(alpha: isDark ? 0.05 : 0.02),
+                              Colors.transparent,
+                            ],
+                            stops: const [0.0, 0.6, 1.0],
+                          ),
+                          borderRadius: BorderRadius.circular(20),
                         ),
                       ),
                     ),
+                    
+                    if (isEncrypted)
+                      Positioned.fill(
+                        child: Opacity(
+                          opacity: 0.03,
+                          child: CustomPaint(
+                            painter: GridPainter(color: accentColor),
+                          ),
+                        ),
+                      ),
 
-                  Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Header: Title and Date/Actions
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Title Section
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      // Decorative marker or Lock Icon
-                                      if (isEncrypted) ...[
-                                         Container(
-                                            padding: const EdgeInsets.all(4),
-                                            decoration: BoxDecoration(
-                                               color: Colors.orange.withValues(alpha: 0.2),
-                                               shape: BoxShape.circle,
-                                            ),
-                                            child: const Icon(Icons.lock_rounded, size: 14, color: Colors.orange),
-                                         ),
-                                         const SizedBox(width: 8),
-                                      ] else if (noteColor != null) ...[
-                                        Container(
-                                          width: 10,
-                                          height: 10,
-                                          decoration: BoxDecoration(
-                                            color: noteColor,
-                                            shape: BoxShape.circle,
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: noteColor.withValues(alpha: 0.4),
-                                                blurRadius: 4,
-                                                spreadRadius: 1,
-                                              )
-                                            ]
-                                          ),
-                                        ),
-                                        const SizedBox(width: 10),
-                                      ],
-                                      
-                                      Expanded(
-                                        child: Text(
-                                          widget.note.title.isEmpty ? 'Başlıksız Not' : widget.note.title,
-                                          style: theme.textTheme.titleMedium?.copyWith(
-                                            fontWeight: FontWeight.w800, // Bolder
-                                            fontSize: 18,
-                                            height: 1.2,
-                                            color: theme.textTheme.titleMedium?.color,
-                                          ),
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 8),
-                                    // Meta Info
+                    Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
                                     Row(
                                       children: [
-                                         Icon(Icons.access_time_rounded, size: 12, color: theme.disabledColor),
-                                         const SizedBox(width: 4),
-                                         Text(
-                                          _formatDate(widget.note.updatedAt),
-                                          style: theme.textTheme.bodySmall?.copyWith(
-                                            fontWeight: FontWeight.w500,
-                                            fontSize: 11,
-                                            color: theme.disabledColor,
+                                        if (isEncrypted) ...[
+                                           Container(
+                                              padding: const EdgeInsets.all(4),
+                                              decoration: BoxDecoration(
+                                                 color: Colors.orange.withValues(alpha: 0.2),
+                                                 shape: BoxShape.circle,
+                                              ),
+                                              child: const Icon(Icons.lock_rounded, size: 14, color: Colors.orange),
+                                           ),
+                                           const SizedBox(width: 8),
+                                        ] else if (noteColor != null) ...[
+                                          Container(
+                                            width: 10,
+                                            height: 10,
+                                            decoration: BoxDecoration(
+                                              color: noteColor,
+                                              shape: BoxShape.circle,
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: noteColor.withValues(alpha: 0.4),
+                                                  blurRadius: 4,
+                                                  spreadRadius: 1,
+                                                )
+                                              ]
+                                            ),
+                                          ),
+                                          const SizedBox(width: 10),
+                                        ],
+                                        
+                                        Expanded(
+                                          child: Text(
+                                            widget.note.title.isEmpty ? 'Başlıksız Not' : widget.note.title,
+                                            style: theme.textTheme.titleMedium?.copyWith(
+                                              fontWeight: FontWeight.w800,
+                                              fontSize: 18,
+                                              height: 1.2,
+                                              color: theme.textTheme.titleMedium?.color,
+                                            ),
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
                                           ),
                                         ),
-                                        if (!isEncrypted) ...[
-                                          const SizedBox(width: 8),
-                                          const Text('•', style: TextStyle(fontSize: 10, color: Colors.grey)),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            '${_calculateReadingTime(widget.note.content)} dk',
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                      Row(
+                                        children: [
+                                           Icon(Icons.access_time_rounded, size: 12, color: theme.disabledColor),
+                                           const SizedBox(width: 4),
+                                           Text(
+                                            _formatDate(widget.note.updatedAt),
                                             style: theme.textTheme.bodySmall?.copyWith(
+                                              fontWeight: FontWeight.w500,
                                               fontSize: 11,
                                               color: theme.disabledColor,
                                             ),
                                           ),
-                                        ]
-                                      ],
-                                    ),
-                                ],
+                                          if (!isEncrypted) ...[
+                                            const SizedBox(width: 8),
+                                            const Text('•', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              '${_calculateReadingTime(widget.note.content)} dk',
+                                              style: theme.textTheme.bodySmall?.copyWith(
+                                                fontSize: 11,
+                                                color: theme.disabledColor,
+                                              ),
+                                            ),
+                                          ]
+                                        ],
+                                      ),
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
-                        
-                        // Excerpt (Blurred if encrypted)
-                        const SizedBox(height: 12),
-                        if (isEncrypted)
-                           Container(
-                              width: double.infinity,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                 borderRadius: BorderRadius.circular(4),
-                                 gradient: LinearGradient(
-                                    colors: [
-                                       theme.disabledColor.withValues(alpha: 0.1),
-                                       theme.disabledColor.withValues(alpha: 0.05),
-                                    ],
-                                 ),
-                              ),
-                              child: Center(
-                                 child: Text(
-                                    '•••••••••••••••••',
-                                    style: TextStyle(letterSpacing: 4, color: theme.disabledColor.withValues(alpha: 0.5)),
-                                 ),
-                              ),
-                           )
-                        else if (widget.note.excerpt.isNotEmpty)
-                          Text(
-                            widget.note.excerpt,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              height: 1.6,
-                              fontSize: 14,
-                              color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.85),
-                            ),
-                            maxLines: 4,
-                            overflow: TextOverflow.ellipsis,
+                            ],
                           ),
+                          
+                          const SizedBox(height: 12),
+                          if (isEncrypted)
+                             Container(
+                                width: double.infinity,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                   borderRadius: BorderRadius.circular(4),
+                                   gradient: LinearGradient(
+                                      colors: [
+                                         theme.disabledColor.withValues(alpha: 0.1),
+                                         theme.disabledColor.withValues(alpha: 0.05),
+                                      ],
+                                   ),
+                                ),
+                                child: Center(
+                                   child: Text(
+                                      '•••••••••••••••••',
+                                      style: TextStyle(letterSpacing: 4, color: theme.disabledColor.withValues(alpha: 0.5)),
+                                   ),
+                                ),
+                             )
+                          else if (widget.note.excerpt.isNotEmpty)
+                            Text(
+                              widget.note.excerpt,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                height: 1.6,
+                                fontSize: 14,
+                                color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.85),
+                              ),
+                              maxLines: 4,
+                              overflow: TextOverflow.ellipsis,
+                            ),
 
-                        // Footer: Tags, Links and Actions
-                        const SizedBox(height: 16),
-                        Row(
-                          children: [
-                             // Pinned Indicator
-                             if (widget.isPinned)
-                               Padding(
-                                 padding: const EdgeInsets.only(right: 8.0),
-                                 child: Tooltip(
-                                   message: 'Sabitlenmiş',
-                                   child: Icon(Icons.push_pin_rounded, size: 16, color: accentColor),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                               if (widget.isPinned)
+                                 Padding(
+                                   padding: const EdgeInsets.only(right: 8.0),
+                                   child: Tooltip(
+                                     message: 'Sabitlenmiş',
+                                     child: Icon(Icons.push_pin_rounded, size: 16, color: accentColor),
+                                   ),
                                  ),
-                               ),
 
-                             // Link Count Badge
-                             if (linkCount > 0) 
-                               Container(
-                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                 decoration: BoxDecoration(
-                                   color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                                   borderRadius: BorderRadius.circular(8),
-                                   border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.2)),
-                                 ),
-                                 child: Row(
-                                   mainAxisSize: MainAxisSize.min,
-                                   children: [
-                                     Icon(Icons.link_rounded, size: 12, color: theme.colorScheme.primary),
-                                     const SizedBox(width: 4),
-                                     Text(
-                                       '$linkCount',
-                                       style: TextStyle(
-                                         color: theme.colorScheme.primary,
-                                         fontWeight: FontWeight.w700,
-                                         fontSize: 11
+                               if (linkCount > 0) 
+                                 Container(
+                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                   decoration: BoxDecoration(
+                                     color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                                     borderRadius: BorderRadius.circular(8),
+                                     border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.2)),
+                                   ),
+                                   child: Row(
+                                     mainAxisSize: MainAxisSize.min,
+                                     children: [
+                                       Icon(Icons.link_rounded, size: 12, color: theme.colorScheme.primary),
+                                       const SizedBox(width: 4),
+                                       Text(
+                                         '$linkCount',
+                                         style: TextStyle(
+                                           color: theme.colorScheme.primary,
+                                           fontWeight: FontWeight.w700,
+                                           fontSize: 11
+                                         ),
                                        ),
-                                     ),
-                                   ],
+                                     ],
+                                   ),
                                  ),
-                               ),
-                            
-                            const Spacer(),
-                            
-                            // Actions always visible on mobile, hover on desktop
-                            if (_isHovered || MediaQuery.of(context).size.width < 1200) 
-                              _buildActionButtons(theme, context, isEncrypted),
-                          ],
-                        ),
-                      ],
+                              
+                              const Spacer(),
+                              
+                              if (_isHovered || MediaQuery.of(context).size.width < 1200) 
+                                _buildActionButtons(theme, context, isEncrypted),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

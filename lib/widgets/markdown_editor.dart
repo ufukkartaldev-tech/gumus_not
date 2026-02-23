@@ -245,13 +245,19 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
       body: SafeArea(
         child: Stack(
           children: [
-            Column(
-              children: [
-                 Expanded(
-                   child: _isPreviewMode ? _buildPreview() : _buildEditor(context),
-                 ),
-                 if (!_isFocusMode) const SizedBox(height: 80), 
-              ],
+            Hero(
+              tag: 'note_${widget.note?.id ?? 'new_${widget.note?.createdAt}'}',
+              child: Material(
+                color: Colors.transparent,
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: _isPreviewMode ? _buildPreview() : _buildEditor(context),
+                    ),
+                    if (!_isFocusMode) const SizedBox(height: 80), 
+                  ],
+                ),
+              ),
             ),
             if (!_isFocusMode && !_isPreviewMode)
               Positioned(

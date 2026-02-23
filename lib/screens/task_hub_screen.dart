@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter/services.dart';
 import '../models/note_model.dart';
+import '../widgets/confetti_effect.dart';
 import '../providers/note_provider.dart';
 import 'dart:ui';
 
@@ -214,26 +216,38 @@ class _TaskHubScreenState extends State<TaskHubScreen> with SingleTickerProvider
   }
 
   Widget _buildTaskCard(BuildContext context, TaskItem item, NoteProvider provider) {
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 400),
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
+          // Completion Glow Effect
+          if (item.isCompleted)
+            BoxShadow(
+              color: Colors.green.withOpacity(0.2),
+              blurRadius: 15,
+              spreadRadius: 2,
+            ),
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
         ],
+        border: item.isCompleted 
+          ? Border.all(color: Colors.green.withOpacity(0.3), width: 1)
+          : null,
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
         child: IntrinsicHeight(
           child: Row(
             children: [
-              // Left Accent Line
-              Container(
+              // Left Accent Line with Animated Color
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 400),
                 width: 6,
                 color: item.isCompleted ? Colors.green : Theme.of(context).primaryColor,
               ),
@@ -333,6 +347,11 @@ class _TaskHubScreenState extends State<TaskHubScreen> with SingleTickerProvider
     );
 
     await noteProvider.updateNote(updatedNote);
+    
+    if (newValue) {
+      HapticFeedback.lightImpact();
+      ConfettiEffect.show(context);
+    }
     
     if (mounted) {
        ScaffoldMessenger.of(context).showSnackBar(

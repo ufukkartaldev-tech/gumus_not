@@ -737,20 +737,24 @@ class _NoteListScreenState extends State<NoteListScreen> {
       });
     } else {
       Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (context) => Scaffold(
+        PageRouteBuilder(
+          transitionDuration: const Duration(milliseconds: 400),
+          pageBuilder: (context, animation, secondaryAnimation) => Scaffold(
             body: MarkdownEditor(
               note: note,
-              onSave: (savedNote) {
-                _handleSave(savedNote, encryptionPassword);
-                Navigator.of(context).pop();
-                Provider.of<NoteProvider>(context, listen: false).loadNotes();
+              onSave: (updatedNote) async {
+                await _handleSave(updatedNote, encryptionPassword);
+                if (mounted) {
+                   Navigator.pop(context);
+                   Provider.of<NoteProvider>(context, listen: false).loadNotes();
+                }
               },
-              onCancel: () {
-                Navigator.of(context).pop();
-              },
+              onCancel: () => Navigator.pop(context),
             ),
           ),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(opacity: animation, child: child);
+          },
         ),
       );
     }
