@@ -46,6 +46,11 @@ class SearchService {
     }
 
     for (var note in candidateNotes) {
+      // PERFORMANS: Şifreli notların içeriğine erişemiyoruz, bu yüzden onları 
+      // sadece başlık/etiket için süz veya içerik araması varsa direkt atla?
+      // Şimdilik sadece içerik araması kısmında süzüyoruz ama döngü başında süzmek daha mantıklı.
+      // Eğer not şifreliyse ve biz içerikte kelime arıyorsak, bu notu sadece başlığından yakalayabiliriz.
+      
       int score = 0;
       final title = note.title.toLowerCase();
       final content = note.content.toLowerCase();
@@ -77,14 +82,11 @@ class SearchService {
       }
 
       // 3. İÇERİK KONTROLÜ
-      // Şifreli notların içeriğinde arama yapılamaz (Güvenlik)
       if (!note.isEncrypted && !STOP_WORDS.contains(normalizedQuery)) {
-        // Hızlı sayım için split yerine RegExp match count
         final contentMatches = RegExp(RegExp.escape(normalizedQuery)).allMatches(content).length;
         score += contentMatches * SCORE_CONTENT_MATCH;
       }
 
-      // Eğer puan > 0 ise sonuçlara ekle
       if (score > 0) {
         scoredNotes.add({
           'note': note,

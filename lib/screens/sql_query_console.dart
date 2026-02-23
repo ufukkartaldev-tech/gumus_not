@@ -603,34 +603,39 @@ SELECT * FROM notes ORDER BY updated_at DESC LIMIT 10;''';
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.grey.shade300),
       ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
+      child: Scrollbar(
+        thumbVisibility: true,
+        thickness: 8,
+        radius: const Radius.circular(4),
         child: SingleChildScrollView(
-          child: DataTable(
-            columns: columns.map((column) {
-              return DataColumn(
-                label: Text(
-                  column,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'monospace',
-                  ),
-                ),
-              );
-            }).toList(),
-            rows: _results.map((row) {
-              return DataRow(
-                cells: columns.map((column) {
-                  final value = row[column];
-                  return DataCell(
-                    Text(
-                      value?.toString() ?? 'NULL',
-                      style: const TextStyle(fontFamily: 'monospace'),
+          scrollDirection: Axis.horizontal,
+          child: SingleChildScrollView(
+            child: DataTable(
+              columns: columns.map((column) {
+                return DataColumn(
+                  label: Text(
+                    column,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'monospace',
                     ),
-                  );
-                }).toList(),
-              );
-            }).toList(),
+                  ),
+                );
+              }).toList(),
+              rows: _results.map((row) {
+                return DataRow(
+                  cells: columns.map((column) {
+                    final value = row[column];
+                    return DataCell(
+                      Text(
+                        value?.toString() ?? 'NULL',
+                        style: const TextStyle(fontFamily: 'monospace'),
+                      ),
+                    );
+                  }).toList(),
+                );
+              }).toList(),
+            ),
           ),
         ),
       ),
