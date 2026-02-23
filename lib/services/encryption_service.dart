@@ -25,12 +25,12 @@ class EncryptionService {
   EncryptionService._();
 
   /// Kasa ilk kez kurulurken veya şifre ile açılırken kullanılır.
-  static Future<void> initialize(String password) async {
+  static Future<void> initialize(String password, {String? recoveryKey}) async {
     final wrappedPW = await _storage.read(key: _storageKeyWrappedPW);
     
     if (wrappedPW == null) {
       // YENİ KURULUM: Master Key ve Recovery Key üret
-      await _setupNewVault(password);
+      await _setupNewVault(password, recoveryKey: recoveryKey);
     } else {
       // MEVCUT KASA: Master Key'i şifre ile çöz (Unwrap)
       await _unlockWithPassword(password, wrappedPW);
@@ -56,12 +56,12 @@ class EncryptionService {
     }
   }
 
-  static Future<void> _setupNewVault(String password) async {
+  static Future<void> _setupNewVault(String password, {String? recoveryKey}) async {
     // 1. Rastgele Master Key üret (32 byte / 256 bit)
     final mk = Uint8List.fromList(List.generate(32, (index) => Random.secure().nextInt(256)));
     
-    // 2. Rastgele Kurtarma Anahtarı üret (24 karakterlik güvenli bir kod)
-    _recoveryKey = _generateSecureRandomString(24);
+    // 2. Kurtarma Anahtarı belirle (varsa kullan, yoksa üret)
+    _recoveryKey = recoveryKey ?? _generateSecureRandomString(24);
     
     // 3. Şifre ve Kurtarma Anahtarı ile Master Key'i paketle (Wrap)
     final wrappedPW = await _wrapKey(mk, password);
@@ -182,6 +182,37 @@ class EncryptionService {
     final encoded = Encrypted.fromBase64(parts[2]);
     final key = Key(Uint8List.fromList(sha256.convert(utf8.encode(password + salt.base64)).bytes));
     return Encrypter(AES(key)).decrypt(encoded, iv: iv);
+  }
+
+  /// Kurtarma anahtarının geçerli olup olmadığını doğrular
+  static bool verifyRecoveryKey(String recoveryKey, String password) {
+    try {
+      // Base64 format kontrolü
+      final decoded = base64.decode(recoveryKey);
+      if (decoded.length != 32) return false; // 256 bit = 32 byte
+      
+      // Kurtarma anahtarı formatı geçerli, gerçek doğrulama için attemptRecovery kullanılmalı
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// Kurtarma anahtarı ile kurtarma işlemi yapar
+  static Future<bool> attemptRecovery(String recoveryKey) async {
+    try {
+      final wrappedRec = await _storage.read(key: _storageKeyWrappedRecovery);
+      if (wrappedRec == null) return false;
+
+      final mkBytes = await _unwrapKey(wrappedRec, recoveryKey);
+      _masterKey = mkBytes;
+      _encrypter = Encrypter(AES(Key(_masterKey!)));
+      _recoveryKey = recoveryKey;
+      
+      return true;
+    } catch (e) {
+      return false;
+    }
   }
 }
 

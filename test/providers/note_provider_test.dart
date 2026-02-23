@@ -8,7 +8,7 @@ import 'package:flutter/material.dart';
 
 void main() {
   // Helper function to clear test database
-  Future<void> _clearTestDatabase() async {
+  Future<void> clearTestDatabase() async {
     try {
       final db = await DatabaseService.database;
       await db.delete('notes');
@@ -34,7 +34,7 @@ void main() {
       SharedPreferences.setMockInitialValues({});
       
       // Clear database between tests
-      await _clearTestDatabase();
+      await clearTestDatabase();
       
       provider = NoteProvider();
       await provider.loadNotes();
@@ -43,7 +43,7 @@ void main() {
     tearDown(() async {
       provider.dispose();
       // Clear database after each test
-      await _clearTestDatabase();
+      await clearTestDatabase();
     });
 
     test('Provider initializes correctly', () async {

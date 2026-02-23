@@ -157,15 +157,22 @@ class DashboardScreen extends StatelessWidget {
               scrollDirection: Axis.horizontal,
               itemCount: recentNotes.length,
               itemBuilder: (context, index) {
+                final provider = Provider.of<NoteProvider>(context, listen: false);
                 return SizedBox(
                   width: 300,
                   child: NoteCard(
                     note: recentNotes[index],
                     isPinned: recentNotes[index].tags.contains('sabit'),
                     onTap: () {
-                       // Hero navigation will trigger in NoteCard's onTap wrapper if we pop back to list?
-                       // Or we navigate directly
-                       Navigator.pushNamed(context, '/note-editor', arguments: recentNotes[index]);
+                      Navigator.pushNamed(context, '/note-editor', arguments: recentNotes[index]);
+                    },
+                    onEdit: () {
+                      Navigator.pushNamed(context, '/note-editor', arguments: recentNotes[index]);
+                    },
+                    onDelete: () {
+                      // Silme onayı alıp silebiliriz veya sessizce silebiliriz
+                      // Ancak dashboard'da güvenli tarafta kalalım. 
+                      provider.deleteNote(recentNotes[index].id!);
                     },
                   ),
                 );

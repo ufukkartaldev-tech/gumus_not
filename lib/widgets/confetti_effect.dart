@@ -13,7 +13,7 @@ class ConfettiEffect {
 
     for (int i = 0; i < 15; i++) {
       late OverlayEntry entry;
-      final color = [Colors.gold, Colors.yellow, Colors.green, Colors.blue, Colors.pink][random.nextInt(5)];
+      final color = [Colors.yellow, Colors.green, Colors.blue, Colors.pink, Colors.orange][random.nextInt(5)];
       final angle = random.nextDouble() * 2 * pi;
       final distance = 50.0 + random.nextDouble() * 50.0;
       final duration = Duration(milliseconds: 600 + random.nextInt(400));
@@ -71,7 +71,7 @@ class _ParticleState extends State<_Particle> with SingleTickerProviderStateMixi
     _positionAnimation = Tween<Offset>(
       begin: widget.startPosition,
       end: widget.targetPosition,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.outSecondary));
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
 
     _opacityAnimation = Tween<double>(begin: 1.0, end: 0.0).animate(
       CurvedAnimation(parent: _controller, curve: const Interval(0.6, 1.0)),

@@ -38,7 +38,9 @@ class PdfExportService {
             alignment: pw.Alignment.centerRight,
             margin: const pw.EdgeInsets.only(top: 20),
             padding: const pw.EdgeInsets.only(top: 10),
-            border: const pw.Border(top: pw.BorderSide(color: PdfColors.grey300, width: 0.5)),
+            decoration: pw.BoxDecoration(
+              border: pw.Border(top: pw.BorderSide(color: PdfColors.grey300, width: 0.5)),
+            ),
             child: pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
@@ -59,7 +61,9 @@ class PdfExportService {
             // Başlık Bölümü
             pw.Container(
               padding: const pw.EdgeInsets.only(bottom: 10),
-              border: const pw.Border(bottom: pw.BorderSide(color: PdfColors.blue900, width: 2)),
+              decoration: pw.BoxDecoration(
+                border: pw.Border(bottom: pw.BorderSide(color: PdfColors.blue900, width: 2)),
+              ),
               child: pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: pw.CrossAxisAlignment.end,
@@ -132,7 +136,7 @@ class PdfExportService {
               } else {
                 return pw.Paragraph(
                   text: trimmed,
-                  style: pw.TextStyle(font: font, fontSize: 11, lineHeight: 1.5, color: PdfColors.grey900),
+                  style: pw.TextStyle(font: font, fontSize: 11, color: PdfColors.grey900),
                   textAlign: pw.TextAlign.justify,
                 );
               }

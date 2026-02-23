@@ -128,4 +128,26 @@ $convertedContent
 \\end{document}
 ''';
   }
+
+  static String generateLatexReport(String title, String author, String content) {
+    final convertedContent = convertToLatex(content);
+    
+    return '''
+\\documentclass{article}
+\\usepackage[utf8]{inputenc}
+\\usepackage{geometry}
+\\geometry{a4paper, margin=1in}
+
+\\title{$title}
+\\author{$author}
+\\date{\\today}
+
+\\begin{document}
+\\maketitle
+
+$convertedContent
+
+\\end{document}
+''';
+  }
 }
