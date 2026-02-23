@@ -15,6 +15,10 @@ class _TaskHubScreenState extends State<TaskHubScreen> with SingleTickerProvider
   bool _showCompleted = true;
   late AnimationController _animationController;
   final ScrollController _scrollController = ScrollController();
+  
+  // PERFORMANS: Görevleri önbelleğe alalım
+  List<TaskItem>? _cachedTasks;
+  int? _lastNotesTimestamp;
 
   @override
   void initState() {
@@ -38,7 +42,17 @@ class _TaskHubScreenState extends State<TaskHubScreen> with SingleTickerProvider
       backgroundColor: Theme.of(context).colorScheme.background,
       body: Consumer<NoteProvider>(
         builder: (context, noteProvider, child) {
-          final tasks = _extractTasks(noteProvider.notes);
+          // Önbellek kontrolü: Eğer notların toplam sayısı veya son güncelleme zamanı değişmediyse 
+          // (Veya basitlik için not referansı değişmediyse) eski sonuçları kullan.
+          // NoteProvider'da notlar her değiştiğinde liste referansı yenilendiği için bu iyi bir gösterge.
+          final currentNotes = noteProvider.notes;
+          
+          if (_cachedTasks == null || _lastNotesTimestamp != _calculateNotesHash(currentNotes)) {
+             _cachedTasks = _extractTasks(currentNotes);
+             _lastNotesTimestamp = _calculateNotesHash(currentNotes);
+          }
+
+          final tasks = _cachedTasks!;
           final filteredTasks = _showCompleted ? tasks : tasks.where((t) => !t.isCompleted).toList();
           final completionRate = tasks.isEmpty ? 0.0 : tasks.where((t) => t.isCompleted).length / tasks.length;
 
@@ -278,7 +292,8 @@ class _TaskHubScreenState extends State<TaskHubScreen> with SingleTickerProvider
 
   List<TaskItem> _extractTasks(List<Note> notes) {
     List<TaskItem> tasks = [];
-    final regex = RegExp(r'^- \[([ xX])\] (.*)', multiLine: true);
+    // İYİLEŞTİRİLMİŞ REGEX: Satır başındaki boşlukları (indentation) destekler
+    final regex = RegExp(r'^\s*- \[([ xX])\] (.*)', multiLine: true);
 
     for (var note in notes) {
       if (note.isEncrypted) continue; // Şifreli notları tarama (Güvenlik)
@@ -334,6 +349,13 @@ class _TaskHubScreenState extends State<TaskHubScreen> with SingleTickerProvider
 
   void _navigateToNote(BuildContext context, Note note) {
     Navigator.of(context).pushNamed('/note-editor', arguments: note);
+  }
+
+  // Notların durumunu hızlıca kontrol etmek için basit bir hash/timestamp mantığı
+  int _calculateNotesHash(List<Note> notes) {
+    if (notes.isEmpty) return 0;
+    // Tüm notların updatedAt değerlerini toplayarak basit bir "değişim" işareti oluşturalım
+    return notes.fold(0, (sum, note) => sum + note.updatedAt + note.id!);
   }
 }
 
