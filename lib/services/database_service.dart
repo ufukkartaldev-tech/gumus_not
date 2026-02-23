@@ -202,6 +202,42 @@ class DatabaseService {
     }
   }
 
+  static Future<List<Note>> getRecentNotes({int limit = 5}) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'notes',
+      orderBy: 'updated_at DESC',
+      limit: limit,
+    );
+    return List.generate(maps.length, (i) => Note.fromMap(maps[i]));
+  }
+
+  static Future<List<Note>> getPendingTasks({int limit = 10}) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'notes',
+      where: 'content LIKE ?',
+      whereArgs: ['% - [ %'],
+      orderBy: 'updated_at DESC',
+      limit: limit,
+    );
+    return List.generate(maps.length, (i) => Note.fromMap(maps[i]));
+  }
+
+  static Future<Map<String, dynamic>> getDatabaseStats() async {
+    final db = await database;
+    
+    final totalNotesResult = await db.rawQuery('SELECT COUNT(*) as count FROM notes');
+    final totalTasksResult = await db.rawQuery('SELECT COUNT(*) as count FROM notes WHERE content LIKE "% - [ %"');
+    final lastNoteResult = await db.query('notes', orderBy: 'updated_at DESC', limit: 1);
+    
+    return {
+      'totalNotes': totalNotesResult.first['count'],
+      'totalTasks': totalTasksResult.first['count'],
+      'lastNoteDate': lastNoteResult.isNotEmpty ? lastNoteResult.first['updated_at'] : null,
+    };
+  }
+
   static Future<void> close() async {
     final db = await database;
     await db.close();

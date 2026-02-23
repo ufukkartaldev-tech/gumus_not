@@ -3,6 +3,9 @@ import 'dashboard_screen.dart';
 import 'note_list_screen.dart';
 import 'task_hub_screen.dart';
 import 'graph_view_screen.dart';
+import 'widget_screen.dart';
+import '../services/sharing_service.dart';
+import '../services/widget_service.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -13,13 +16,26 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
+  final SharingService _sharingService = SharingService();
+  final WidgetService _widgetService = WidgetService();
 
   final List<Widget> _screens = [
     const DashboardScreen(),
     const NoteListScreen(),
     const TaskHubScreen(),
     const GraphViewScreen(),
+    const WidgetScreen(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    // Paylaşım servisini başlat
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _sharingService.initialize(context);
+      _widgetService.startPeriodicUpdates();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -71,6 +87,11 @@ class _MainScreenState extends State<MainScreen> {
                 icon: Icon(Icons.hub_rounded),
                 activeIcon: Icon(Icons.hub_rounded),
                 label: 'Zihin Haritası',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.widgets_rounded),
+                activeIcon: Icon(Icons.widgets_rounded),
+                label: 'Widget',
               ),
             ],
           ),

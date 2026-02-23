@@ -49,7 +49,11 @@ GümüşNot, ekran boyutuna göre çalışma alanını optimize eder:
 *   **Durum Yönetimi**: `Provider`
 *   **Güvenlik**: `encrypt` (AES-256), `local_auth` (Biyometrik), `flutter_secure_storage`
 *   **Render**: `flutter_markdown`, `flutter_math_fork`
-*   **Dosya Yönetimi**: `pdf`, `printing`, `path_provider`, `archive`
+*   **Grafik ve Görselleştirme**: `fl_chart`
+*   **Dosya Yönetimi**: `pdf`, `printing`, `path_provider`, `archive`, `file_picker`
+*   **Medya**: `image_picker`, `cached_network_image`, `signature`
+*   **Cloud Sync**: `googleapis`, `googleapis_auth` (Geliştirme aşamasında)
+*   **UI Bileşenleri**: `flutter_staggered_grid_view`, `flutter_colorpicker`
 
 ---
 
@@ -66,18 +70,86 @@ GümüşNot, ekran boyutuna göre çalışma alanını optimize eder:
 3. **Çalıştırın**:
    ```bash
    flutter run -d windows  # Windows için
+   flutter run -d android   # Android için
+   flutter run -d ios       # iOS için
    flutter run -d chrome   # Web (Deneysel) için
+   flutter run -d linux    # Linux için
+   flutter run -d macos    # macOS için
+   ```
+
+4. **Testleri Çalıştırın**:
+   ```bash
+   flutter test
+   flutter test --coverage  # Kapsam raporu için
    ```
 
 ---
 
 ## 📉 Güncel Durum ve Notlar
-*   **Windows OCR**: Windows platformundaki kütüphane uyumsuzlukları nedeniyle OCR özelliği geçici olarak devre dışı bırakılmıştır.
-*   **Bulut Senkronizasyonu**: Google Drive entegrasyonu altyapısı mevcuttur, mobil sürümlerde geliştirme aşamasındadır.
+
+### ✅ Tamamlanan Özellikler
+*   **Temel Not Yönetimi**: Oluşturma, düzenleme, silme, arama
+*   **Zettelkasten Bağlantıları**: Çift yönlü bağlantılar ve grafik görünümü
+*   **Görev Merkezi**: Notlardaki görevleri otomatik tarama ve yönetme
+*   **Şifreleme**: AES-256 ile not şifreleme ve biyometrik koruma
+*   **Markdown ve LaTeX**: Zengin metin ve matematiksel formül desteği
+*   **Çizim Özelliği**: El yazısı notlar ve şemalar
+*   **Resim Desteği**: Kamera ve galeriden görsel ekleme
+*   **PDF/LaTeX Export**: Profesyonel dışa aktarma imkanları
+*   **Responsive Tasarım**: Masaüstü, tablet ve mobil uyumlu arayüz
+
+### 🚧 Geliştirme Aşamasında
+*   **Windows OCR**: Platform kütüphane uyumsuzlukları nedeniyle geçici olarak devre dışı
+*   **Bulut Senkronizasyonu**: Google Drive entegrasyonu altyapısı hazır, mobil sürümlerde devam ediyor
+*   **Sesli Not**: Ses kaydetme ve metne çevirme özelliği planlanıyor
+
+### 🐋 Bilinen Sorunlar
+*   **Web Platformu**: Bazı güvenlik özellikleri web'de kısıtlı çalışabilir
+*   **Performans**: Çok büyük not veritabanlarında grafik görünümü yavaşlayabilir
 
 ---
 
-## 📄 Lisans
+## 🧪 Test ve Kalite
+
+Proje, kapsamlı test stratejisi ile geliştirilmektedir:
+*   **Unit Testler**: `flutter test` ile çalıştırılabilir
+*   **Widget Testler**: UI bileşenlerinin doğrulanması
+*   **Entegrasyon Testler**: Özellikler arası etkileşim testleri
+*   **Kapsam Raporu**: `flutter test --coverage` ile detaylı analiz
+
+Detaylı test raporları için `TEST_COVERAGE_REPORT.md` dosyasına bakabilirsiniz.
+
+---
+
+## � Ek Belgeler
+
+Proje hakkında detaylı bilgi için aşağıdaki belgelere göz atabilirsiniz:
+
+*   **[Özellik Yol Haritası](OZELLIK_YOLHARITASI.md)** - Geliştirme planı ve özellik detayları
+*   **[Algoritma Dokümanı](ALGORITMA_DOKUMAN.md)** - Temel algoritmalar ve veri yapıları
+*   **[Biyometrik Güvenlik](BIYOMETRIK_GUVENLIK.md)** - Şifreleme ve kimlik doğrulama sistemi
+*   **[Çizim Özelliği](CIZIM_OZELLIGI.md)** - El yazısı ve çizim desteği
+*   **[PDF Export](PDF_EXPORT.md)** - Dışa aktarma özellikleri
+*   **[Resim Desteği](RESIM_DESTEGI.md)** - Görsel yönetimi ve optimizasyonu
+*   **[Sesli Not](SESLI_NOT.md)** - Ses kaydetme özellikleri (planlanan)
+*   **[OCR Özelliği](OCR_OZELLIGI.md)** - Metin tanıma sistemi
+*   **[Kalite Raporları](KALITE_RAPORU.md)** - Kod kalitesi ve analiz sonuçları
+*   **[Test Kapsamı](TEST_COVERAGE_REPORT.md)** - Detaylı test raporları
+
+---
+
+## 🤝 Katkıda Bulunma
+
+Katkıda bulunmak isterseniz:
+1.  Projeyi fork edin
+2.  Yeni bir branch oluşturun (`git checkout -b feature/amazing-feature`)
+3.  Değişikliklerinizi yapın ve commit edin
+4.  Branch'inizi push edin (`git push origin feature/amazing-feature`)
+5.  Bir Pull Request oluşturun
+
+---
+
+## �📄 Lisans
 
 Bu proje **MIT Lisansı** altında korunmaktadır. Detaylar için `LICENSE` dosyasına bakabilirsiniz.
 
