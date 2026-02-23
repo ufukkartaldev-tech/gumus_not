@@ -2,6 +2,7 @@
 
 GümüşNot, Zettelkasten metodolojisinden ilham alan, **local-first** (önce yerel) yaklaşımını benimseyen, çok platformlu ve son derece güvenli bir not alma ekosistemidir. Notlarınızı sadece birer metin yığını olmaktan çıkarıp, birbirine bağlı bir **Kişisel Bilgi Ağı (Personal Knowledge Graph)** haline getirir.
 
+
 ---
 
 ## 🚀 Öne Çıkan Özellikler
@@ -31,6 +32,13 @@ GümüşNot, Zettelkasten metodolojisinden ilham alan, **local-first** (önce ye
 *   **Çoklu Format**: Notlarınızı PDF veya LaTeX formatında profesyonel çıktılara dönüştürün.
 *   **Toplu Dışa Aktarma**: Birden fazla notu aynı anda farklı formatlarda paketleyin.
 
+### 6. 🎯 Widget ve Paylaşım Entegrasyonu
+*   **Ana Ekran Widget'ları**: Hızlı not, son notlar ve görev listesi widget'ları ile ana ekranınızdan takip yapın.
+*   **Paylaşım Menüsü Entegrasyonu**: Diğer uygulamalardan metin, resim veya dosya paylaşarak anında not oluşturun.
+*   **Akıllı Otomatizasyon**: Paylaşım türüne göre otomatik etiketleme ve "Gelen" klasörüne kaydetme.
+*   **Periyodik Güncellemeler**: Widget'lar her 30 dakikada bir otomatik olarak güncellenir.
+*   **Widget Yönetimi**: Widget konfigürasyon ekranı ve kurulum yardımı ile tam kontrol.
+
 ---
 
 ## 📱 Duyarlı Tasarım (Responsive Layout)
@@ -54,6 +62,7 @@ GümüşNot, ekran boyutuna göre çalışma alanını optimize eder:
 *   **Medya**: `image_picker`, `cached_network_image`, `signature`
 *   **Cloud Sync**: `googleapis`, `googleapis_auth` (Geliştirme aşamasında)
 *   **UI Bileşenleri**: `flutter_staggered_grid_view`, `flutter_colorpicker`
+*   **Widget ve Paylaşım**: `home_widget`, `receive_sharing_intent`, `share_plus`
 
 ---
 
@@ -97,6 +106,8 @@ GümüşNot, ekran boyutuna göre çalışma alanını optimize eder:
 *   **Resim Desteği**: Kamera ve galeriden görsel ekleme
 *   **PDF/LaTeX Export**: Profesyonel dışa aktarma imkanları
 *   **Responsive Tasarım**: Masaüstü, tablet ve mobil uyumlu arayüz
+*   **Widget Entegrasyonu**: Ana ekran widget'ları ve otomatik güncellemeler
+*   **Paylaşım Özellikleri**: Diğer uygulamalardan içerik paylaşarak not oluşturma
 
 ### 🚧 Geliştirme Aşamasında
 *   **Windows OCR**: Platform kütüphane uyumsuzlukları nedeniyle geçici olarak devre dışı
@@ -121,7 +132,7 @@ Detaylı test raporları için `TEST_COVERAGE_REPORT.md` dosyasına bakabilirsin
 
 ---
 
-## � Ek Belgeler
+## 📚 Ek Belgeler
 
 Proje hakkında detaylı bilgi için aşağıdaki belgelere göz atabilirsiniz:
 
@@ -135,6 +146,25 @@ Proje hakkında detaylı bilgi için aşağıdaki belgelere göz atabilirsiniz:
 *   **[OCR Özelliği](OCR_OZELLIGI.md)** - Metin tanıma sistemi
 *   **[Kalite Raporları](KALITE_RAPORU.md)** - Kod kalitesi ve analiz sonuçları
 *   **[Test Kapsamı](TEST_COVERAGE_REPORT.md)** - Detaylı test raporları
+
+---
+
+## 🌟 Kullanım Senaryoları
+
+### 📱 **Hızlı Not Alma**
+- Web sayfasını paylaş → Otomatik not oluştur
+- Makaleyi paylaş → Etiketlerlenmiş not olarak kaydet
+- Fotoğraf paylaş → Nota görsel ekle
+
+### 🏠 **Ana Ekran Widget'ları**
+- Son notları ana ekrandan takip et
+- Görev durumunu widget'tan kontrol et
+- Günlük motivasyon alıntıları gör
+
+### 🔗 **Zettelkasten Sistemi**
+- `[[]]` söz dizimi ile notları birbirine bağla
+- Grafik görünüm ile bilgi ağını keşfet
+- Hayalet notlar ile eksik bağlantıları tamamla
 
 ---
 
