@@ -226,6 +226,9 @@ class _PrivateVaultScreenState extends State<PrivateVaultScreen> {
       
       _showSuccess('Kasa şifresi başarıyla ayarlandı');
       
+      // KRİTİK HATIRLATMA: Kurtarma anahtarını hemen göster ve saklat
+      _showCriticalRecoveryReminder();
+
       if (_canUseBiometrics) {
         _showBiometricOfferDialog(password);
       }
@@ -781,6 +784,71 @@ class _PrivateVaultScreenState extends State<PrivateVaultScreen> {
     );
   }
 
+  void _showCriticalRecoveryReminder() {
+    showDialog(
+      context: context,
+      barrierDismissible: false, // Kullanıcı okumadan geçemesin
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
+            SizedBox(width: 8),
+            Text('ÇOK ÖNEMLİ!', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'GümüşNot Private Vault başarıyla oluşturuldu. Ancak, şifrenizi unutursanız verilerinize erişmenizin TEK YOLU aşağıdaki kurtarma anahtarıdır.',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.red.shade200),
+              ),
+              child: Column(
+                children: [
+                  const Text(
+                    'KURTARMA ANAHTARINIZ',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.red),
+                  ),
+                  const SizedBox(height: 8),
+                  SelectableText(
+                    _recoveryKey ?? 'Hata!',
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              '⚠️ DİKKAT: Bu anahtarı bir kağıda yazıp fiziksel bir kasada saklamanız önerilir. Dijital ortamda saklamak saldırılara açıktır. Bu anahtar kaybolursa ve şifrenizi unutursanız verileriniz SONSUZA KADAR KAYBOLUR.',
+              style: TextStyle(fontSize: 13, color: Colors.black87),
+            ),
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('ANLADIM, ANAHTARI SAKLADIM', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showRecoveryKeyDialog() {
     showDialog(
       context: context,
@@ -797,7 +865,7 @@ class _PrivateVaultScreenState extends State<PrivateVaultScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Bu anahtarı şifrenizi unutursanız, verilerinizi kurtarabilirsiniz.',
+              'Şifrenizi unutursanız özel notlarınıza erişebilmek için bu anahtara ihtiyacınız olacak.',
               style: TextStyle(fontSize: 14),
             ),
             const SizedBox(height: 16),
@@ -820,16 +888,22 @@ class _PrivateVaultScreenState extends State<PrivateVaultScreen> {
                     _recoveryKey ?? 'Henüz oluşturulmadı',
                     style: const TextStyle(
                       fontFamily: 'monospace',
-                      fontSize: 12,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    '⚠️ Bu anahtarı güvenli bir yerde saklayın!',
-                    style: TextStyle(color: Colors.orange, fontSize: 12),
                   ),
                 ],
               ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              '🛡️ TAVSİYE: Bu anahtarı fiziksel bir kağıda yazın veya güvenli bir parola yöneticisinde (Bitwarden, 1Password vb.) saklayın.',
+              style: TextStyle(color: Colors.blue.shade800, fontSize: 13, fontStyle: FontStyle.italic),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              '⚠️ UYARI: Bu anahtar çalınırsa, kasanıza şifreniz olmadan erişilebilir.',
+              style: TextStyle(color: Colors.orange.shade800, fontSize: 13, fontWeight: FontWeight.w600),
             ),
           ],
         ),
@@ -841,7 +915,6 @@ class _PrivateVaultScreenState extends State<PrivateVaultScreen> {
           ElevatedButton.icon(
             onPressed: () {
               _copyRecoveryKey();
-              Navigator.of(context).pop();
               _showSuccess('Kurtarma anahtarı kopyalandı!');
             },
             icon: const Icon(Icons.copy),
