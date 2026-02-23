@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/services.dart';
 import '../models/note_model.dart';
+import '../services/task_service.dart';
 import '../widgets/confetti_effect.dart';
 import '../providers/note_provider.dart';
 import 'dart:ui';
@@ -50,7 +51,7 @@ class _TaskHubScreenState extends State<TaskHubScreen> with SingleTickerProvider
           final currentNotes = noteProvider.notes;
           
           if (_cachedTasks == null || _lastNotesTimestamp != _calculateNotesHash(currentNotes)) {
-             _cachedTasks = _extractTasks(currentNotes);
+             _cachedTasks = TaskService.extractTasks(currentNotes);
              _lastNotesTimestamp = _calculateNotesHash(currentNotes);
           }
 
@@ -304,32 +305,6 @@ class _TaskHubScreenState extends State<TaskHubScreen> with SingleTickerProvider
     );
   }
 
-  List<TaskItem> _extractTasks(List<Note> notes) {
-    List<TaskItem> tasks = [];
-    // İYİLEŞTİRİLMİŞ REGEX: Satır başındaki boşlukları (indentation) destekler
-    final regex = RegExp(r'^\s*- \[([ xX])\] (.*)', multiLine: true);
-
-    for (var note in notes) {
-      if (note.isEncrypted) continue; // Şifreli notları tarama (Güvenlik)
-      
-      final matches = regex.allMatches(note.content);
-      for (var match in matches) {
-        if (match.group(2) != null) {
-          final statusChar = match.group(1)!;
-          final isCompleted = statusChar.toLowerCase() == 'x';
-          
-          tasks.add(TaskItem(
-            note: note,
-            taskText: match.group(2)!.trim(),
-            isCompleted: isCompleted,
-            originalLine: match.group(0)!,
-          ));
-        }
-      }
-    }
-    return tasks;
-  }
-
   Future<void> _toggleTaskStatus(BuildContext context, TaskItem item, bool newValue) async {
     final noteProvider = Provider.of<NoteProvider>(context, listen: false);
     
@@ -374,20 +349,6 @@ class _TaskHubScreenState extends State<TaskHubScreen> with SingleTickerProvider
   int _calculateNotesHash(List<Note> notes) {
     if (notes.isEmpty) return 0;
     // Tüm notların updatedAt değerlerini toplayarak basit bir "değişim" işareti oluşturalım
-    return notes.fold(0, (sum, note) => sum + note.updatedAt + note.id!);
+    return notes.fold(0, (sum, note) => sum + note.updatedAt + (note.id ?? 0));
   }
-}
-
-class TaskItem {
-  final Note note;
-  final String taskText;
-  final bool isCompleted;
-  final String originalLine;
-
-  TaskItem({
-    required this.note, 
-    required this.taskText, 
-    this.isCompleted = false,
-    required this.originalLine,
-  });
 }

@@ -8,6 +8,8 @@ import 'screens/graph_view_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/splash_screen.dart';
 import 'screens/task_hub_screen.dart';
+import 'screens/main_screen.dart';
+import 'screens/dashboard_screen.dart';
 import 'widgets/markdown_editor.dart';
 import 'models/note_model.dart';
 
@@ -50,7 +52,9 @@ class ConnectedNotebookApp extends StatelessWidget {
               '/splash': (context) => SplashScreen(
                 onInitialized: () => Navigator.of(context).pushReplacementNamed('/'),
               ),
-              '/': (context) => const NoteListScreen(),
+              '/': (context) => const MainScreen(),
+              '/dashboard': (context) => const DashboardScreen(),
+              '/notes': (context) => const NoteListScreen(),
               '/graph': (context) => const GraphViewScreen(),
               '/settings': (context) => const SettingsScreen(),
               '/task-hub': (context) => const TaskHubScreen(),
@@ -58,18 +62,23 @@ class ConnectedNotebookApp extends StatelessWidget {
             onGenerateRoute: (settings) {
               if (settings.name == '/note-editor') {
                 final note = settings.arguments as Note?;
-                return MaterialPageRoute(
-                  builder: (context) => Scaffold(
+                return PageRouteBuilder(
+                  transitionDuration: const Duration(milliseconds: 400),
+                  pageBuilder: (context, animation, secondaryAnimation) => Scaffold(
                     body: MarkdownEditor(
                       note: note,
                       onSave: (savedNote) {
                         Navigator.of(context).pop();
+                        Provider.of<NoteProvider>(context, listen: false).loadNotes();
                       },
                       onCancel: () {
                         Navigator.of(context).pop();
                       },
                     ),
                   ),
+                  transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                    return FadeTransition(opacity: animation, child: child);
+                  },
                 );
               }
               return null;
