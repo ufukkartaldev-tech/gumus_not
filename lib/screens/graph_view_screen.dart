@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:vector_math/vector_math_64.dart' hide Character;
 import '../models/note_model.dart';
 import '../providers/note_provider.dart';
 
@@ -9,6 +10,7 @@ import '../providers/note_provider.dart';
 class GraphNode {
   final String id;
   final String label;
+  final bool isGhost;
   int connectionCount;
   Offset position;
   Offset velocity;
@@ -16,6 +18,7 @@ class GraphNode {
   GraphNode({
     required this.id,
     required this.label,
+    this.isGhost = false,
     this.connectionCount = 0,
     required this.position,
   }) : velocity = Offset.zero;
@@ -28,6 +31,78 @@ class GraphEdge {
   GraphEdge(this.source, this.target);
 }
 
+class GraphController extends ChangeNotifier {
+  List<GraphNode> nodes = [];
+  List<GraphEdge> edges = [];
+  
+  // Fizik Sabitleri
+  final double _repulsionForce = 1500.0;
+  final double _attractionForce = 0.15;
+  final double _damping = 0.8;
+  final double _centerForce = 0.05;
+  final double _movementThreshold = 0.01;
+
+  void updatePhysics(Size screenSize) {
+    if (nodes.isEmpty) return;
+    
+    final center = Offset(screenSize.width / 2, screenSize.height / 2);
+    bool hasSignificantMovement = false;
+
+    // 1. İtme Kuvveti
+    for (int i = 0; i < nodes.length; i++) {
+        for (int j = i + 1; j < nodes.length; j++) {
+            final nodeA = nodes[i];
+            final nodeB = nodes[j];
+            var delta = nodeA.position - nodeB.position;
+            double distance = delta.distance;
+            if (distance < 1) distance = 1;
+
+            if(distance > 400) continue;
+
+            final force = (_repulsionForce / (distance * distance * 0.5)); 
+            final offset = delta / distance * force;
+            
+            nodeA.velocity += offset;
+            nodeB.velocity -= offset;
+        }
+    }
+
+    // 2. Çekme Kuvveti
+    for (var edge in edges) {
+        final delta = edge.target.position - edge.source.position;
+        final force = delta * _attractionForce;
+        edge.source.velocity += force;
+        edge.target.velocity -= force;
+    }
+
+    // 3. Merkeze Çekim
+    for (var node in nodes) {
+        final delta = center - node.position;
+        node.velocity += delta * _centerForce;
+    }
+
+    // 4. Pozisyonu Güncelle
+    for (var node in nodes) {
+        if (node.velocity.distance > _movementThreshold) {
+            node.position += node.velocity;
+            node.velocity *= _damping;
+            hasSignificantMovement = true;
+        } else {
+            node.velocity = Offset.zero;
+        }
+    }
+
+    if (hasSignificantMovement) {
+      notifyListeners(); // Sadece fizik değişiminde tetikle (SetState yerine)
+    }
+  }
+
+  void stop() {
+    for (var n in nodes) n.velocity = Offset.zero;
+    notifyListeners();
+  }
+}
+
 // --- EKRAN ---
 
 class GraphViewScreen extends StatefulWidget {
@@ -38,30 +113,19 @@ class GraphViewScreen extends StatefulWidget {
 }
 
 class _GraphViewScreenState extends State<GraphViewScreen> with SingleTickerProviderStateMixin {
-  List<GraphNode> _nodes = [];
-  List<GraphEdge> _edges = [];
-  late AnimationController _controller;
-  final Random _random = Random();
+  final GraphController _graphController = GraphController();
+  late AnimationController _physicsLoop;
   final TransformationController _transformationController = TransformationController();
-
-  // Fizik Sabitleri
-  final double _repulsionForce = 2000.0; // İtme Gücü
-  final double _attractionForce = 0.05; // Çekme Gücü (Yay)
-  final double _damping = 0.9; // Sürtünme (Hız kesici)
-  final double _centerForce = 0.02; // Merkeze çekim
+  final Random _random = Random();
 
   @override
   void initState() {
     super.initState();
-    // Animasyon döngüsü (Fizik motorunu saniyede 60 kare çalıştırır)
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 1), // Sonsuz döngü için placeholder
-    )..repeat();
-    
-    _controller.addListener(_updatePhysics);
+    _physicsLoop = AnimationController(vsync: this, duration: const Duration(seconds: 1))..repeat();
+    _physicsLoop.addListener(() {
+      _graphController.updatePhysics(MediaQuery.of(context).size);
+    });
 
-    // İlk açılışta veriyi hazırla
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeGraph();
     });
@@ -69,8 +133,9 @@ class _GraphViewScreenState extends State<GraphViewScreen> with SingleTickerProv
 
   @override
   void dispose() {
-    _controller.dispose();
+    _physicsLoop.dispose();
     _transformationController.dispose();
+    _graphController.dispose();
     super.dispose();
   }
 
@@ -82,141 +147,100 @@ class _GraphViewScreenState extends State<GraphViewScreen> with SingleTickerProv
     Map<String, GraphNode> nodeMap = {};
     List<GraphEdge> edges = [];
 
-    // 1. Düğümleri (Node) Oluştur
+    // 1. Gerçek Düğümleri Oluştur
     for (var note in notes) {
-      // Rastgele başlangıç pozisyonu (Merkeze yakın)
-      final initialPos = center + Offset(
-        (_random.nextDouble() - 0.5) * 100,
-        (_random.nextDouble() - 0.5) * 100,
-      );
-
-      // Başlık boşsa ID kullan
-      String label = note.title.isNotEmpty ? note.title : 'Not ${note.id}';
-      
-      // Node'u kaydet
-      // Not ID'si string değilse (veritabanı int id verebilir), id.toString() kullan.
-      // Note modelinizde id int? olabilir. Kontrol edelim.
-      final noteId = note.id.toString(); 
-      
+      final initialPos = center + Offset((_random.nextDouble() - 0.5) * 200, (_random.nextDouble() - 0.5) * 200);
+      final noteId = note.id.toString();
       nodeMap[noteId] = GraphNode(
-        id: noteId, 
-        label: label, 
-        position: initialPos
+        id: noteId,
+        label: note.title.isNotEmpty ? note.title : 'Adsız',
+        position: initialPos,
       );
     }
 
-    // 2. Bağlantıları (Edge) Oluştur
+    // 2. Bağlantıları ve Hayalet Düğümleri Analiz Et
     final linkRegex = RegExp(r'\[\[(.*?)\]\]');
-
     for (var note in notes) {
-      final sourceId = note.id.toString();
-      final sourceNode = nodeMap[sourceId];
+      final sourceNode = nodeMap[note.id.toString()];
       if (sourceNode == null) continue;
 
       final matches = linkRegex.allMatches(note.content);
       for (var match in matches) {
         final targetTitle = match.group(1);
-        if (targetTitle == null) continue;
+        if (targetTitle == null || targetTitle.isEmpty) continue;
 
-        // İsme göre hedef notu bul
-        try {
-          // Basit eşleştirme (Başlık tam eşleşmeli)
-          // Gerçek hayatta daha akıllı arama gerekebilir.
-          final targetNote = notes.firstWhere(
-            (n) => n.title.toLowerCase() == targetTitle.toLowerCase(),
-            orElse: () => Note(title: '', content: '', createdAt: 0, updatedAt: 0) // Dummy
-          );
+        // Hedef notu bulmaya çalış
+        final targetNote = notes.firstWhereOrNull((n) => n.title.toLowerCase() == targetTitle.toLowerCase());
 
-          if (targetNote.title.isNotEmpty) {
-            final targetId = targetNote.id.toString();
-            final targetNode = nodeMap[targetId];
-
-            if (targetNode != null && sourceId != targetId) {
-              edges.add(GraphEdge(sourceNode, targetNode));
-              // Bağlantı sayılarını artır (Node büyüklüğü için)
-              sourceNode.connectionCount++; // Bu setter değil, basit field ise arttıramam. late final değilse.
-              // GraphNode'u final olmayan connectionCount ile güncelleyeyim.
-            }
+        if (targetNote != null) {
+          // GERÇEK BAĞLANTI
+          final targetNode = nodeMap[targetNote.id.toString()];
+          if (targetNode != null && targetNode.id != sourceNode.id) {
+            edges.add(GraphEdge(sourceNode, targetNode));
+            sourceNode.connectionCount++;
+            targetNode.connectionCount++;
           }
-        } catch (e) {
-          // Hata yok say
+        } else {
+          // HAYALET BAĞLANTI (HAYALET NODE OLUŞTUR)
+          final ghostId = 'ghost_$targetTitle';
+          var ghostNode = nodeMap[ghostId];
+          
+          if (ghostNode == null) {
+            final ghostPos = sourceNode.position + Offset((_random.nextDouble() - 0.5) * 100, (_random.nextDouble() - 0.5) * 100);
+            ghostNode = GraphNode(
+              id: ghostId,
+              label: targetTitle,
+              isGhost: true,
+              position: ghostPos,
+            );
+            nodeMap[ghostId] = ghostNode;
+          }
+          
+          edges.add(GraphEdge(sourceNode, ghostNode));
+          sourceNode.connectionCount++;
+          ghostNode.connectionCount++;
         }
       }
     }
 
-    // Bağlantı sayılarını güncelle (Manuel, çünkü GraphNode immutable değil artık)
-    for (var edge in edges) {
-       // connectionCount dynamic logic needed mostly for visualization radius
-    }
-
-    setState(() {
-      _nodes = nodeMap.values.toList();
-      _edges = edges;
-    });
+    _graphController.nodes = nodeMap.values.toList();
+    _graphController.edges = edges;
+    _graphController.notifyListeners();
   }
 
-  void _updatePhysics() {
-    if (_nodes.isEmpty) return;
-    
-    final size = MediaQuery.of(context).size;
-    final center = Offset(size.width / 2, size.height / 2);
+  void _onTap(TapUpDetails details) {
+    final RenderBox box = context.findRenderObject() as RenderBox;
+    final Offset localOffset = box.globalToLocal(details.globalPosition);
+    final inverseTransform = Matrix4.inverted(_transformationController.value);
+    final transformedTapPos = inverseTransform.transform3(Vector3(localOffset.dx, localOffset.dy, 0));
+    final graphSpaceTap = Offset(transformedTapPos.x, transformedTapPos.y);
 
-    // 1. İtme Kuvveti (Repulsion) - Her düğüm diğerini iter
-    for (int i = 0; i < _nodes.length; i++) {
-        for (int j = i + 1; j < _nodes.length; j++) {
-            final nodeA = _nodes[i];
-            final nodeB = _nodes[j];
-            
-            var delta = nodeA.position - nodeB.position;
-            double distance = delta.distance;
-            if (distance < 1) distance = 1; // Sıfıra bölme hatası önlemi
+    GraphNode? clickedNode;
+    double minDistance = 30.0;
 
-            // Coulomb Yasası benzeri: F = k / d
-            // Yön: delta / distance
-            final force = (_repulsionForce / (distance * distance * 0.5)); 
-            // Çok uzakları hesaplama (Optimizasyon)
-            if(distance > 300) continue;
-
-            final offset = delta / distance * force;
-            
-            nodeA.velocity += offset;
-            nodeB.velocity -= offset;
-        }
+    for (var node in _graphController.nodes) {
+      double dist = (node.position - graphSpaceTap).distance;
+      if (dist < minDistance) {
+        minDistance = dist;
+        clickedNode = node;
+      }
     }
 
-    // 2. Çekme Kuvveti (Attraction) - Bağlı düğümler birbirini çeker
-    for (var edge in _edges) {
-        final delta = edge.target.position - edge.source.position;
-        final distance = delta.distance;
-        
-        // Yay Yasası: F = k * x
-        final force = delta * _attractionForce;
-        
-        edge.source.velocity += force;
-        edge.target.velocity -= force;
-    }
+    if (clickedNode != null) {
+      if (clickedNode.isGhost) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('"${clickedNode.label}" henüz oluşturulmamış bir hayalet nottur.')),
+        );
+        return;
+      }
 
-    // 3. Merkeze Çekim (Center Gravity) - Sonsuza uçmasınlar
-    for (var node in _nodes) {
-        final delta = center - node.position;
-        node.velocity += delta * _centerForce;
+      final noteProvider = Provider.of<NoteProvider>(context, listen: false);
+      final note = noteProvider.getNoteById(int.parse(clickedNode.id));
+      if (note != null) {
+        _graphController.stop();
+        Navigator.of(context).pushNamed('/note-editor', arguments: note);
+      }
     }
-
-    // 4. Pozisyonu Güncelle ve Hızı Sönümle
-    for (var node in _nodes) {
-        node.position += node.velocity;
-        node.velocity *= _damping; // Sürtünme
-    }
-
-    // Eğer hareket çok azaldıysa animasyonu durdur? 
-    // Hayır, "canlı" hissi için hep çalışsın (Micro-movements)
-    // Ama performans için Threshold konabilir. Şimdilik kalsın.
-    
-    // Sadece velocity değişti, pozisyon değişti.
-    // SetState çağırmaya gerek var mı? 
-    // CustomPainter repaint için notify etmeli. 
-    // _controller zaten her tick'te build tetikler mi? Hayır, addListener içinde setState lazım.
-    if(mounted) setState(() {});
   }
 
   @override
@@ -230,14 +254,22 @@ class _GraphViewScreenState extends State<GraphViewScreen> with SingleTickerProv
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: GestureDetector(
+        onTapUp: _onTap,
         child: InteractiveViewer(
           transformationController: _transformationController,
-          boundaryMargin: const EdgeInsets.all(double.infinity), // Sonsuz tuval
+          boundaryMargin: const EdgeInsets.all(2000),
           minScale: 0.1,
-          maxScale: 5.0,
-          child: CustomPaint(
-            painter: GraphPainter(_nodes, _edges, Theme.of(context)),
-            size: Size.infinite,
+          maxScale: 3.0,
+          child: ListenableBuilder(
+            listenable: _graphController,
+            builder: (context, child) {
+              return RepaintBoundary(
+                child: CustomPaint(
+                  painter: GraphPainter(_graphController.nodes, _graphController.edges, Theme.of(context)),
+                  size: const Size(4000, 4000),
+                ),
+              );
+            },
           ),
         ),
       ),
@@ -263,58 +295,60 @@ class GraphPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    // 1. Bağlantıları Çiz (En alta)
+    // 1. Bağlantıları Çiz
     final edgePaint = Paint()
-      ..color = Colors.grey.withOpacity(0.3)
-      ..strokeWidth = 1.5
-      ..style = PaintingStyle.stroke;
+      ..color = Colors.grey.withOpacity(0.2)
+      ..strokeWidth = 1.0;
 
     for (var edge in edges) {
       canvas.drawLine(edge.source.position, edge.target.position, edgePaint);
     }
 
     // 2. Düğümleri Çiz
-    final nodePaint = Paint()
-      ..color = theme.primaryColor
-      ..style = PaintingStyle.fill;
-      
-    final textPainter = TextPainter(
-      textDirection: TextDirection.ltr,
-    );
+    final textPainter = TextPainter(textDirection: TextDirection.ltr);
 
     for (var node in nodes) {
-      // Düğüm Çapı (Bağlantı sayısına göre dinamik olabilir ama şimdilik sabit)
-      double radius = 6.0;
+      // DYNAMİC RADIUS: Bağlantı sayısına göre (Hub tespiti)
+      // Radius = Base (6) + connections * 1.5 (Max limit 25)
+      double radius = min(6.0 + (node.connectionCount * 1.5), 25.0);
 
-      // Glow Efekti (Neon)
-      final glowPaint = Paint()
-        ..color = theme.primaryColor.withOpacity(0.3)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
-      canvas.drawCircle(node.position, radius + 4, glowPaint);
+      // GHOST STYLE: Hayalet notlar için gri ve şeffaf
+      Color nodeColor = node.isGhost 
+        ? Colors.grey.withOpacity(0.5) 
+        : theme.primaryColor;
+
+      final nodePaint = Paint()
+        ..color = nodeColor
+        ..style = PaintingStyle.fill;
+
+      // Glow Efekti (Gerçek notlar için daha güçlü)
+      if (!node.isGhost) {
+        final glowPaint = Paint()
+          ..color = nodeColor.withOpacity(0.2)
+          ..maskFilter = MaskFilter.blur(BlurStyle.normal, radius > 15 ? 12 : 6);
+        canvas.drawCircle(node.position, radius + 5, glowPaint);
+      }
 
       // Ana Daire
       canvas.drawCircle(node.position, radius, nodePaint);
+      
+      // Hayaletler için kesikli çerçeve opsiyonel ama şimdilik opacity yeterli
 
-      // Metin Etiketi (Sadece node'a yakınsak veya zoom seviyesi yüksekse çizilmeli aslında)
-      // Şimdilik hep çizelim ama çok küçük olmasın
+      // Metin Etiketi (Hub'larda daha büyük, hayaletlerde daha silik)
       textPainter.text = TextSpan(
         text: node.label,
         style: TextStyle(
-          color: Colors.white.withOpacity(0.8),
-          fontSize: 10,
-          shadows: const [Shadow(blurRadius: 2, color: Colors.black)],
+          color: Colors.white.withOpacity(node.isGhost ? 0.5 : 0.9),
+          fontSize: radius > 15 ? 12 : 10,
+          fontWeight: radius > 15 ? FontWeight.bold : FontWeight.normal,
+          shadows: [const Shadow(blurRadius: 2, color: Colors.black)],
         ),
       );
       textPainter.layout();
-      textPainter.paint(
-        canvas, 
-        node.position + Offset(-textPainter.width / 2, radius + 4) // Altına ortala
-      );
+      textPainter.paint(canvas, node.position + Offset(-textPainter.width / 2, radius + 4));
     }
   }
 
   @override
-  bool shouldRepaint(covariant GraphPainter oldDelegate) {
-    return true; // Animasyon olduğu için her karede çiz
-  }
+  bool shouldRepaint(covariant GraphPainter oldDelegate) => true;
 }
