@@ -318,14 +318,11 @@ class _NoteListScreenState extends State<NoteListScreen> {
           tooltip: 'Komut Paleti / Arama',
           onPressed: _showCommandPalette,
         ),
-        if (MediaQuery.of(context).size.width > 600) // Show only on tablets/desktop
-          IconButton(
-            icon: const Icon(Icons.check_circle_outline),
-            tooltip: 'Görev Merkezi',
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (context) => const TaskHubScreen()),
-            ),
-          ),
+        IconButton(
+          icon: const Icon(Icons.check_circle_outline),
+          tooltip: 'Görev Merkezi',
+          onPressed: () => Navigator.of(context).pushNamed('/task-hub'),
+        ),
         if (MediaQuery.of(context).size.width > 600)
           IconButton(
             icon: const Icon(Icons.shuffle),

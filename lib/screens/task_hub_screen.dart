@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/note_model.dart';
 import '../providers/note_provider.dart';
+import 'dart:ui';
 
 class TaskHubScreen extends StatefulWidget {
   const TaskHubScreen({Key? key}) : super(key: key);
@@ -10,43 +11,164 @@ class TaskHubScreen extends StatefulWidget {
   State<TaskHubScreen> createState() => _TaskHubScreenState();
 }
 
-class _TaskHubScreenState extends State<TaskHubScreen> {
-  bool _showCompleted = true; // Tamamlananları göster/gizle
+class _TaskHubScreenState extends State<TaskHubScreen> with SingleTickerProviderStateMixin {
+  bool _showCompleted = true;
+  late AnimationController _animationController;
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    )..forward();
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Görev Merkezi'),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: Icon(_showCompleted ? Icons.visibility : Icons.visibility_off),
-            onPressed: () => setState(() => _showCompleted = !_showCompleted),
-            tooltip: 'Tamamlananları Göster/Gizle',
-          ),
-        ],
-      ),
+      backgroundColor: Theme.of(context).colorScheme.background,
       body: Consumer<NoteProvider>(
         builder: (context, noteProvider, child) {
           final tasks = _extractTasks(noteProvider.notes);
-
-          if (tasks.isEmpty) {
-            return _buildEmptyState();
-          }
-
           final filteredTasks = _showCompleted ? tasks : tasks.where((t) => !t.isCompleted).toList();
+          final completionRate = tasks.isEmpty ? 0.0 : tasks.where((t) => t.isCompleted).length / tasks.length;
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: filteredTasks.length,
-            itemBuilder: (context, index) {
-              final item = filteredTasks[index];
-              return _buildTaskCard(context, item, noteProvider);
-            },
+          return CustomScrollView(
+            controller: _scrollController,
+            slivers: [
+              _buildAppBar(completionRate),
+              if (tasks.isEmpty)
+                SliverFillRemaining(child: _buildEmptyState())
+              else
+                SliverPadding(
+                  padding: const EdgeInsets.all(16),
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        final item = filteredTasks[index];
+                        return AnimatedBuilder(
+                          animation: _animationController,
+                          builder: (context, child) {
+                            final delay = index * 0.05;
+                            final animValue = Curves.easeOutBack.transform(
+                              (_animationController.value - delay).clamp(0.0, 1.0),
+                            );
+                            return Transform.translate(
+                              offset: Offset(0, 50 * (1 - animValue)),
+                              child: Opacity(
+                                opacity: animValue,
+                                child: child,
+                              ),
+                            );
+                          },
+                          child: _buildTaskCard(context, item, noteProvider),
+                        );
+                      },
+                      childCount: filteredTasks.length,
+                    ),
+                  ),
+                ),
+            ],
           );
         },
       ),
+    );
+  }
+
+  Widget _buildAppBar(double completionRate) {
+    return SliverAppBar(
+      expandedHeight: 200.0,
+      floating: false,
+      pinned: true,
+      stretch: true,
+      backgroundColor: Theme.of(context).primaryColor,
+      flexibleSpace: FlexibleSpaceBar(
+        stretchModes: const [StretchMode.zoomBackground, StretchMode.blurBackground],
+        title: const Text(
+          'Görev Merkezi',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+        ),
+        background: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Dark Gradient Overlay
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Theme.of(context).primaryColor,
+                    Theme.of(context).primaryColor.withOpacity(0.8),
+                  ],
+                ),
+              ),
+            ),
+            // Decorative circles
+            Positioned(
+              right: -50,
+              top: -50,
+              child: CircleAvatar(
+                radius: 100,
+                backgroundColor: Colors.white.withOpacity(0.1),
+              ),
+            ),
+            // Progress Center
+            Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const SizedBox(height: 20),
+                  Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      SizedBox(
+                        width: 80,
+                        height: 80,
+                        child: CircularProgressIndicator(
+                          value: completionRate,
+                          strokeWidth: 8,
+                          backgroundColor: Colors.white.withOpacity(0.2),
+                          valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      ),
+                      Text(
+                        '${(completionRate * 100).toInt()}%',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Genel Tamamlanma',
+                    style: TextStyle(color: Colors.white70, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        IconButton(
+          icon: Icon(_showCompleted ? Icons.visibility : Icons.visibility_off, color: Colors.white),
+          onPressed: () => setState(() => _showCompleted = !_showCompleted),
+          tooltip: 'Tamamlananları Göster/Gizle',
+        ),
+      ],
     );
   }
 
@@ -55,7 +177,7 @@ class _TaskHubScreenState extends State<TaskHubScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.check_circle_outline, size: 80, color: Theme.of(context).dividerColor),
+          Icon(Icons.assignment_turned_in_outlined, size: 80, color: Theme.of(context).disabledColor.withOpacity(0.3)),
           const SizedBox(height: 16),
           Text(
             'Bekleyen görev yok',
@@ -64,9 +186,13 @@ class _TaskHubScreenState extends State<TaskHubScreen> {
             ),
           ),
           const SizedBox(height: 8),
-          Text(
-            'Notlarına "- [ ] Görev" ekleyerek başlayabilirsin.',
-            style: TextStyle(color: Theme.of(context).disabledColor),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 40),
+            child: Text(
+              'Notlarına "- [ ] Görev" yazarak hedeflerini burada toplayabilirsin.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Theme.of(context).disabledColor),
+            ),
           ),
         ],
       ),
@@ -74,53 +200,89 @@ class _TaskHubScreenState extends State<TaskHubScreen> {
   }
 
   Widget _buildTaskCard(BuildContext context, TaskItem item, NoteProvider provider) {
-    return Card(
-      elevation: 2,
+    return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: ListTile(
-        leading: Checkbox(
-          value: item.isCompleted,
-          onChanged: (bool? value) {
-            if (value != null) {
-              _toggleTaskStatus(context, item, value);
-            }
-          },
-          activeColor: Colors.green,
-        ),
-        title: Text(
-          item.taskText,
-          style: TextStyle(
-            fontWeight: FontWeight.w500,
-            decoration: item.isCompleted ? TextDecoration.lineThrough : null,
-            color: item.isCompleted ? Colors.grey : null,
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: IntrinsicHeight(
+          child: Row(
+            children: [
+              // Left Accent Line
+              Container(
+                width: 6,
+                color: item.isCompleted ? Colors.green : Theme.of(context).primaryColor,
+              ),
+              Expanded(
+                child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  leading: Transform.scale(
+                    scale: 1.2,
+                    child: Checkbox(
+                      value: item.isCompleted,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                      onChanged: (bool? value) {
+                        if (value != null) {
+                          _toggleTaskStatus(context, item, value);
+                        }
+                      },
+                      activeColor: Colors.green,
+                    ),
+                  ),
+                  title: Text(
+                    item.taskText,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                      decoration: item.isCompleted ? TextDecoration.lineThrough : null,
+                      color: item.isCompleted ? Colors.grey : null,
+                    ),
+                  ),
+                  subtitle: Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Row(
+                      children: [
+                        Icon(Icons.description_outlined, size: 12, color: Theme.of(context).primaryColor.withOpacity(0.6)),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            item.note.title.isEmpty ? 'Başlıksız Not' : item.note.title,
+                            style: TextStyle(color: Theme.of(context).hintColor, fontSize: 12),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  trailing: const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
+                  onTap: () => _navigateToNote(context, item.note),
+                ),
+              ),
+            ],
           ),
         ),
-        subtitle: Row(
-          children: [
-            const Icon(Icons.description_outlined, size: 12, color: Colors.grey),
-            const SizedBox(width: 4),
-            Expanded(
-              child: Text(
-                item.note.title.isEmpty ? 'Başlıksız Not' : item.note.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
-        trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
-        onTap: () => _navigateToNote(context, item.note),
       ),
     );
   }
 
   List<TaskItem> _extractTasks(List<Note> notes) {
     List<TaskItem> tasks = [];
-    // Hem [ ] hem de [x] olanları yakala (case insensitive)
-    final regex = RegExp(r'- \[([ xX])\] (.*)');
+    final regex = RegExp(r'^- \[([ xX])\] (.*)', multiLine: true);
 
     for (var note in notes) {
+      if (note.isEncrypted) continue; // Şifreli notları tarama (Güvenlik)
+      
       final matches = regex.allMatches(note.content);
       for (var match in matches) {
         if (match.group(2) != null) {
@@ -131,7 +293,7 @@ class _TaskHubScreenState extends State<TaskHubScreen> {
             note: note,
             taskText: match.group(2)!.trim(),
             isCompleted: isCompleted,
-            originalLine: match.group(0)!, // Değişim için orijinal satırı sakla
+            originalLine: match.group(0)!,
           ));
         }
       }
@@ -142,14 +304,10 @@ class _TaskHubScreenState extends State<TaskHubScreen> {
   Future<void> _toggleTaskStatus(BuildContext context, TaskItem item, bool newValue) async {
     final noteProvider = Provider.of<NoteProvider>(context, listen: false);
     
-    // Basit bir replace: Orijinal satırı bul ve işaretini değiştir
-    // DİKKAT: Aynı içerikli birden fazla görev varsa ilkini değiştirir. 
-    // Daha güvenli olması için index bazlı veya split line bazlı gidilebilir ama şimdilik bu MVP için yeterli.
-    
-    String oldLine = item.originalLine; // Örn: - [ ] Market
+    String oldLine = item.originalLine;
     String newLine = oldLine.replaceFirst(
-      RegExp(r'- \[([ xX])\]'), 
-      newValue ? '- [x]' : '- [ ]'
+      RegExp(r'\[([ xX])\]'), 
+      newValue ? '[x]' : '[ ]'
     );
 
     String newContent = item.note.content.replaceFirst(oldLine, newLine);
@@ -165,34 +323,17 @@ class _TaskHubScreenState extends State<TaskHubScreen> {
        ScaffoldMessenger.of(context).showSnackBar(
          SnackBar(
            content: Text(newValue ? 'Görev tamamlandı! 🎉' : 'Görev geri alındı.'),
-           duration: const Duration(milliseconds: 1000),
+           duration: const Duration(seconds: 1),
+           behavior: SnackBarBehavior.floating,
            backgroundColor: newValue ? Colors.green : Colors.orange,
+           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
          ),
        );
     }
   }
 
   void _navigateToNote(BuildContext context, Note note) {
-    // Burada NoteEditor açılmalı
-    // Mevcut rota yapısına göre:
-     // Navigator.pushNamed(context, '/note-editor', arguments: note);
-     // Veya main.dart'taki yapıya göre push MaterialPageRoute
-     // Ama NoteListScreen içindeki logic karmaşık, en iyisi NoteListScreen'e dönüp search yapmak yerine
-     // Direkt bir editor activity açmak. (Şimdilik placeholder rota veya pop)
-     
-     // Doğrusu: Main screen'e "Şu notu aç" emri vermek ama bu karmaşık.
-     // En basiti: Geçici bir editor ekranı pushlamak.
-     
-     // NoteListScreen'deki _openEditor fonksiyonuna erişemiyoruz.
-     // O yüzden burada MarkdownEditor'ü direkt push edebiliriz ama onSave callback'i lazım.
-     // Ama TaskHub bir "Screen", yani üstünde stack var.
-     
-     // En temiz yöntem: Event Bus veya Provider üzerinden "Selected Note" set edip ana sayfaya dönmek.
-     // Ama o daha büyük refactor ister.
-     // Şimdilik sadece uyarı verelim veya basit bir editor açalım.
-     ScaffoldMessenger.of(context).showSnackBar(
-       const SnackBar(content: Text('Notu düzenlemek için Ana Ekrana dönün.')),
-     );
+    Navigator.of(context).pushNamed('/note-editor', arguments: note);
   }
 }
 

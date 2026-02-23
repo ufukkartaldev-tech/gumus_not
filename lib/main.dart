@@ -7,6 +7,7 @@ import 'screens/note_list_screen.dart';
 import 'screens/graph_view_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/splash_screen.dart';
+import 'screens/task_hub_screen.dart';
 import 'widgets/markdown_editor.dart';
 import 'models/note_model.dart';
 
@@ -52,6 +53,7 @@ class ConnectedNotebookApp extends StatelessWidget {
               '/': (context) => const NoteListScreen(),
               '/graph': (context) => const GraphViewScreen(),
               '/settings': (context) => const SettingsScreen(),
+              '/task-hub': (context) => const TaskHubScreen(),
             },
             onGenerateRoute: (settings) {
               if (settings.name == '/note-editor') {
