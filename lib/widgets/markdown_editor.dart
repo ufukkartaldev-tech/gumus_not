@@ -277,7 +277,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
                 right: 20,
                 child: FloatingActionButton.small(
                   onPressed: () => setState(() => _isFocusMode = false),
-                  backgroundColor: Colors.black.withValues(alpha: 0.5),
+                  backgroundColor: Colors.black.withOpacity(0.5),
                   child: const Icon(Icons.fullscreen_exit, color: Colors.white),
                 ),
               ),
@@ -373,25 +373,25 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
           height: 60,
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: (isDark ? Colors.grey[900] : Colors.white)!.withValues(alpha: 0.8),
+            color: (isDark ? Colors.grey[900] : Colors.white)!.withOpacity(0.8),
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+            border: Border.all(color: Colors.white.withOpacity(0.2)),
             boxShadow: [
-              BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 20, offset: const Offset(0, 5))
+              BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 20, offset: const Offset(0, 5))
             ],
           ),
           child: Row(
             children: [
                Container(
                  decoration: BoxDecoration(
-                   color: Theme.of(context).dividerColor.withValues(alpha: 0.1),
+                    color: Theme.of(context).dividerColor.withOpacity(0.1),
                    borderRadius: BorderRadius.circular(20),
                  ),
                  child: TabBar(
                    controller: _toolbarTabController,
                    indicatorSize: TabBarIndicatorSize.label,
                    indicator: BoxDecoration(
-                     color: Theme.of(context).primaryColor.withValues(alpha: 0.2),
+                      color: Theme.of(context).primaryColor.withOpacity(0.2),
                      borderRadius: BorderRadius.circular(20),
                    ),
                    labelColor: Theme.of(context).primaryColor,
@@ -573,7 +573,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
               margin: const EdgeInsets.only(right: 8),
               decoration: BoxDecoration(
-                color: isSelected ? Theme.of(context).primaryColor.withValues(alpha: 0.2) : Colors.transparent,
+                color: isSelected ? Theme.of(context).primaryColor.withOpacity(0.2) : Colors.transparent,
                 borderRadius: BorderRadius.circular(12),
                 border: isSelected ? Border.all(color: Theme.of(context).primaryColor, width: 1) : null,
               ),
@@ -582,7 +582,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
                 style: TextStyle(
                   fontSize: isSelected ? 22 : 18,
                   shadows: isSelected ? [
-                    Shadow(color: Theme.of(context).primaryColor.withValues(alpha: 0.5), blurRadius: 10)
+                    Shadow(color: Theme.of(context).primaryColor.withOpacity(0.5), blurRadius: 10)
                   ] : null
                 )
               ),
@@ -624,7 +624,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
             ),
             decoration: InputDecoration(
               hintText: 'Başlık',
-              hintStyle: TextStyle(color: Theme.of(context).disabledColor.withValues(alpha: 0.3)),
+              hintStyle: TextStyle(color: Theme.of(context).disabledColor.withOpacity(0.3)),
               border: InputBorder.none,
               contentPadding: EdgeInsets.zero,
             ),
@@ -646,7 +646,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
         
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 32),
-          child: Divider(color: Theme.of(context).dividerColor.withValues(alpha: 0.1), thickness: 1),
+          child: Divider(color: Theme.of(context).dividerColor.withOpacity(0.1), thickness: 1),
         ),
         
         Expanded(
@@ -668,7 +668,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
               cursorRadius: const Radius.circular(2),
               decoration: InputDecoration(
                 hintText: 'Düşüncelerinizi buraya yazın...',
-                hintStyle: TextStyle(color: Theme.of(context).disabledColor.withValues(alpha: 0.3), fontStyle: FontStyle.italic),
+                hintStyle: TextStyle(color: Theme.of(context).disabledColor.withOpacity(0.3), fontStyle: FontStyle.italic),
                 border: InputBorder.none,
               ),
             ),

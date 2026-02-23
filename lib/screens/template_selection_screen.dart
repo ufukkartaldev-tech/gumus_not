@@ -61,7 +61,7 @@ class TemplateSelectionScreen extends StatelessWidget {
         decoration: BoxDecoration(
           color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withValues(alpha: 0.3), width: 1.5),
+          border: Border.all(color: color.withOpacity(0.3), width: 1.5),
         ),
         padding: const EdgeInsets.all(16),
         child: Column(

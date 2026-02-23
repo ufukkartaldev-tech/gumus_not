@@ -86,20 +86,20 @@ class _NoteCardState extends State<NoteCard> with SingleTickerProviderStateMixin
               borderRadius: const BorderRadius.all(Radius.circular(20)),
               boxShadow: [
                 BoxShadow(
-                  color: accentColor.withValues(alpha: _isHovered ? 0.2 : 0.05),
+                  color: accentColor.withOpacity(_isHovered ? 0.2 : 0.05),
                   blurRadius: _isHovered ? 16 : 6,
                   offset: Offset(0, _isHovered ? 8 : 4),
                   spreadRadius: _isHovered ? 1 : 0,
                 ),
                 if (!_isHovered)
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.04),
+                    color: Colors.black.withOpacity(isDark ? 0.3 : 0.04),
                     blurRadius: 2,
                     offset: const Offset(0, 1),
                   ),
               ],
               border: Border.all(
-                color: _isHovered ? accentColor.withValues(alpha: 0.5) : theme.dividerColor.withValues(alpha: isDark ? 0.2 : 0.6),
+                color: _isHovered ? accentColor.withOpacity(0.5) : theme.dividerColor.withOpacity(isDark ? 0.2 : 0.6),
                 width: _isHovered ? 1.5 : 1,
               ),
             ),
@@ -109,7 +109,7 @@ class _NoteCardState extends State<NoteCard> with SingleTickerProviderStateMixin
               child: InkWell(
                 onTap: widget.onTap,
                 borderRadius: BorderRadius.circular(20),
-                splashColor: accentColor.withValues(alpha: 0.1),
+                splashColor: accentColor.withOpacity(0.1),
                 hoverColor: Colors.transparent, 
                 child: Stack(
                   children: [
@@ -121,8 +121,8 @@ class _NoteCardState extends State<NoteCard> with SingleTickerProviderStateMixin
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                             colors: [
-                              noteColor.withValues(alpha: isDark ? 0.15 : 0.1),
-                              noteColor.withValues(alpha: isDark ? 0.05 : 0.02),
+                              noteColor.withOpacity(isDark ? 0.15 : 0.1),
+                              noteColor.withOpacity(isDark ? 0.05 : 0.02),
                               Colors.transparent,
                             ],
                             stops: const [0.0, 0.6, 1.0],
@@ -160,7 +160,7 @@ class _NoteCardState extends State<NoteCard> with SingleTickerProviderStateMixin
                                            Container(
                                               padding: const EdgeInsets.all(4),
                                               decoration: BoxDecoration(
-                                                 color: Colors.orange.withValues(alpha: 0.2),
+                                                 color: Colors.orange.withOpacity(0.2),
                                                  shape: BoxShape.circle,
                                               ),
                                               child: const Icon(Icons.lock_rounded, size: 14, color: Colors.orange),
@@ -175,7 +175,7 @@ class _NoteCardState extends State<NoteCard> with SingleTickerProviderStateMixin
                                               shape: BoxShape.circle,
                                               boxShadow: [
                                                 BoxShadow(
-                                                  color: noteColor.withValues(alpha: 0.4),
+                                                  color: noteColor.withOpacity(0.4),
                                                   blurRadius: 4,
                                                   spreadRadius: 1,
                                                 )
@@ -242,15 +242,15 @@ class _NoteCardState extends State<NoteCard> with SingleTickerProviderStateMixin
                                    borderRadius: BorderRadius.circular(4),
                                    gradient: LinearGradient(
                                       colors: [
-                                         theme.disabledColor.withValues(alpha: 0.1),
-                                         theme.disabledColor.withValues(alpha: 0.05),
+                                          theme.disabledColor.withOpacity(0.1),
+                                          theme.disabledColor.withOpacity(0.05),
                                       ],
                                    ),
                                 ),
                                 child: Center(
                                    child: Text(
                                       '•••••••••••••••••',
-                                      style: TextStyle(letterSpacing: 4, color: theme.disabledColor.withValues(alpha: 0.5)),
+                                       style: TextStyle(letterSpacing: 4, color: theme.disabledColor.withOpacity(0.5)),
                                    ),
                                 ),
                              )
@@ -260,7 +260,7 @@ class _NoteCardState extends State<NoteCard> with SingleTickerProviderStateMixin
                               style: theme.textTheme.bodyMedium?.copyWith(
                                 height: 1.6,
                                 fontSize: 14,
-                                color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.85),
+                                color: theme.textTheme.bodyMedium?.color?.withOpacity(0.85),
                               ),
                               maxLines: 4,
                               overflow: TextOverflow.ellipsis,
@@ -282,9 +282,9 @@ class _NoteCardState extends State<NoteCard> with SingleTickerProviderStateMixin
                                  Container(
                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                    decoration: BoxDecoration(
-                                     color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                                     borderRadius: BorderRadius.circular(8),
-                                     border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.2)),
+                                      color: theme.colorScheme.primary.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: theme.colorScheme.primary.withOpacity(0.2)),
                                    ),
                                    child: Row(
                                      mainAxisSize: MainAxisSize.min,
@@ -435,7 +435,7 @@ class _ActionButton extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.1),
+            color: color.withOpacity(0.1),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(icon, size: 18, color: color),

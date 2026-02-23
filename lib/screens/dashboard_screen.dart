@@ -255,9 +255,10 @@ class DashboardScreen extends StatelessWidget {
                   children: [
                     const Text('Popüler Etiketler', style: TextStyle(fontWeight: FontWeight.bold)),
                     const SizedBox(height: 12),
-                    ...tagFreq.entries.toList()
-                      ..sort((a, b) => b.value.compareTo(a.value))
-                      ..take(4).map((entry) => Padding(
+                    ...(tagFreq.entries.toList()
+                      ..sort((a, b) => b.value.compareTo(a.value)))
+                      .take(4)
+                      .map((entry) => Padding(
                         padding: const EdgeInsets.only(bottom: 8.0),
                         child: Row(
                           children: [
