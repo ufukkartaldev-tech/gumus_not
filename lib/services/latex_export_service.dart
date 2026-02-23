@@ -1,120 +1,102 @@
 import 'package:flutter/material.dart';
-import '../widgets/math_markdown_renderer.dart';
 
 class LatexExportService {
   static String convertToLatex(String markdownContent) {
-    String latexContent = markdownContent;
+    List<String> lines = markdownContent.split('\n');
+    List<String> resultLines = [];
+    bool inList = false;
 
-    // Convert headers
-    latexContent = latexContent.replaceAllMapped(
-      RegExp(r'^# (.+)$', multiLine: true),
-      (match) => '\\section{${match.group(1)}}',
-    );
-    latexContent = latexContent.replaceAllMapped(
-      RegExp(r'^## (.+)$', multiLine: true),
-      (match) => '\\subsection{${match.group(1)}}',
-    );
-    latexContent = latexContent.replaceAllMapped(
-      RegExp(r'^### (.+)$', multiLine: true),
-      (match) => '\\subsubsection{${match.group(1)}}',
-    );
+    for (int i = 0; i < lines.length; i++) {
+      String line = lines[i];
+      String trimmed = line.trim();
 
-    // Convert bold and italic
-    latexContent = latexContent.replaceAllMapped(
-      RegExp(r'\*\*(.+?)\*\*'),
-      (match) => '\\textbf{${match.group(1)}}',
-    );
-    latexContent = latexContent.replaceAllMapped(
-      RegExp(r'\*(.+?)\*'),
-      (match) => '\\textit{${match.group(1)}}',
-    );
+      // Liste Yönetimi (Itemize)
+      if (trimmed.startsWith('- ')) {
+        if (!inList) {
+          resultLines.add('\\begin{itemize}');
+          inList = true;
+        }
+        resultLines.add('  \\item ${trimmed.substring(2)}');
+      } else {
+        if (inList) {
+          resultLines.add('\\end{itemize}');
+          inList = false;
+        }
 
-    // Convert code blocks
-    latexContent = latexContent.replaceAllMapped(
-      RegExp(r'```(\w+)?\n(.*?)\n```', dotAll: true),
-      (match) {
-        final language = match.group(1) ?? '';
-        final code = match.group(2) ?? '';
-        return '\\begin{verbatim}\n$code\n\\end{verbatim}';
-      },
-    );
+        // Başlıklar
+        if (trimmed.startsWith('# ')) {
+          resultLines.add('\\section{${trimmed.substring(2)}}');
+        } else if (trimmed.startsWith('## ')) {
+          resultLines.add('\\subsection{${trimmed.substring(3)}}');
+        } else if (trimmed.startsWith('### ')) {
+          resultLines.add('\\subsubsection{${trimmed.substring(4)}}');
+        } 
+        // Kod Blokları
+        else if (trimmed.startsWith('```')) {
+          resultLines.add('\\begin{verbatim}');
+          i++;
+          while (i < lines.length && !lines[i].trim().startsWith('```')) {
+            resultLines.add(lines[i]);
+            i++;
+          }
+          resultLines.add('\\end{verbatim}');
+        }
+        // Alıntılar
+        else if (trimmed.startsWith('> ')) {
+          resultLines.add('\\begin{quote}');
+          resultLines.add(trimmed.substring(2));
+          resultLines.add('\\end{quote}');
+        }
+        // Standart Paragraf
+        else if (trimmed.isNotEmpty) {
+          resultLines.add(trimmed);
+        } else {
+          resultLines.add(''); // Boş satır
+        }
+      }
+    }
+    
+    if (inList) resultLines.add('\\end{itemize}');
 
-    // Convert inline code
-    latexContent = latexContent.replaceAllMapped(
-      RegExp(r'`(.+?)`'),
-      (match) => '\\texttt{${match.group(1)}}',
-    );
+    String combined = resultLines.join('\n');
 
-    // Convert lists
-    latexContent = latexContent.replaceAllMapped(
-      RegExp(r'^- (.+)$', multiLine: true),
-      (match) => '\\item ${match.group(1)}',
-    );
+    // Satır içi formatlamalar (Inline)
+    combined = combined.replaceAllMapped(RegExp(r'\*\*(.+?)\*\*'), (m) => '\\textbf{${m.group(1)}}');
+    combined = combined.replaceAllMapped(RegExp(r'\*(.+?)\*'), (m) => '\\textit{${m.group(1)}}');
+    combined = combined.replaceAllMapped(RegExp(r'`(.+?)`'), (m) => '\\texttt{${m.group(1)}}');
+    
+    // Matematik
+    combined = combined.replaceAllMapped(RegExp(r'\$\$(.+?)\$\$', dotAll: true), (m) => '\\[ ${m.group(1)} \\]');
+    combined = combined.replaceAllMapped(RegExp(r'\$(.+?)\$'), (m) => '\\( ${m.group(1)} \\)');
 
-    // Convert math blocks (already in LaTeX format)
-    latexContent = latexContent.replaceAllMapped(
-      RegExp(r'\$\$(.+?)\$\$', dotAll: true),
-      (match) => '\\[\n${match.group(1)}\n\\]',
-    );
-
-    // Convert inline math (already in LaTeX format)
-    latexContent = latexContent.replaceAllMapped(
-      RegExp(r'\$(.+?)\$'),
-      (match) => '\\(${match.group(1)}\\)',
-    );
-
-    // Convert tables (basic support)
-    latexContent = latexContent.replaceAllMapped(
-      RegExp(r'^\|(.+)\|\$', multiLine: true),
-      (match) {
-        final row = match.group(1)!;
-        final cells = row.split('|').map((cell) => cell.trim()).toList();
-        final latexRow = cells.join(' & ');
-        return '$latexRow \\\\';
-      },
-    );
-
-    // Convert links
-    latexContent = latexContent.replaceAllMapped(
-      RegExp(r'\[([^\]]+)\]\(([^)]+)\)'),
-      (match) => '\\href{${match.group(2)}}{${match.group(1)}}',
-    );
-
-    // Convert line breaks
-    latexContent = latexContent.replaceAllMapped(
-      RegExp(r'\n\n'),
-      (match) => '\n\n',
-    );
-
-    return latexContent;
+    return combined;
   }
 
-  static String generateLatexDocument(String title, String content) {
+  static String generateLatexDocument({required String title, required String content, String author = 'GümüşNot'}) {
     final convertedContent = convertToLatex(content);
     
     return '''
 \\documentclass[12pt,a4paper]{article}
 \\usepackage[utf8]{inputenc}
+\\usepackage[turkish]{babel} % TÜRKÇE DESTEĞİ
 \\usepackage[T1]{fontenc}
-\\usepackage{amsmath}
-\\usepackage{amsfonts}
-\\usepackage{amssymb}
+\\usepackage{amsmath, amsfonts, amssymb}
 \\usepackage{graphicx}
 \\usepackage{hyperref}
 \\usepackage{geometry}
-\\usepackage{listings}
 \\usepackage{xcolor}
 \\usepackage{verbatim}
 
 \\geometry{a4paper, margin=1in}
 
 \\title{$title}
-\\author{Generated by Connected Notebook}
+\\author{$author}
 \\date{\\today}
 
 \\begin{document}
 
 \\maketitle
+\\newpage
 
 $convertedContent
 
@@ -128,70 +110,20 @@ $convertedContent
     return '''
 \\documentclass[12pt]{beamer}
 \\usepackage[utf8]{inputenc}
+\\usepackage[turkish]{babel}
 \\usepackage[T1]{fontenc}
-\\usepackage{amsmath}
-\\usepackage{amsfonts}
-\\usepackage{amssymb}
-\\usepackage{graphicx}
-\\usepackage{hyperref}
-\\usepackage{listings}
-\\usepackage{xcolor}
+\\usepackage{amsmath, amsfonts, amssymb}
 
 \\usetheme{Madrid}
-\\usecolortheme{default}
-
 \\title{$title}
-\\author{Generated by Connected Notebook}
-\\date{\\today}
+\\author{GümüşNot}
 
 \\begin{document}
-
 \\frame{\\titlepage}
 
+\\begin{frame}[fragile]
 $convertedContent
-
-\\end{document}
-''';
-  }
-
-  static String generateLatexReport(String title, String author, String content) {
-    final convertedContent = convertToLatex(content);
-    
-    return '''
-\\documentclass[12pt,a4paper]{report}
-\\usepackage[utf8]{inputenc}
-\\usepackage[T1]{fontenc}
-\\usepackage{amsmath}
-\\usepackage{amsfonts}
-\\usepackage{amssymb}
-\\usepackage{graphicx}
-\\usepackage{hyperref}
-\\usepackage{geometry}
-\\usepackage{listings}
-\\usepackage{xcolor}
-\\usepackage{verbatim}
-\\usepackage{fancyhdr}
-\\usepackage{tocbibind}
-
-\\geometry{a4paper, margin=1in}
-
-\\title{$title}
-\\author{$author}
-\\date{\\today}
-
-\\pagestyle{fancy}
-\\fancyhf{}
-\\fancyhead[L]{\\leftmark}
-\\fancyhead[R]{\\thepage}
-\\fancyfoot[C]{\\thepage}
-
-\\begin{document}
-
-\\maketitle
-\\tableofcontents
-\\newpage
-
-$convertedContent
+\\end{frame}
 
 \\end{document}
 ''';

@@ -225,8 +225,9 @@ class _LatexExportScreenState extends State<LatexExportScreen> {
           break;
         default:
           latexContent = LatexExportService.generateLatexDocument(
-            widget.note.title,
-            widget.note.content,
+            title: widget.note.title,
+            content: widget.note.content,
+            author: _author.isEmpty ? 'GümüşNot' : _author,
           );
       }
 
