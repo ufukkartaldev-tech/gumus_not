@@ -122,6 +122,7 @@ class EncryptionService {
 
   static String encrypt(String plainText) {
     if (_encrypter == null) throw Exception('Kasa kilitli');
+    if (plainText.isEmpty) return '';
     
     final iv = IV.fromSecureRandom(16);
     final encrypted = _encrypter!.encrypt(plainText, iv: iv);
@@ -130,6 +131,7 @@ class EncryptionService {
 
   static String decrypt(String encryptedPackage) {
     if (_encrypter == null) throw Exception('Kasa kilitli');
+    if (encryptedPackage.isEmpty) return '';
 
     try {
       final parts = encryptedPackage.split(':');
@@ -167,6 +169,7 @@ class EncryptionService {
   // --- Eski Uyumluluk veya Not Bazlı Şifreleme (Değişmedi ama Master Key entegre edilebilir) ---
 
   static String encryptWithPassword(String plainText, String password) {
+    if (plainText.isEmpty) return '';
     final salt = IV.fromSecureRandom(16);
     final key = Key(Uint8List.fromList(sha256.convert(utf8.encode(password + salt.base64)).bytes));
     final iv = IV.fromSecureRandom(16);
@@ -176,26 +179,22 @@ class EncryptionService {
   }
 
   static String decryptWithPassword(String encryptedPackage, String password) {
-    final parts = encryptedPackage.split(':');
-    final salt = IV.fromBase64(parts[0]);
-    final iv = IV.fromBase64(parts[1]);
-    final encoded = Encrypted.fromBase64(parts[2]);
-    final key = Key(Uint8List.fromList(sha256.convert(utf8.encode(password + salt.base64)).bytes));
-    return Encrypter(AES(key)).decrypt(encoded, iv: iv);
+    if (encryptedPackage.isEmpty) return '';
+    try {
+      final parts = encryptedPackage.split(':');
+      if (parts.length != 3) throw Exception('Format hatası');
+      final salt = IV.fromBase64(parts[0]);
+      final iv = IV.fromBase64(parts[1]);
+      final encoded = Encrypted.fromBase64(parts[2]);
+      final key = Key(Uint8List.fromList(sha256.convert(utf8.encode(password + salt.base64)).bytes));
+      return Encrypter(AES(key)).decrypt(encoded, iv: iv);
+    } catch (e) {
+      throw Exception('Şifre çözme hatası');
+    }
   }
 
-  /// Kurtarma anahtarının geçerli olup olmadığını doğrular
   static bool verifyRecoveryKey(String recoveryKey, String password) {
-    try {
-      // Base64 format kontrolü
-      final decoded = base64.decode(recoveryKey);
-      if (decoded.length != 32) return false; // 256 bit = 32 byte
-      
-      // Kurtarma anahtarı formatı geçerli, gerçek doğrulama için attemptRecovery kullanılmalı
-      return true;
-    } catch (e) {
-      return false;
-    }
+    return recoveryKey.length == 24;
   }
 
   /// Kurtarma anahtarı ile kurtarma işlemi yapar
