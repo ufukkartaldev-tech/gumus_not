@@ -1,20 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'providers/note_provider.dart';
-import 'providers/theme_provider.dart';
-import 'screens/note_list_screen.dart';
-import 'screens/graph_view_screen.dart';
-import 'screens/settings_screen.dart';
-import 'screens/splash_screen.dart';
-import 'screens/task_hub_screen.dart';
-import 'screens/main_screen.dart';
-import 'screens/dashboard_screen.dart';
-import 'screens/widget_screen.dart';
-import 'widgets/markdown_editor.dart';
-import 'models/note_model.dart';
-import 'services/sharing_service.dart';
-import 'services/widget_service.dart';
+import 'package:connected_notebook/features/notes/providers/note_provider.dart';
+import 'package:connected_notebook/core/theme/theme_provider.dart';
+import 'package:connected_notebook/features/notes/presentation/note_list_screen.dart';
+import 'package:connected_notebook/features/graph/presentation/graph_view_screen.dart';
+import 'package:connected_notebook/features/settings/presentation/settings_screen.dart';
+import 'package:connected_notebook/features/splash/presentation/splash_screen.dart';
+import 'package:connected_notebook/features/tasks/presentation/task_hub_screen.dart';
+import 'package:connected_notebook/features/notes/presentation/main_screen.dart';
+import 'package:connected_notebook/features/notes/presentation/dashboard_screen.dart';
+import 'package:connected_notebook/features/home_widget/presentation/widget_screen.dart';
+import 'package:connected_notebook/features/notes/widgets/markdown_editor.dart';
+import 'package:connected_notebook/features/notes/models/note_model.dart';
+import 'package:connected_notebook/shared/utils/sharing_service.dart';
+import 'package:connected_notebook/features/home_widget/services/widget_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

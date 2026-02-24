@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:connected_notebook/widgets/note_card.dart';
-import 'package:connected_notebook/models/note_model.dart';
+import 'package:connected_notebook/features/notes/widgets/note_card.dart';
+import 'package:connected_notebook/features/notes/models/note_model.dart';
 
 void main() {
   group('NoteCard Widget Tests', () {

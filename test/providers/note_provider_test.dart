@@ -1,9 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:connected_notebook/providers/note_provider.dart';
-import 'package:connected_notebook/models/note_model.dart';
+import 'package:connected_notebook/features/notes/providers/note_provider.dart';
+import 'package:connected_notebook/features/notes/models/note_model.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'package:connected_notebook/services/database_service.dart';
+import 'package:connected_notebook/core/database/database_service.dart';
 import 'package:flutter/material.dart';
 
 void main() {

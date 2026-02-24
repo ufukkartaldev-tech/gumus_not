@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:connected_notebook/main.dart';
-import 'package:connected_notebook/providers/theme_provider.dart';
+import 'package:connected_notebook/core/theme/theme_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
