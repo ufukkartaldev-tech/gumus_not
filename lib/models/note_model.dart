@@ -194,6 +194,18 @@ class Note {
     return '${words.take(20).join(' ')}...';
   }
 
+  int get wordCount {
+    if (content.trim().isEmpty) return 0;
+    return content.trim().split(RegExp(r'\s+')).length;
+  }
+
+  int get readingTime {
+    final words = wordCount;
+    if (words == 0) return 0;
+    // Average reading speed is 200-250 words per minute
+    return (words / 200).ceil();
+  }
+
   @override
   String toString() {
     return 'Note(id: $id, title: $title, createdAt: $DateTime.fromMillisecondsSinceEpoch(createdAt))';

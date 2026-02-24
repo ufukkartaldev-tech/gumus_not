@@ -1,9 +1,0 @@
-﻿
-> Building Windows applicati
-on...                       
-          
-> Building Windows applicati
-on...                       
-             54,2s
-
-
