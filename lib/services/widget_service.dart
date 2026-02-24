@@ -8,14 +8,12 @@ class WidgetService {
   factory WidgetService() => _instance;
   WidgetService._internal();
 
-  final DatabaseService _dbService = DatabaseService();
-
   // Widget'ı güncellemek için ana fonksiyon
   Future<void> updateWidget() async {
     try {
       // Son notları ve görevleri getir
-      final recentNotes = await _dbService.getRecentNotes(limit: 3);
-      final pendingTasks = await _dbService.getPendingTasks(limit: 5);
+      final recentNotes = await DatabaseService.getRecentNotes(limit: 3);
+      final pendingTasks = await DatabaseService.getPendingTasks(limit: 5);
 
       // Widget verisini hazırla
       final widgetData = {
@@ -37,7 +35,7 @@ class WidgetService {
   // Hızlı not widget'ı için
   Future<void> updateQuickNoteWidget() async {
     try {
-      final stats = await _dbService.getDatabaseStats();
+      final stats = await DatabaseService.getDatabaseStats();
       
       final quickNoteData = {
         'totalNotes': stats['totalNotes'] ?? 0,

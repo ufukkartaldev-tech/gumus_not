@@ -5,6 +5,7 @@ import '../providers/theme_provider.dart';
 import '../themes/app_theme.dart';
 import '../services/encryption_service.dart';
 import 'about_screen.dart';
+import 'backup_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({Key? key}) : super(key: key);
@@ -181,6 +182,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 24),
           _buildDataManagementSection(),
           const SizedBox(height: 24),
+          _buildBackupSection(),
+          const SizedBox(height: 24),
           _buildAboutSection(),
         ],
       ),
@@ -340,6 +343,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildBackupSection() {
+    return Card(
+      child: ListTile(
+        leading: const Icon(Icons.cloud_sync),
+        title: const Text('Yedekleme & Senkronizasyon'),
+        subtitle: const Text('Google Drive ile yedekleme ve senkronizasyon'),
+        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const BackupScreen()),
+          );
+        },
       ),
     );
   }

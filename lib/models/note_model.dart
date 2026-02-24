@@ -151,6 +151,34 @@ class Note {
     );
   }
 
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'content': content,
+      'createdAt': createdAt,
+      'updatedAt': updatedAt,
+      'isEncrypted': isEncrypted,
+      'tags': tags,
+      'color': color,
+      'folderName': folderName,
+    };
+  }
+
+  factory Note.fromJson(Map<String, dynamic> json) {
+    return Note(
+      id: json['id'],
+      title: json['title'] ?? '',
+      content: json['content'] ?? '',
+      createdAt: json['createdAt'] ?? 0,
+      updatedAt: json['updatedAt'] ?? 0,
+      isEncrypted: json['isEncrypted'] ?? false,
+      tags: List<String>.from(json['tags'] ?? []),
+      color: json['color'],
+      folderName: json['folderName'] ?? 'Genel',
+    );
+  }
+
   List<String> extractLinks() {
     final RegExp linkRegex = RegExp(r'\[\[([^\]]+)\]\]');
     final matches = linkRegex.allMatches(content);

@@ -63,6 +63,19 @@ class _WidgetScreenState extends State<WidgetScreen> {
     }
   }
 
+  String _getDailyQuote() {
+    final quotes = [
+      "Bilgi, gücün temelidir.",
+      "Not almak, düşünmek için yazmaktır.",
+      "Küçük adımlar, büyük değişimler yaratır.",
+      "Başarı, iyi alışkanlıkların birikimidir.",
+      "Bugün yazdığın, yarının bilgisidir.",
+    ];
+    
+    final dayOfYear = DateTime.now().difference(DateTime(DateTime.now().year, 1, 1)).inDays;
+    return quotes[dayOfYear % quotes.length];
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -159,7 +172,7 @@ class _WidgetScreenState extends State<WidgetScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '💡 "${_widgetService._getDailyQuote()}"',
+                    '💡 "${_getDailyQuote()}"',
                     style: const TextStyle(fontStyle: FontStyle.italic),
                   ),
                   const SizedBox(height: 8),
@@ -200,7 +213,7 @@ class _WidgetScreenState extends State<WidgetScreen> {
                 final note = Note.fromMap(noteData);
                 return ListTile(
                   dense: true,
-                  leading: const Icon(Icons.note_outline),
+                  leading: const Icon(Icons.note),
                   title: Text(
                     note.title,
                     maxLines: 1,

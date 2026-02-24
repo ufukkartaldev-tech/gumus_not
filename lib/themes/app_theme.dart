@@ -71,7 +71,7 @@ class AppTheme {
         onError: Colors.white,
         surface: surface,
         onSurface: textPrimary,
-        surfaceContainerHighest: isDark ? darkSurfaceHighlight : Color(0xFFF9FAFB),
+        secondaryContainer: isDark ? darkSurfaceHighlight : Color(0xFFF9FAFB),
         outline: border,
       ),
       

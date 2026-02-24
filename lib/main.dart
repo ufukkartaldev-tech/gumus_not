@@ -10,8 +10,11 @@ import 'screens/splash_screen.dart';
 import 'screens/task_hub_screen.dart';
 import 'screens/main_screen.dart';
 import 'screens/dashboard_screen.dart';
+import 'screens/widget_screen.dart';
 import 'widgets/markdown_editor.dart';
 import 'models/note_model.dart';
+import 'services/sharing_service.dart';
+import 'services/widget_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -58,6 +61,7 @@ class ConnectedNotebookApp extends StatelessWidget {
               '/graph': (context) => const GraphViewScreen(),
               '/settings': (context) => const SettingsScreen(),
               '/task-hub': (context) => const TaskHubScreen(),
+              '/widgets': (context) => const WidgetScreen(),
             },
             onGenerateRoute: (settings) {
               if (settings.name == '/note-editor') {

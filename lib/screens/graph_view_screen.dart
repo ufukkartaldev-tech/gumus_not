@@ -1,7 +1,8 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:vector_math/vector_math_64.dart' hide Character;
+import 'package:collection/collection.dart';
+import 'package:vector_math/vector_math_64.dart' hide Character, Colors;
 import '../models/note_model.dart';
 import '../providers/note_provider.dart';
 
@@ -260,8 +261,8 @@ class _GraphViewScreenState extends State<GraphViewScreen> with SingleTickerProv
           boundaryMargin: const EdgeInsets.all(2000),
           minScale: 0.1,
           maxScale: 3.0,
-          child: ListenableBuilder(
-            listenable: _graphController,
+          child: AnimatedBuilder(
+            animation: _graphController,
             builder: (context, child) {
               return RepaintBoundary(
                 child: CustomPaint(
