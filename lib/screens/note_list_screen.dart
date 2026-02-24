@@ -705,20 +705,33 @@ class _NoteListScreenState extends State<NoteListScreen> {
   void _selectNote(Note note) async {
     // Şifreli Not Kontrolü
     if (note.isEncrypted) {
-      final password = await _showPasswordDialog(isCreate: false);
-      if (password == null) return; // Kullanıcı iptal etti
+      if (!EncryptionService.isInitialized()) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Şifreleme servisi başlatılmamış. Ayarlardan açın.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
 
+      // Master key ile şifreli notu doğrudan açmaya çalış
       try {
-        final decryptedContent = EncryptionService.decryptWithPassword(note.content, password);
+        final decryptedContent = EncryptionService.decrypt(note.content);
         // Deşifre edilmiş içeriği olan GEÇİCİ bir not oluşturuyoruz
-        final decryptedNote = note.copyWith(content: decryptedContent);
+        final decryptedNote = note.copyWith(content: decryptedContent, isEncrypted: false);
         
-        _openEditor(decryptedNote, password);
+        _openEditor(decryptedNote, null);
       } catch (e) {
         if (mounted) {
-           ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Hatalı şifre! Erişim reddedildi.'), backgroundColor: Colors.red),
-           );
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Bu not açılamıyor. Şifreleme servisi kontrol edin.'),
+              backgroundColor: Colors.red,
+            ),
+          );
         }
       }
     } else {
@@ -766,11 +779,11 @@ class _NoteListScreenState extends State<NoteListScreen> {
 
     // Şifreli kayıt gerekiyorsa, içeriği önce şifrele
     Note noteToPersist;
-    if (encryptionPassword != null) {
-      final encryptedContent = EncryptionService.encryptWithPassword(
-        savedNote.content,
-        encryptionPassword,
-      );
+    if (savedNote.isEncrypted) {
+      if (!EncryptionService.isInitialized()) {
+        throw Exception('Şifreleme servisi başlatılmamış');
+      }
+      final encryptedContent = EncryptionService.encrypt(savedNote.content);
       noteToPersist = savedNote.copyWith(
         content: encryptedContent,
         isEncrypted: true,

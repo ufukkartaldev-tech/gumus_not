@@ -82,16 +82,9 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
     String content = widget.note?.content ?? '';
     _isEncrypted = widget.note?.isEncrypted ?? false;
     
+    // Şifreli notlar otomatik olarak çözülmez, şifre istenir
     if (_isEncrypted) {
-      if (EncryptionService.isInitialized()) {
-        try {
-          content = EncryptionService.decrypt(content);
-        } catch (e) {
-          content = 'Hata: Şifre çözülemedi.';
-        }
-      } else {
-         content = 'Bu not şifreli.';
-      }
+      content = '🔒 Bu not şifreli. İçeriği görmek için şifre giriniz.';
     }
     
     _contentController = TextEditingController(text: content);
@@ -200,6 +193,72 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
 
   void _showError(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
+  }
+
+  Future<void> _showPasswordDialog() async {
+    final passwordController = TextEditingController();
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('🔒 Şifreli Not'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Bu notun içeriğini görmek için şifrenizi girin:'),
+              const SizedBox(height: 16),
+              TextField(
+                controller: passwordController,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: 'Şifre',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.lock),
+                ),
+                onSubmitted: (_) => _unlockNote(passwordController.text),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('İptal'),
+            ),
+            ElevatedButton(
+              onPressed: () => _unlockNote(passwordController.text),
+              child: const Text('Giriş'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _unlockNote(String password) async {
+    try {
+      if (!EncryptionService.isInitialized()) {
+        _showError('Şifreleme servisi başlatılmamış. Ayarlardan şifreleyiciyi açın.');
+        Navigator.of(context).pop();
+        return;
+      }
+
+      // Şifreyi doğrula ve notu çöz
+      final encryptedContent = widget.note?.content ?? '';
+      final decryptedContent = EncryptionService.decrypt(encryptedContent);
+      
+      // Şifre doğrulama başarılı, içeriği güncelle
+      setState(() {
+        _contentController.text = decryptedContent;
+        _isEncrypted = false; // Geçici olarak kilidi aç
+      });
+      
+      Navigator.of(context).pop();
+      _showError('Not başarıyla açıldı');
+      
+    } catch (e) {
+      _showError('Şifre hatalı veya not açılamadı: $e');
+    }
   }
 
   void _insertMarkdownSyntax(String syntax) {
@@ -610,6 +669,46 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
   }
 
   Widget _buildEditor(BuildContext context) {
+    // Eğer not şifreliyse ve henüz açılmadıysa şifre dialogunu göster
+    if (_isEncrypted && _contentController.text.contains('🔒 Bu not şifreli')) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.lock_rounded, size: 80, color: Colors.orange.withOpacity(0.6)),
+            const SizedBox(height: 24),
+            Text(
+              'Bu Not Şifreli',
+              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: Colors.orange,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'İçeriği görmek ve düzenlemek için şifre giriniz.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).disabledColor,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
+            ElevatedButton.icon(
+              onPressed: _showPasswordDialog,
+              icon: const Icon(Icons.lock_open),
+              label: const Text('Şifre ile Aç'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Column(
       children: [
         Padding(
