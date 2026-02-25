@@ -100,7 +100,7 @@ GümüşNot, ekran boyutuna göre çalışma alanını optimize eder:
 *   **Temel Not Yönetimi**: Oluşturma, düzenleme, silme, arama
 *   **Zettelkasten Bağlantıları**: Çift yönlü bağlantılar ve grafik görünümü
 *   **Görev Merkezi**: Notlardaki görevleri otomatik tarama ve yönetme
-*   **Şifreleme**: AES-256 ile not şifreleme ve biyometrik koruma
+*   **Şifreleme ve Güvenlik**: AES-256 ile not şifreleme, biyometrik koruma ve geliştirilmiş şifre hataları ile güvenli çalışma
 *   **Markdown ve LaTeX**: Zengin metin ve matematiksel formül desteği
 *   **Çizim Özelliği**: El yazısı notlar ve şemalar
 *   **Resim Desteği**: Kamera ve galeriden görsel ekleme
@@ -110,6 +110,7 @@ GümüşNot, ekran boyutuna göre çalışma alanını optimize eder:
 *   **Paylaşım Özellikleri**: Diğer uygulamalardan içerik paylaşarak not oluşturma
 
 ### 🚧 Geliştirme Aşamasında
+*   **SOLID Mimari Göçü**: Kod tabanının daha modüler ve test edilebilir olması için SOLID prensiplerine uyarlanması
 *   **Windows OCR**: Platform kütüphane uyumsuzlukları nedeniyle geçici olarak devre dışı
 *   **Bulut Senkronizasyonu**: Google Drive entegrasyonu altyapısı hazır, mobil sürümlerde devam ediyor
 *   **Sesli Not**: Ses kaydetme ve metne çevirme özelliği planlanıyor
@@ -144,7 +145,6 @@ Proje hakkında detaylı bilgi için aşağıdaki belgelere göz atabilirsiniz:
 *   **[Resim Desteği](RESIM_DESTEGI.md)** - Görsel yönetimi ve optimizasyonu
 *   **[Sesli Not](SESLI_NOT.md)** - Ses kaydetme özellikleri (planlanan)
 *   **[OCR Özelliği](OCR_OZELLIGI.md)** - Metin tanıma sistemi
-*   **[Kalite Raporları](KALITE_RAPORU.md)** - Kod kalitesi ve analiz sonuçları
 *   **[Test Kapsamı](TEST_COVERAGE_REPORT.md)** - Detaylı test raporları
 
 ---
