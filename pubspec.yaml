@@ -80,6 +80,7 @@ dependencies:
   home_widget: ^0.9.0
   receive_sharing_intent: ^1.8.0
   share_plus: ^7.2.2
+  flutter_secure_storage: ^10.0.0
 
 
 dev_dependencies:

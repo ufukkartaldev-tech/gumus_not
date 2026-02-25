@@ -35,10 +35,13 @@ class _PrivateVaultScreenState extends State<PrivateVaultScreen> {
   String _biometricButtonLabel = 'Biyometrik Giriş';
   String? _recoveryKey;
   List<Note> _privateNotes = [];
+  
+  late final BiometricService _biometricService;
 
   @override
   void initState() {
     super.initState();
+    _biometricService = BiometricService.instance;
     _checkVaultStatus();
     _checkBiometrics();
   }
@@ -46,23 +49,32 @@ class _PrivateVaultScreenState extends State<PrivateVaultScreen> {
   // ... (dispose) ...
 
   Future<void> _checkBiometrics() async {
-    final status = await BiometricService.getStatus();
+    final status = await _biometricService.getStatus();
     
     if (status == BiometricStatus.ready) {
-      // İkon belirle
-      final types = await BiometricService.getAvailableBiometrics();
+      final types = await _biometricService.getAvailableBiometrics();
+      
+      const iconMap = {
+        BiometricType.face: Icons.face,
+        BiometricType.fingerprint: Icons.fingerprint,
+        BiometricType.iris: Icons.remove_red_eye,
+      };
+      
+      const labelMap = {
+        BiometricType.face: 'Yüz Tanıma ile Aç',
+        BiometricType.fingerprint: 'Parmak İzi ile Aç',
+        BiometricType.iris: 'İris Tanıma ile Aç',
+      };
+      
+      final matchedType = types.firstWhere(
+        (type) => iconMap.containsKey(type),
+        orElse: () => BiometricType.fingerprint,
+      );
+
       setState(() {
         _isBiometricReady = true;
-        if (types.contains(BiometricType.face)) {
-          _biometricIcon = Icons.face;
-          _biometricButtonLabel = 'Yüz Tanıma ile Aç';
-        } else if (types.contains(BiometricType.fingerprint)) {
-           _biometricIcon = Icons.fingerprint;
-           _biometricButtonLabel = 'Parmak İzi ile Aç';
-        } else if (types.contains(BiometricType.iris)) {
-           _biometricIcon = Icons.remove_red_eye;
-           _biometricButtonLabel = 'İris Tanıma ile Aç';
-        }
+        _biometricIcon = iconMap[matchedType] ?? Icons.fingerprint;
+        _biometricButtonLabel = labelMap[matchedType] ?? 'Biyometrik Giriş';
       });
     } else {
       setState(() => _isBiometricReady = false);
@@ -76,8 +88,8 @@ class _PrivateVaultScreenState extends State<PrivateVaultScreen> {
       _loadPrivateNotes();
     } else {
       // Otomatik biyometrik deneme (kullanıcı daha önce açtıysa)
-      final bioEnabled = await BiometricService.isBiometricEnabled();
-      if (bioEnabled && (await BiometricService.getStatus() == BiometricStatus.ready)) {
+      final bioEnabled = await _biometricService.isBiometricEnabled();
+      if (bioEnabled && (await _biometricService.getStatus() == BiometricStatus.ready)) {
         // Otomatik denemede session'ı temizlemiş olabilir, tekrar sor
         _attemptBiometricUnlock(); 
       }
@@ -85,7 +97,7 @@ class _PrivateVaultScreenState extends State<PrivateVaultScreen> {
   }
 
   Future<void> _attemptBiometricUnlock() async {
-    final status = await BiometricService.getStatus();
+    final status = await _biometricService.getStatus();
 
     // 1. Durum Kontrolü: Donanım var mı?
     if (status == BiometricStatus.notSupported) {
@@ -105,7 +117,7 @@ class _PrivateVaultScreenState extends State<PrivateVaultScreen> {
     }
 
     // 3. Atomik Doğrulama ve Şifre Alma (GÜVENLİ YOL)
-    final storedPassword = await BiometricService.authenticateAndRetrievePassword();
+    final storedPassword = await _biometricService.authenticateAndRetrievePassword();
 
     if (storedPassword != null) {
       try {
@@ -136,12 +148,7 @@ class _PrivateVaultScreenState extends State<PrivateVaultScreen> {
       await noteProvider.loadNotes();
       
       final privateNotes = noteProvider.notes.where((note) => 
-        note.isEncrypted && 
-        (note.title.contains('FREELANCE') || 
-         note.title.contains('PROJE') || 
-         note.title.contains('İŞ') ||
-         note.title.contains('MÜŞTERİ') ||
-         note.title.contains('ÖZEL'))
+        note.isEncrypted
       ).toList();
       
       // Decrypt notes for display
@@ -186,7 +193,7 @@ class _PrivateVaultScreenState extends State<PrivateVaultScreen> {
       _showSuccess('Kasa başarıyla açıldı');
 
       // Biyometrik destekleniyor ama açık değilse teklif et
-      if (_canUseBiometrics && !(await BiometricService.isBiometricEnabled())) {
+      if (_canUseBiometrics && !(await _biometricService.isBiometricEnabled())) {
         _showBiometricOfferDialog(currentPassword);
       }
     } catch (e) {
@@ -239,7 +246,7 @@ class _PrivateVaultScreenState extends State<PrivateVaultScreen> {
     }
   }
 
-  Future<void> _showBiometricOfferDialog(String password) async {
+  Future<void> _showBiometricOfferDialog(String? password) async {
     // Şifreyi hemen temizleme, dialog sonucunu bekle
     // Not: Gerçek uygulamada password'ü bellekte uzun süre tutmamak gerekir.
     
@@ -250,19 +257,23 @@ class _PrivateVaultScreenState extends State<PrivateVaultScreen> {
         content: const Text('Kasanızı parmak izi veya yüz tanıma ile açmak ister misiniz?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () {
+              password = null; // Bellek güvenliği
+              Navigator.pop(context);
+            },
             child: const Text('Hayır'),
           ),
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(context);
-              final success = await BiometricService.authenticate(
+              final success = await _biometricService.authenticate(
                 localizedReason: 'Biyometrik girişi etkinleştirmek için doğrulayın'
               );
-              if (success) {
-                await BiometricService.enableBiometricLogin(password);
+              if (success && password != null) {
+                await _biometricService.enableBiometricLogin(password!);
                 _showSuccess('Biyometrik giriş etkinleştirildi');
               }
+              password = null; // Bellek güvenliği: GC için referansı kaldır
             },
             child: const Text('Evet, Etkinleştir'),
           ),

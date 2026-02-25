@@ -1,0 +1,38 @@
+00:00 +0: loading C:/Users/90538/Desktop/02_Yazilim_Projeleri/gumus_not/test/core/security/encryption_service_test.dart
+00:00 +0: EncryptionService Tests (setUpAll)
+00:00 +0: EncryptionService Tests Service initializes correctly with password
+00:00 +1: EncryptionService Tests Service initializes with custom recovery key
+00:00 +2: EncryptionService Tests Encryption and decryption work correctly
+00:00 +3: EncryptionService Tests Each encryption produces different output (semantic security)
+00:00 +4: EncryptionService Tests Password-based encryption and decryption work
+00:00 +5: EncryptionService Tests Password-based encryption produces different outputs
+00:00 +6: EncryptionService Tests Decryption fails with wrong password
+00:00 +7: EncryptionService Tests Password-based decryption fails with wrong password
+00:00 +8: EncryptionService Tests Recovery key verification works correctly
+00:00 +9: EncryptionService Tests Recovery key verification fails with wrong password
+00:00 +9 -1: EncryptionService Tests Recovery key verification fails with wrong password [E]
+  Expected: false
+    Actual: <true>
+  
+  package:matcher                                       expect
+  package:flutter_test/src/widget_tester.dart 473:18    expect
+  test\core\security\encryption_service_test.dart 99:7  main.<fn>.<fn>
+  
+00:00 +9 -1: EncryptionService Tests Recovery key verification fails with invalid key format
+00:00 +10 -1: EncryptionService Tests Recovery attempt works with valid key
+00:00 +11 -1: EncryptionService Tests Recovery attempt fails with invalid key
+00:00 +12 -1: EncryptionService Tests Service throws exception when not initialized
+00:00 +13 -1: EncryptionService Tests Empty string encryption returns empty string
+00:00 +14 -1: EncryptionService Tests Encryption with different passwords produces different results
+00:00 +15 -1: EncryptionService Tests Service can be cleared and reinitialized
+00:00 +15 -2: EncryptionService Tests Service can be cleared and reinitialized [E]
+  Exception: ??ifre hatal?? veya kasa bozuk
+  package:connected_notebook/core/security/encryption_service.dart 87:7  EncryptionService._unlockWithPassword
+  
+00:00 +15 -2: EncryptionService Tests Invalid encrypted format throws exception
+00:00 +16 -2: EncryptionService Tests Invalid password-based encrypted format throws exception
+00:00 +17 -2: EncryptionService Tests Recovery key is consistent for same password
+00:00 +18 -2: EncryptionService Tests Recovery key differs for different passwords
+00:00 +19 -2: EncryptionService Tests Service instance is singleton
+00:00 +20 -2: EncryptionService Tests (tearDownAll)
+00:00 +20 -2: Some tests failed.
