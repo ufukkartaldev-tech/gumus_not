@@ -111,8 +111,6 @@ GümüşNot, ekran boyutuna göre çalışma alanını optimize eder:
 
 ### 🚧 Geliştirme Aşamasında
 *   **SOLID Mimari Göçü**: Kod tabanının daha modüler ve test edilebilir olması için SOLID prensiplerine uyarlanması
-*   **Windows OCR**: Platform kütüphane uyumsuzlukları nedeniyle geçici olarak devre dışı
-*   **Bulut Senkronizasyonu**: Google Drive entegrasyonu altyapısı hazır, mobil sürümlerde devam ediyor
 *   **Sesli Not**: Ses kaydetme ve metne çevirme özelliği planlanıyor
 
 ### 🐋 Bilinen Sorunlar

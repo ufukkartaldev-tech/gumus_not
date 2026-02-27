@@ -10,6 +10,7 @@ import '../features/notes/providers/note_state_provider.dart';
 import '../features/notes/providers/note_action_provider.dart';
 import '../features/media/services/image_service.dart';
 import '../features/media/services/note_image_service.dart';
+import '../features/analytics/services/analytics_service.dart';
 import '../core/database/idatabase_service.dart';
 import '../core/database/sqlite_database_service.dart';
 import '../core/theme/theme_provider.dart';
@@ -73,6 +74,11 @@ class DependencyInjection {
 
       Provider<NoteImageService>(
         create: (context) => NoteImageService(),
+      ),
+
+      // Analytics Service
+      Provider<AnalyticsService>(
+        create: (context) => AnalyticsService(context.read<INoteRepository>()),
       ),
 
       // Providers
@@ -187,6 +193,9 @@ extension DependencyInjectionExtension on BuildContext {
 
   /// Get Note Image Service
   NoteImageService get noteImageService => read<NoteImageService>();
+
+  /// Get Analytics Service
+  AnalyticsService get analyticsService => read<AnalyticsService>();
 
   /// Get Theme Provider
   ThemeProvider get themeProvider => read<ThemeProvider>();
