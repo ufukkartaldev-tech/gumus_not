@@ -12,6 +12,7 @@ import '../features/media/services/image_service.dart';
 import '../features/media/services/note_image_service.dart';
 import '../core/database/idatabase_service.dart';
 import '../core/database/sqlite_database_service.dart';
+import '../core/theme/theme_provider.dart';
 
 /// Dependency Injection configuration
 /// Follows Dependency Inversion Principle: High-level modules don't depend on low-level modules
@@ -31,6 +32,11 @@ class DependencyInjection {
   /// Get all providers for the application
   static List<ChangeNotifierProvider> getProviders() {
     return [
+      // Theme Provider (should be early as other widgets depend on it)
+      ChangeNotifierProvider<ThemeProvider>(
+        create: (_) => ThemeProvider()..loadTheme(),
+      ),
+
       // Database service
       Provider<IDatabaseService>(
         create: (_) => _isTestMode ? _createMockDatabaseService() : SqliteDatabaseService(),
@@ -181,6 +187,9 @@ extension DependencyInjectionExtension on BuildContext {
 
   /// Get Note Image Service
   NoteImageService get noteImageService => read<NoteImageService>();
+
+  /// Get Theme Provider
+  ThemeProvider get themeProvider => read<ThemeProvider>();
 }
 
 /// Provider configuration for different environments
