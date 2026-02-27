@@ -277,7 +277,11 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                       ),
                     ),
                   ),
-                  if (actions != null) ...actions!,
+                  if (actions != null)
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(children: actions!),
+                    ),
                 ],
               ),
             ),

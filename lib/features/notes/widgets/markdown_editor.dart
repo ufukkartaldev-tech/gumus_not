@@ -14,7 +14,6 @@ import 'package:connected_notebook/features/tools/widgets/tag_manager_widget.dar
 import 'package:connected_notebook/features/tools/widgets/pomodoro_timer.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:connected_notebook/core/security/encryption_service.dart';
-import 'package:connected_notebook/features/notes/presentation/drawing_screen.dart';
 import 'package:connected_notebook/features/export/services/pdf_service.dart';
 
 
@@ -304,17 +303,19 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
       body: SafeArea(
         child: Stack(
           children: [
-            Hero(
-              tag: 'note_${widget.note?.id ?? 'new_${widget.note?.createdAt}'}',
-              child: Material(
-                color: Colors.transparent,
-                child: Column(
-                  children: [
-                    Expanded(
-                      child: _isPreviewMode ? _buildPreview() : _buildEditor(context),
-                    ),
-                    if (!_isFocusMode) const SizedBox(height: 80), 
-                  ],
+            Positioned.fill(
+              child: Hero(
+                tag: 'note_${widget.note?.id ?? 'new_${widget.note?.createdAt}'}',
+                child: Material(
+                  color: Colors.transparent,
+                  child: Column(
+                    children: [
+                      Expanded(
+                        child: _isPreviewMode ? _buildPreview() : _buildEditor(context),
+                      ),
+                      if (!_isFocusMode) const SizedBox(height: 80), 
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -352,12 +353,16 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
                ),
              if (widget.note != null && !_isPreviewMode && !_isFocusMode)
                Positioned(
-                  top: 0,
-                  right: 0,
-                  child: SizedBox(
-                    width: 40,
-                    height: 40,
-                    child: Center(child: CrossReferenceTracker(currentNote: widget.note!)),
+                  top: 10,
+                  right: 10,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 280, maxHeight: 300),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: SingleChildScrollView(
+                        child: CrossReferenceTracker(currentNote: widget.note!),
+                      ),
+                    ),
                   ),
                ),
           ],
@@ -424,11 +429,12 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
 
   Widget _buildGlassToolbar(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
-      child: BackdropFilter(
-        filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Container(
+    return ClipRect(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Container(
           height: 60,
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
@@ -475,6 +481,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
             ],
           ),
         ),
+        ),
       ),
     );
   }
@@ -498,11 +505,6 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
         _toolIcon(Icons.link, '[', suffix: ']'),
         _toolIcon(Icons.image, '', onPressed: _pickImage),
         const VerticalDivider(indent: 12, endIndent: 12),
-        IconButton(
-          icon: const Icon(Icons.draw),
-          onPressed: _openDrawingScreen,
-          tooltip: 'Çizim Yap',
-        ),
         IconButton(
           icon: const Icon(Icons.picture_as_pdf),
           onPressed: _exportToPdf,
@@ -530,30 +532,6 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
       await PdfService.exportToPdf(currentNote);
     } catch (e) {
       _showError('PDF oluşturulurken hata: $e');
-    }
-  }
-
-  Future<void> _openDrawingScreen() async {
-    final String? resultPath = await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const DrawingScreen()),
-    );
-
-    if (resultPath != null) {
-      try {
-        final File tempFile = File(resultPath);
-        final String? savedPath = await ImageService.saveImageFile(tempFile);
-        
-        if (savedPath != null) {
-          final markdownImage = ImageService.createMarkdownImageLink(
-            savedPath,
-            altText: 'Çizim ${DateTime.now().toString().substring(0, 10)}',
-          );
-          _insertMarkdownSyntax('\n$markdownImage\n');
-        }
-      } catch (e) {
-        _showError('Çizim eklenirken hata: $e');
-      }
     }
   }
 
@@ -612,43 +590,46 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
     final moods = ['😊', '😐', '😢', '😡', '🚀'];
     final selectedMood = _findCurrentMood();
 
-    return Row(
-      children: [
-        Text(
-          'Mod:',
-          style: TextStyle(
-            color: Theme.of(context).disabledColor, 
-            fontWeight: FontWeight.bold,
-            fontSize: 12
-          ),
-        ),
-        const SizedBox(width: 8),
-        ...moods.map((mood) {
-          final isSelected = selectedMood == mood;
-          return GestureDetector(
-            onTap: () => _updateMood(mood),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-              margin: const EdgeInsets.only(right: 8),
-              decoration: BoxDecoration(
-                color: isSelected ? Theme.of(context).primaryColor.withOpacity(0.2) : Colors.transparent,
-                borderRadius: BorderRadius.circular(12),
-                border: isSelected ? Border.all(color: Theme.of(context).primaryColor, width: 1) : null,
-              ),
-              child: Text(
-                mood, 
-                style: TextStyle(
-                  fontSize: isSelected ? 22 : 18,
-                  shadows: isSelected ? [
-                    Shadow(color: Theme.of(context).primaryColor.withOpacity(0.5), blurRadius: 10)
-                  ] : null
-                )
-              ),
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          Text(
+            'Mod:',
+            style: TextStyle(
+              color: Theme.of(context).disabledColor, 
+              fontWeight: FontWeight.bold,
+              fontSize: 12
             ),
-          );
-        }),
-      ],
+          ),
+          const SizedBox(width: 8),
+          ...moods.map((mood) {
+            final isSelected = selectedMood == mood;
+            return GestureDetector(
+              onTap: () => _updateMood(mood),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                margin: const EdgeInsets.only(right: 8),
+                decoration: BoxDecoration(
+                  color: isSelected ? Theme.of(context).primaryColor.withOpacity(0.2) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(12),
+                  border: isSelected ? Border.all(color: Theme.of(context).primaryColor, width: 1) : null,
+                ),
+                child: Text(
+                  mood, 
+                  style: TextStyle(
+                    fontSize: isSelected ? 22 : 18,
+                    shadows: isSelected ? [
+                      Shadow(color: Theme.of(context).primaryColor.withOpacity(0.5), blurRadius: 10)
+                    ] : null
+                  )
+                ),
+              ),
+            );
+          }),
+        ],
+      ),
     );
   }
 
@@ -737,9 +718,14 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
 
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 8),
-          child: TagManagerWidget(
-            initialTags: _tags,
-            onTagsChanged: (t) => setState(() => _tags = t),
+          child: SizedBox(
+            height: 120,
+            child: SingleChildScrollView(
+              child: TagManagerWidget(
+                initialTags: _tags,
+                onTagsChanged: (t) => setState(() => _tags = t),
+              ),
+            ),
           ),
         ),
         

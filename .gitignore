@@ -43,3 +43,13 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Test and debug files
+test_err*.txt
+test_output*.txt
+test_single_fail*.txt
+fix_tests.dart
+solid_migration.dart
+test_graph_data.dart
+*.tmp
+*.temp

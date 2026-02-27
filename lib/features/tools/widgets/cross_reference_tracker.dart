@@ -345,58 +345,61 @@ class _CrossReferenceTrackerState extends State<CrossReferenceTracker> {
   }
 
   Widget _buildHeader() {
-    return Row(
-      children: [
-        Icon(Icons.link, color: Theme.of(context).primaryColor),
-        const SizedBox(width: 8),
-        Text(
-          'İlişkili Düşünceler (${_relatedNotes.length})',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-            color: Theme.of(context).primaryColor,
-          ),
-        ),
-        const Spacer(),
-        if (_isCalculatingSimilarity)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: Colors.orange.shade100,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox(
-                  width: 12,
-                  height: 12,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.orange.shade600,
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  'Hesaplanıyor...',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: Colors.orange.shade600,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          Icon(Icons.link, color: Theme.of(context).primaryColor),
+          const SizedBox(width: 8),
+          Text(
+            'İlişkili Düşünceler (${_relatedNotes.length})',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: Theme.of(context).primaryColor,
             ),
           ),
-        IconButton(
-            icon: Icon(Icons.share, color: Colors.grey.shade600, size: 16),
-            onPressed: () => _navigateToGraphView(),
-            tooltip: 'Graf Görünümü',
+          const SizedBox(width: 8),
+          if (_isCalculatingSimilarity)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade100,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: 12,
+                    height: 12,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.orange.shade600,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Hesaplanıyor...',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: Colors.orange.shade600,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          IconButton(
+              icon: Icon(Icons.share, color: Colors.grey.shade600, size: 16),
+              onPressed: () => _navigateToGraphView(),
+              tooltip: 'Graf Görünümü',
+            ),
+          Icon(Icons.info_outline, 
+            color: Colors.grey.shade600,
+            size: 16,
           ),
-        Icon(Icons.info_outline, 
-          color: Colors.grey.shade600,
-          size: 16,
-        ),
-      ],
+        ],
+      ),
     );
   }
 
