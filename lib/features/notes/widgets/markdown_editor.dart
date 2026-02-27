@@ -5,7 +5,9 @@ import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:connected_notebook/features/notes/models/note_model.dart';
 import 'package:connected_notebook/features/notes/providers/note_provider.dart';
-import 'package:connected_notebook/shared/utils/image_service.dart';
+import 'package:connected_notebook/features/media/services/image_service.dart';
+import 'package:connected_notebook/features/media/widgets/image_picker_widget.dart';
+import 'package:connected_notebook/features/media/services/note_image_service.dart';
 
 import 'package:connected_notebook/features/notes/widgets/custom_widgets.dart';
 import 'package:connected_notebook/features/notes/widgets/math_markdown_renderer.dart';
@@ -15,7 +17,6 @@ import 'package:connected_notebook/features/tools/widgets/pomodoro_timer.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:connected_notebook/core/security/encryption_service.dart';
 import 'package:connected_notebook/features/export/services/pdf_service.dart';
-
 
 class MarkdownEditor extends StatefulWidget {
   final Note? note;

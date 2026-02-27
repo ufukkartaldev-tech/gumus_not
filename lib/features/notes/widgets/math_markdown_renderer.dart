@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:connected_notebook/features/media/widgets/image_picker_widget.dart';
 
 class MathMarkdownRenderer extends StatelessWidget {
   final String data;

@@ -8,6 +8,8 @@ import '../features/notes/services/backlink_service.dart';
 import '../features/notes/services/note_search_service.dart';
 import '../features/notes/providers/note_state_provider.dart';
 import '../features/notes/providers/note_action_provider.dart';
+import '../features/media/services/image_service.dart';
+import '../features/media/services/note_image_service.dart';
 import '../core/database/idatabase_service.dart';
 import '../core/database/sqlite_database_service.dart';
 
@@ -56,6 +58,15 @@ class DependencyInjection {
           context.read<INoteRepository>(),
           context.read<BacklinkService>(),
         ),
+      ),
+
+      // Media Services
+      Provider<ImageService>(
+        create: (_) => ImageService(),
+      ),
+
+      Provider<NoteImageService>(
+        create: (context) => NoteImageService(),
       ),
 
       // Providers
@@ -164,6 +175,12 @@ extension DependencyInjectionExtension on BuildContext {
 
   /// Get Database Service
   IDatabaseService get databaseService => read<IDatabaseService>();
+
+  /// Get Image Service
+  ImageService get imageService => read<ImageService>();
+
+  /// Get Note Image Service
+  NoteImageService get noteImageService => read<NoteImageService>();
 }
 
 /// Provider configuration for different environments
