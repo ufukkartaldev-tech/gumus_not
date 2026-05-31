@@ -21,6 +21,6 @@ void main() {
     await tester.pumpWidget(ConnectedNotebookApp(themeProvider: themeProvider));
 
     expect(find.byType(MaterialApp), findsOneWidget);
-    expect(find.text('Bağlantılı Düşünce Not Defteri'), findsOneWidget);
+    expect(find.text('GümüşNot'), findsOneWidget);
   });
 }

@@ -1,160 +1,155 @@
-import '../models/note_model.dart';
+import 'package:connected_notebook/features/notes/models/note_model.dart';
+import 'package:connected_notebook/features/notes/repositories/note_repository.dart';
 
-/// Mock implementation of INoteRepository for testing
-/// Follows Dependency Inversion Principle: Can be easily swapped with real implementation
-class MockNoteRepository implements INoteRepository {
-  final List<Note> _notes = [];
-  int _nextId = 1;
+/// Mock repository for testing
+class MockNoteRepository implements NoteRepository {
+  final List<Note> _mockNotes = [];
+  final List<Backlink> _mockBacklinks = [];
 
   @override
-  Future<int> insertNote(Note note) async {
-    final newNote = note.copyWith(id: _nextId++);
-    _notes.add(newNote);
-    return newNote.id!;
+  Future<List<Note>> getAllNotes() async {
+    return List.from(_mockNotes);
   }
 
   @override
   Future<Note?> getNoteById(int id) async {
-    try {
-      return _notes.firstWhere((note) => note.id == id);
-    } catch (e) {
-      return null;
-    }
-  }
-
-  @override
-  Future<List<Note>> getAllNotes() async {
-    return List.from(_notes);
-  }
-
-  @override
-  Future<int> updateNote(Note note) async {
-    final index = _notes.indexWhere((n) => n.id == note.id);
-    if (index != -1) {
-      _notes[index] = note;
-      return 1;
-    }
-    return 0;
-  }
-
-  @override
-  Future<int> deleteNote(int id) async {
-    _notes.removeWhere((note) => note.id == id);
-    return 1;
+    return _mockNotes.firstWhere((note) => note.id == id, orElse: () => null);
   }
 
   @override
   Future<List<Note>> searchNotes(String query) async {
-    if (query.isEmpty) return getAllNotes();
-    
-    final lowerQuery = query.toLowerCase();
-    return _notes.where((note) =>
-        note.title.toLowerCase().contains(lowerQuery) ||
-        note.content.toLowerCase().contains(lowerQuery)
+    return _mockNotes.where((note) => 
+      note.title.toLowerCase().contains(query.toLowerCase()) ||
+      note.content.toLowerCase().contains(query.toLowerCase())
     ).toList();
   }
 
   @override
+  Future<int> addNote(Note note) async {
+    final newId = _mockNotes.isEmpty ? 1 : (_mockNotes.last.id ?? 0) + 1;
+    final newNote = note.copyWith(id: newId);
+    _mockNotes.add(newNote);
+    return newId;
+  }
+
+  @override
+  Future<void> updateNote(Note note) async {
+    final index = _mockNotes.indexWhere((n) => n.id == note.id);
+    if (index != -1) {
+      _mockNotes[index] = note;
+    }
+  }
+
+  @override
+  Future<void> deleteNote(int id) async {
+    _mockNotes.removeWhere((note) => note.id == id);
+  }
+
+  @override
   Future<List<Note>> getRecentNotes({int limit = 5}) async {
-    final sortedNotes = List.from(_notes)
+    final sorted = List.from(_mockNotes)
       ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-    return sortedNotes.take(limit).toList();
+    return sorted.take(limit).toList();
   }
 
   @override
   Future<List<Note>> getPendingTasks({int limit = 10}) async {
-    return _notes
-        .where((note) => note.content.contains('- [ '))
-        .toList()
-      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt))
-      ..take(limit);
-  }
-
-  @override
-  Future<List<Note>> getNotesByFolder(String folderName) async {
-    return _notes.where((note) => note.folderName == folderName).toList();
-  }
-
-  @override
-  Future<List<Note>> getNotesByTag(String tag) async {
-    return _notes.where((note) => note.tags.contains(tag)).toList();
-  }
-
-  @override
-  Future<List<String>> getAllFolders() async {
-    final folderSet = _notes
-        .map((note) => note.folderName)
-        .where((folder) => folder.isNotEmpty)
-        .toSet();
-    
-    if (!folderSet.contains('Genel')) {
-      folderSet.add('Genel');
-    }
-    
-    return folderSet.toList()..sort();
+    return _mockNotes
+        .where((note) => note.content.contains('- [ ]'))
+        .take(limit)
+        .toList();
   }
 
   @override
   Future<Map<String, dynamic>> getDatabaseStats() async {
-    final totalTasks = _notes.where((note) => note.content.contains('- [ ')).length;
-    final lastNoteDate = _notes.isNotEmpty ? 
-        _notes.map((n) => n.updatedAt).reduce((a, b) => a > b ? a : b) : null;
-    
     return {
-      'totalNotes': _notes.length,
-      'totalTasks': totalTasks,
-      'lastNoteDate': lastNoteDate,
+      'totalNotes': _mockNotes.length,
+      'totalTasks': _mockNotes.where((n) => n.content.contains('- [ ]')).length,
+      'lastNoteDate': _mockNotes.isNotEmpty 
+          ? _mockNotes.map((n) => n.updatedAt).reduce((a, b) => a > b ? a : b)
+          : null,
     };
   }
 
   @override
-  Future<void> insertNotes(List<Note> notes) async {
-    for (final note in notes) {
-      await insertNote(note);
+  Future<List<Backlink>> getBacklinksForNote(int noteId) async {
+    return _mockBacklinks.where((bl) => bl.targetNoteId == noteId).toList();
+  }
+
+  @override
+  Future<List<Backlink>> getOutgoingLinksForNote(int noteId) async {
+    return _mockBacklinks.where((bl) => bl.sourceNoteId == noteId).toList();
+  }
+
+  @override
+  Future<void> updateBacklinks(Note note, List<Note> allNotes) async {
+    // Remove existing backlinks from this note
+    _mockBacklinks.removeWhere((bl) => bl.sourceNoteId == note.id);
+    
+    // Extract links and create new backlinks
+    final RegExp linkRegex = RegExp(r'\[\[([^\]]+)\]\]');
+    final matches = linkRegex.allMatches(note.content);
+    
+    for (final match in matches) {
+      final linkText = match.group(1)!;
+      final targetNote = allNotes.firstWhere(
+        (n) => n.title.toLowerCase() == linkText.toLowerCase(),
+        orElse: () => Note(
+          id: -1,
+          title: linkText,
+          content: '',
+          createdAt: DateTime.now().millisecondsSinceEpoch,
+          updatedAt: DateTime.now().millisecondsSinceEpoch,
+        ),
+      );
+
+      if (targetNote.id != -1) {
+        _mockBacklinks.add(Backlink(
+          sourceNoteId: note.id!,
+          targetNoteId: targetNote.id!,
+          linkText: linkText,
+          createdAt: DateTime.now().millisecondsSinceEpoch,
+        ));
+      }
     }
   }
 
   @override
-  Future<void> deleteNotes(List<int> noteIds) async {
-    _notes.removeWhere((note) => noteIds.contains(note.id));
+  Future<List<String>> getFolders() async {
+    final folderSet = _mockNotes.map((n) => n.folderName).where((f) => f.isNotEmpty).toSet();
+    if (!folderSet.contains('Genel')) folderSet.add('Genel');
+    return folderSet.toList()..sort();
   }
 
   @override
-  Future<List<Map<String, dynamic>>> exportAllNotes() async {
-    return _notes.map((note) => note.toJson()).toList();
+  Future<int> getNoteCountInFolder(String folderName) async {
+    return _mockNotes.where((n) => n.folderName == folderName).length;
   }
 
   @override
-  Future<void> importNotes(List<Map<String, dynamic>> notesData) async {
-    final notes = notesData.map((data) => Note.fromJson(data)).toList();
-    await insertNotes(notes);
+  Future<List<Note>> getNotesByTag(String tag) async {
+    return _mockNotes.where((note) => note.tags.contains(tag)).toList();
   }
 
-  /// Helper method for testing - add sample data
-  void addSampleData() {
-    _notes.addAll([
-      Note(
-        id: _nextId++,
-        title: 'Test Note 1',
-        content: 'This is a test note with some content',
-        createdAt: DateTime.now().millisecondsSinceEpoch,
-        updatedAt: DateTime.now().millisecondsSinceEpoch,
-        tags: ['test', 'sample'],
-      ),
-      Note(
-        id: _nextId++,
-        title: 'Test Note 2',
-        content: 'Another test note - [ ] incomplete task',
-        createdAt: DateTime.now().millisecondsSinceEpoch,
-        updatedAt: DateTime.now().millisecondsSinceEpoch,
-        tags: ['test'],
-      ),
-    ]);
+  @override
+  Future<Map<String, int>> getTagFrequency() async {
+    final Map<String, int> tagFrequency = {};
+    for (final note in _mockNotes) {
+      for (final tag in note.tags) {
+        tagFrequency[tag] = (tagFrequency[tag] ?? 0) + 1;
+      }
+    }
+    return tagFrequency;
   }
 
-  /// Clear all notes for testing
-  void clearAll() {
-    _notes.clear();
-    _nextId = 1;
+  /// Helper method to add mock data for testing
+  void addMockNotes(List<Note> notes) {
+    _mockNotes.addAll(notes);
+  }
+
+  /// Helper method to clear mock data
+  void clear() {
+    _mockNotes.clear();
+    _mockBacklinks.clear();
   }
 }

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'package:connected_notebook/features/notes/providers/note_provider.dart';
+import 'package:connected_notebook/features/notes/di/note_dependency_injection.dart';
 import 'package:connected_notebook/core/theme/theme_provider.dart';
 import 'package:connected_notebook/features/notes/presentation/note_list_screen.dart';
 import 'package:connected_notebook/features/graph/presentation/graph_view_screen.dart';
@@ -39,8 +39,11 @@ class ConnectedNotebookApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => NoteProvider()),
+        // Theme provider
         ChangeNotifierProvider.value(value: themeProvider),
+        
+        // Note feature providers (using dependency injection)
+        ...NoteDependencyInjection.getProviders(),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, child) {
@@ -73,7 +76,7 @@ class ConnectedNotebookApp extends StatelessWidget {
                       note: note,
                       onSave: (savedNote) {
                         Navigator.of(context).pop();
-                        Provider.of<NoteProvider>(context, listen: false).loadNotes();
+                        context.noteProvider.loadNotes();
                       },
                       onCancel: () {
                         Navigator.of(context).pop();
