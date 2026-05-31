@@ -6,6 +6,8 @@ import 'package:connected_notebook/features/notes/repositories/mock_note_reposit
 import 'package:connected_notebook/features/notes/services/search_service_interface.dart';
 import 'package:connected_notebook/features/notes/services/advanced_search_service.dart';
 import 'package:connected_notebook/features/notes/providers/refactored_note_provider.dart';
+import 'package:connected_notebook/core/migration/migration_manager.dart';
+import 'package:connected_notebook/core/security/encryption_service.dart';
 
 /// Dependency injection configuration for notes feature
 /// Follows Dependency Inversion Principle: High-level modules depend on abstractions
@@ -47,6 +49,15 @@ class NoteDependencyInjection {
       // Services
       Provider<SearchService>(
         create: (_) => AdvancedSearchService(),
+      ),
+      
+      // Migration Services
+      Provider<MigrationManager>(
+        create: (_) => MigrationManager(),
+      ),
+      
+      Provider<EnhancedEncryptionService>(
+        create: (_) => EnhancedEncryptionService.instance,
       ),
       
       // State Provider
@@ -159,6 +170,12 @@ extension NoteDependencyInjectionExtension on BuildContext {
   /// Get Note Provider
   NoteProvider get noteProvider => read<NoteProvider>();
   
+  /// Get Migration Manager
+  MigrationManager get migrationManager => read<MigrationManager>();
+  
+  /// Get Encryption Service
+  EnhancedEncryptionService get encryptionService => read<EnhancedEncryptionService>();
+  
   /// Optimize database
   Future<void> optimizeNoteDatabase() async {
     await NoteDependencyInjection.optimizeDatabase(this);
@@ -167,5 +184,21 @@ extension NoteDependencyInjectionExtension on BuildContext {
   /// Get performance statistics
   Map<String, dynamic> getNotePerformanceStats() {
     return NoteDependencyInjection.getPerformanceStats(this);
+  }
+  
+  /// Check migration status
+  Future<Map<String, dynamic>> checkMigrationStatus() async {
+    return await migrationManager.checkMigrationNeeded();
+  }
+  
+  /// Execute migration
+  Future<Map<String, dynamic>> executeMigration({
+    bool backupBeforeMigration = true,
+    bool validateAfterMigration = true,
+  }) async {
+    return await migrationManager.executeMigration(
+      backupBeforeMigration: backupBeforeMigration,
+      validateAfterMigration: validateAfterMigration,
+    );
   }
 }
