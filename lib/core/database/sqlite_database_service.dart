@@ -8,7 +8,7 @@ import 'idatabase_service.dart';
 class SqliteDatabaseService implements IDatabaseService {
   static Database? _database;
   static const String _dbName = 'connected_notebook.db';
-  static const int _dbVersion = 3;
+  static const int _dbVersion = 4;
 
   @override
   Future<Database> get database async {
@@ -71,6 +71,15 @@ class SqliteDatabaseService implements IDatabaseService {
       CREATE INDEX idx_backlinks_source ON backlinks(source_note_id);
       CREATE INDEX idx_backlinks_target ON backlinks(target_note_id);
     ''');
+
+    // FTS5 Virtual Table for Full-Text Search
+    await db.execute('''
+      CREATE VIRTUAL TABLE notes_fts USING fts5(
+        id UNINDEXED,
+        title,
+        content
+      );
+    ''');
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -79,6 +88,21 @@ class SqliteDatabaseService implements IDatabaseService {
     }
     if (oldVersion < 3) {
       await db.execute("ALTER TABLE notes ADD COLUMN folder_name TEXT DEFAULT 'Genel'");
+    }
+    if (oldVersion < 4) {
+      // Create FTS5 table for existing databases
+      await db.execute('''
+        CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(
+          id UNINDEXED,
+          title,
+          content
+        );
+      ''');
+      // Populate FTS5 table with existing data
+      await db.execute('''
+        INSERT INTO notes_fts(id, title, content)
+        SELECT id, title, content FROM notes;
+      ''');
     }
   }
 
@@ -93,7 +117,16 @@ class SqliteDatabaseService implements IDatabaseService {
   @override
   Future<int> insertNote(Map<String, dynamic> note) async {
     final db = await database;
-    return await db.insert('notes', note);
+    final id = await db.insert('notes', note);
+    
+    // Sync with FTS5
+    await db.insert('notes_fts', {
+      'id': id,
+      'title': note['title'],
+      'content': note['content'],
+    });
+    
+    return id;
   }
 
   @override
@@ -117,18 +150,37 @@ class SqliteDatabaseService implements IDatabaseService {
   Future<int> updateNote(Map<String, dynamic> note) async {
     final db = await database;
     note['updated_at'] = DateTime.now().millisecondsSinceEpoch;
-    return await db.update(
+    
+    final count = await db.update(
       'notes',
       note,
       where: 'id = ?',
       whereArgs: [note['id']],
     );
+
+    // Sync with FTS5
+    await db.update(
+      'notes_fts',
+      {
+        'title': note['title'],
+        'content': note['content'],
+      },
+      where: 'id = ?',
+      whereArgs: [note['id']],
+    );
+
+    return count;
   }
 
   @override
   Future<int> deleteNote(int id) async {
     final db = await database;
-    return await db.delete('notes', where: 'id = ?', whereArgs: [id]);
+    final count = await db.delete('notes', where: 'id = ?', whereArgs: [id]);
+    
+    // Sync with FTS5
+    await db.delete('notes_fts', where: 'id = ?', whereArgs: [id]);
+    
+    return count;
   }
 
   @override

@@ -12,7 +12,7 @@ void main() {
     
     setUp(() {
       mockRepository = MockNoteRepository();
-      searchService = AdvancedSearchService();
+      searchService = AdvancedSearchService(mockRepository);
       noteProvider = NoteProvider(
         repository: mockRepository,
         searchService: searchService,

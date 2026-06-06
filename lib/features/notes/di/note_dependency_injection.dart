@@ -48,7 +48,7 @@ class NoteDependencyInjection {
       
       // Services
       Provider<SearchService>(
-        create: (_) => AdvancedSearchService(),
+        create: (context) => AdvancedSearchService(context.read<NoteRepository>()),
       ),
       
       // Migration Services
