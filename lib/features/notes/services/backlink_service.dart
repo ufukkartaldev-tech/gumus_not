@@ -1,10 +1,10 @@
 import '../models/note_model.dart';
-import '../repositories/inote_repository.dart';
+import '../repositories/note_repository.dart';
 
 /// Service for managing backlinks between notes
 /// Follows Single Responsibility Principle: Only handles note linking operations
 class BacklinkService {
-  final INoteRepository _repository;
+  final NoteRepository _repository;
 
   BacklinkService(this._repository);
 

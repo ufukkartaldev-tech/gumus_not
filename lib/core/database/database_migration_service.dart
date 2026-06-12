@@ -14,8 +14,8 @@ class DatabaseMigrationService {
   static Future<bool> oldDatabaseExists() async {
     try {
       final oldPath = join(await getDatabasesPath(), _oldDbName);
-      final databaseFactory = databaseFactory;
-      return await databaseFactory.databaseExists(oldPath);
+      final factory = databaseFactory;
+      return await factory.databaseExists(oldPath);
     } catch (e) {
       return false;
     }
@@ -62,7 +62,7 @@ class DatabaseMigrationService {
       
       // Create new optimized database
       final newRepository = OptimizedSqliteNoteRepository();
-      final newDb = await newRepository._db;
+      final newDb = await newRepository.database;
       migrationStats['newDatabaseExists'] = true;
       
       // Start transaction
@@ -75,7 +75,7 @@ class DatabaseMigrationService {
           try {
             await txn.insert('notes', note);
           } catch (e) {
-            migrationStats['errors'].add('Note ${note['id']}: $e');
+            (migrationStats['errors'] as List).add('Note ${note['id']}: $e');
           }
         }
         
@@ -87,7 +87,7 @@ class DatabaseMigrationService {
           try {
             await txn.insert('backlinks', backlink);
           } catch (e) {
-            migrationStats['errors'].add('Backlink ${backlink['id']}: $e');
+            (migrationStats['errors'] as List).add('Backlink ${backlink['id']}: $e');
           }
         }
         
@@ -101,7 +101,7 @@ class DatabaseMigrationService {
           }
         } catch (e) {
           // Templates table might not exist in old database
-          migrationStats['errors'].add('Templates: $e');
+          (migrationStats['errors'] as List).add('Templates: $e');
         }
       });
       
@@ -113,7 +113,7 @@ class DatabaseMigrationService {
       
     } catch (e) {
       migrationStats['status'] = 'failed';
-      migrationStats['errors'].add('Migration failed: $e');
+      (migrationStats['errors'] as List).add('Migration failed: $e');
     } finally {
       stopwatch.stop();
       migrationStats['durationMs'] = stopwatch.elapsedMilliseconds;
@@ -146,28 +146,29 @@ class DatabaseMigrationService {
       
       validation['oldRecordCount'] = oldNotes.length;
       validation['newRecordCount'] = newNotes.length;
-      validation['details']['notes'] = {
+      final details = validation['details'] as Map<String, dynamic>;
+      details['notes'] = {
         'old': oldNotes.length,
         'new': newNotes.length,
         'match': oldNotes.length == newNotes.length,
       };
       
       if (oldNotes.length != newNotes.length) {
-        validation['mismatches'].add('Note count mismatch: ${oldNotes.length} vs ${newNotes.length}');
+        (validation['mismatches'] as List).add('Note count mismatch: ${oldNotes.length} vs ${newNotes.length}');
       }
       
       // Compare backlink counts
       final oldBacklinks = await oldDb.query('backlinks');
       final newBacklinks = await newDb.query('backlinks');
       
-      validation['details']['backlinks'] = {
+      details['backlinks'] = {
         'old': oldBacklinks.length,
         'new': newBacklinks.length,
         'match': oldBacklinks.length == newBacklinks.length,
       };
       
       if (oldBacklinks.length != newBacklinks.length) {
-        validation['mismatches'].add('Backlink count mismatch: ${oldBacklinks.length} vs ${newBacklinks.length}');
+        (validation['mismatches'] as List).add('Backlink count mismatch: ${oldBacklinks.length} vs ${newBacklinks.length}');
       }
       
       // Compare sample data
@@ -179,14 +180,14 @@ class DatabaseMigrationService {
         );
         
         if (sampleNewNote.isNotEmpty) {
-          validation['details']['sampleNote'] = {
+          details['sampleNote'] = {
             'id': sampleOldNote['id'],
             'titleMatch': sampleOldNote['title'] == sampleNewNote['title'],
             'contentMatch': sampleOldNote['content'] == sampleNewNote['content'],
           };
           
           if (sampleOldNote['title'] != sampleNewNote['title']) {
-            validation['mismatches'].add('Title mismatch for note ${sampleOldNote['id']}');
+            (validation['mismatches'] as List).add('Title mismatch for note ${sampleOldNote['id']}');
           }
         }
       }
@@ -194,13 +195,13 @@ class DatabaseMigrationService {
       // Check FTS5 table
       try {
         final ftsCount = await newDb.rawQuery('SELECT COUNT(*) as count FROM notes_fts');
-        validation['details']['fts5'] = {
+        details['fts5'] = {
           'documentCount': ftsCount.first['count'],
           'exists': true,
         };
       } catch (e) {
-        validation['details']['fts5'] = {'exists': false};
-        validation['mismatches'].add('FTS5 table not found or error: $e');
+        details['fts5'] = {'exists': false};
+        (validation['mismatches'] as List).add('FTS5 table not found or error: $e');
       }
       
       // Check generated columns
@@ -208,24 +209,24 @@ class DatabaseMigrationService {
         final hasPendingTasks = await newDb.rawQuery('''
           SELECT COUNT(*) as count FROM notes WHERE has_pending_tasks = 1
         ''');
-        validation['details']['generatedColumns'] = {
+        details['generatedColumns'] = {
           'hasPendingTasks': hasPendingTasks.first['count'],
           'exists': true,
         };
       } catch (e) {
-        validation['details']['generatedColumns'] = {'exists': false};
-        validation['mismatches'].add('Generated columns not found: $e');
+        details['generatedColumns'] = {'exists': false};
+        (validation['mismatches'] as List).add('Generated columns not found: $e');
       }
       
       // Close databases
       await oldDb.close();
       await newDb.close();
       
-      validation['valid'] = validation['mismatches'].isEmpty;
+      validation['valid'] = (validation['mismatches'] as List).isEmpty;
       
     } catch (e) {
       validation['valid'] = false;
-      validation['mismatches'].add('Validation error: $e');
+      (validation['mismatches'] as List).add('Validation error: $e');
     }
     
     return validation;
@@ -246,7 +247,7 @@ class DatabaseMigrationService {
       
       if (!oldDbExists) {
         plan['migrationRequired'] = false;
-        plan['recommendations'].add('No old database found. Fresh installation detected.');
+        (plan['recommendations'] as List).add('No old database found. Fresh installation detected.');
         return plan;
       }
       
@@ -266,24 +267,24 @@ class DatabaseMigrationService {
       
       // Identify risks
       if (noteCount > 1000) {
-        plan['risks'].add('Large database: $noteCount notes. Migration may take time.');
-        plan['recommendations'].add('Perform migration during low-usage period.');
+        (plan['risks'] as List).add('Large database: $noteCount notes. Migration may take time.');
+        (plan['recommendations'] as List).add('Perform migration during low-usage period.');
       }
       
       if (backlinkCount > 5000) {
-        plan['risks'].add('High backlink count: $backlinkCount. Complex relationships.');
-        plan['recommendations'].add('Verify backlink integrity after migration.');
+        (plan['risks'] as List).add('High backlink count: $backlinkCount. Complex relationships.');
+        (plan['recommendations'] as List).add('Verify backlink integrity after migration.');
       }
       
-      plan['recommendations'].addAll([
+      (plan['recommendations'] as List).addAll([
         'Backup old database before migration.',
         'Validate migration integrity after completion.',
         'Test search functionality with FTS5.',
       ]);
       
     } catch (e) {
-      plan['risks'].add('Error analyzing migration plan: $e');
-      plan['recommendations'].add('Investigate database structure before migration.');
+      (plan['risks'] as List).add('Error analyzing migration plan: $e');
+      (plan['recommendations'] as List).add('Investigate database structure before migration.');
     }
     
     return plan;
@@ -296,10 +297,10 @@ class DatabaseMigrationService {
       final newPath = await getNewDatabasePath();
       final backupPath = '${oldPath}.backup';
       
-      final databaseFactory = databaseFactory;
+      final factory = databaseFactory;
       
       // Check if backup exists
-      final backupExists = await databaseFactory.databaseExists(backupPath);
+      final backupExists = await factory.databaseExists(backupPath);
       
       if (!backupExists) {
         print('No backup found for rollback');
@@ -334,8 +335,8 @@ class DatabaseMigrationService {
       final oldPath = await getOldDatabasePath();
       final backupPath = '${oldPath}.backup';
       
-      final databaseFactory = databaseFactory;
-      final oldDbExists = await databaseFactory.databaseExists(oldPath);
+      final factory = databaseFactory;
+      final oldDbExists = await factory.databaseExists(oldPath);
       
       if (!oldDbExists) {
         print('No old database to backup');

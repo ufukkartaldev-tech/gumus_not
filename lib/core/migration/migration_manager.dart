@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:sqflite/sqflite.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:connected_notebook/core/security/encryption_migration_service.dart';
 import 'package:connected_notebook/core/database/database_migration_service.dart';
 import 'package:connected_notebook/core/security/encryption_service.dart';
@@ -15,17 +16,18 @@ class MigrationManager {
       'migrationNeeded': false,
       'migrationVersion': _currentMigrationVersion,
       'details': {},
-      'recommendations': [],
+      'recommendations': <String>[],
     };
     
     try {
       // Check database migration
       final dbMigrationPlan = await DatabaseMigrationService.createMigrationPlan();
-      result['details']['database'] = dbMigrationPlan;
+      final details = result['details'] as Map<String, dynamic>;
+      details['database'] = dbMigrationPlan;
       
       if (dbMigrationPlan['migrationRequired'] == true) {
         result['migrationNeeded'] = true;
-        result['recommendations'].addAll(dbMigrationPlan['recommendations']);
+        (result['recommendations'] as List).addAll(dbMigrationPlan['recommendations'] as Iterable);
       }
       
       // Check encryption migration (requires database access)
@@ -38,11 +40,11 @@ class MigrationManager {
           database: oldDb,
         );
         
-        result['details']['encryption'] = encryptionReport;
+        details['encryption'] = encryptionReport;
         
         if (encryptionReport['migrationRequired'] == true) {
           result['migrationNeeded'] = true;
-          result['recommendations'].add('Encryption format migration required');
+          (result['recommendations'] as List).add('Encryption format migration required');
         }
         
         await oldDb.close();
@@ -54,13 +56,13 @@ class MigrationManager {
       
       if (lastMigrationVersion < _currentMigrationVersion) {
         result['migrationNeeded'] = true;
-        result['recommendations'].add('App migration from version $lastMigrationVersion to $_currentMigrationVersion');
+        (result['recommendations'] as List).add('App migration from version $lastMigrationVersion to $_currentMigrationVersion');
       }
       
     } catch (e) {
       result['migrationNeeded'] = true;
       result['details']['error'] = e.toString();
-      result['recommendations'].add('Error checking migration status: $e');
+      (result['recommendations'] as List).add('Error checking migration status: $e');
     }
     
     return result;
@@ -73,9 +75,9 @@ class MigrationManager {
   }) async {
     final migrationResult = {
       'status': 'pending',
-      'steps': [],
-      'errors': [],
-      'warnings': [],
+      'steps': <String>[],
+      'errors': <String>[],
+      'warnings': <String>[],
       'durationMs': 0,
       'finalStatus': 'unknown',
     };
@@ -83,37 +85,37 @@ class MigrationManager {
     final stopwatch = Stopwatch()..start();
     
     try {
-      migrationResult['steps'].add('Starting comprehensive migration');
+      (migrationResult['steps'] as List).add('Starting comprehensive migration');
       
       // Step 1: Backup if requested
       if (backupBeforeMigration) {
-        migrationResult['steps'].add('Creating backup');
+        (migrationResult['steps'] as List).add('Creating backup');
         final backupSuccess = await DatabaseMigrationService.createBackup();
         
         if (backupSuccess) {
-          migrationResult['steps'].add('Backup created successfully');
+          (migrationResult['steps'] as List).add('Backup created successfully');
         } else {
-          migrationResult['warnings'].add('Backup creation failed or skipped');
+          (migrationResult['warnings'] as List).add('Backup creation failed or skipped');
         }
       }
       
       // Step 2: Database migration
-      migrationResult['steps'].add('Starting database migration');
+      (migrationResult['steps'] as List).add('Starting database migration');
       final dbMigrationResult = await DatabaseMigrationService.migrateToOptimizedDatabase();
       migrationResult['databaseMigration'] = dbMigrationResult;
       
       if (dbMigrationResult['status'] == 'completed') {
-        migrationResult['steps'].add('Database migration completed');
+        (migrationResult['steps'] as List).add('Database migration completed');
       } else if (dbMigrationResult['status'] == 'skipped') {
-        migrationResult['steps'].add('Database migration skipped (no old database)');
+        (migrationResult['steps'] as List).add('Database migration skipped (no old database)');
       } else {
-        migrationResult['errors'].add('Database migration failed: ${dbMigrationResult['errors']}');
+        (migrationResult['errors'] as List).add('Database migration failed: ${dbMigrationResult['errors']}');
         migrationResult['status'] = 'failed';
       }
       
       // Step 3: Encryption migration (if database migration succeeded)
       if (migrationResult['status'] != 'failed' && dbMigrationResult['status'] == 'completed') {
-        migrationResult['steps'].add('Starting encryption migration');
+        (migrationResult['steps'] as List).add('Starting encryption migration');
         
         // We need the master key for encryption migration
         // This assumes the vault is already initialized
@@ -127,36 +129,36 @@ class MigrationManager {
             
             // Get master key (this is a simplification - in reality, you'd need to handle this carefully)
             // For now, we'll skip encryption migration if we can't get the key
-            migrationResult['warnings'].add('Encryption migration requires master key access. Skipping.');
+            (migrationResult['warnings'] as List).add('Encryption migration requires master key access. Skipping.');
             
             await newDb.close();
           } else {
-            migrationResult['warnings'].add('Vault is locked. Encryption migration skipped.');
+            (migrationResult['warnings'] as List).add('Vault is locked. Encryption migration skipped.');
           }
         } catch (e) {
-          migrationResult['warnings'].add('Encryption migration error: $e');
+          (migrationResult['warnings'] as List).add('Encryption migration error: $e');
         }
       }
       
       // Step 4: Validation
       if (validateAfterMigration && migrationResult['status'] != 'failed') {
-        migrationResult['steps'].add('Validating migration');
+        (migrationResult['steps'] as List).add('Validating migration');
         final validationResult = await DatabaseMigrationService.validateMigration();
         migrationResult['validation'] = validationResult;
         
         if (validationResult['valid'] == true) {
-          migrationResult['steps'].add('Migration validation passed');
+          (migrationResult['steps'] as List).add('Migration validation passed');
         } else {
-          migrationResult['errors'].addAll(validationResult['mismatches']);
-          migrationResult['warnings'].add('Migration validation failed');
+          (migrationResult['errors'] as List).addAll(validationResult['mismatches'] as Iterable);
+          (migrationResult['warnings'] as List).add('Migration validation failed');
         }
       }
       
       // Step 5: Update migration version
-      if (migrationResult['errors'].isEmpty) {
+      if ((migrationResult['errors'] as List).isEmpty) {
         final prefs = await _getPreferences();
         await prefs.setInt(_migrationVersionKey, _currentMigrationVersion);
-        migrationResult['steps'].add('Migration version updated to $_currentMigrationVersion');
+        (migrationResult['steps'] as List).add('Migration version updated to $_currentMigrationVersion');
         migrationResult['finalStatus'] = 'success';
       } else {
         migrationResult['finalStatus'] = 'partial_success';
@@ -167,19 +169,19 @@ class MigrationManager {
     } catch (e) {
       migrationResult['status'] = 'failed';
       migrationResult['finalStatus'] = 'failed';
-      migrationResult['errors'].add('Migration failed with exception: $e');
+      (migrationResult['errors'] as List).add('Migration failed with exception: $e');
       
       // Attempt rollback
-      migrationResult['steps'].add('Attempting rollback');
+      (migrationResult['steps'] as List).add('Attempting rollback');
       try {
         final rollbackSuccess = await DatabaseMigrationService.rollbackMigration();
         if (rollbackSuccess) {
-          migrationResult['steps'].add('Rollback completed');
+          (migrationResult['steps'] as List).add('Rollback completed');
         } else {
-          migrationResult['warnings'].add('Rollback failed or not supported');
+          (migrationResult['warnings'] as List).add('Rollback failed or not supported');
         }
       } catch (rollbackError) {
-        migrationResult['warnings'].add('Rollback error: $rollbackError');
+        (migrationResult['warnings'] as List).add('Rollback error: $rollbackError');
       }
     } finally {
       stopwatch.stop();
@@ -245,23 +247,23 @@ class MigrationManager {
       if (oldDbExists) {
         // In a production app, you might want to keep the old database
         // for a while before deleting it
-        cleanupResult['warnings'].add('Old database exists. Manual cleanup recommended.');
-        cleanupResult['cleanedItems'].add('Old database marked for review');
+        (cleanupResult['warnings'] as List).add('Old database exists. Manual cleanup recommended.');
+        (cleanupResult['cleanedItems'] as List).add('Old database marked for review');
       }
       
       // Check for backup files
-      cleanupResult['warnings'].add('Backup file cleanup requires manual intervention');
+      (cleanupResult['warnings'] as List).add('Backup file cleanup requires manual intervention');
       
       // Clear migration preferences if needed
       final prefs = await _getPreferences();
       final lastVersion = prefs.getInt(_migrationVersionKey) ?? 0;
       
       if (lastVersion < _currentMigrationVersion) {
-        cleanupResult['warnings'].add('Migration not completed. Cleanup not recommended.');
+        (cleanupResult['warnings'] as List).add('Migration not completed. Cleanup not recommended.');
       }
       
     } catch (e) {
-      cleanupResult['errors'].add('Cleanup error: $e');
+      (cleanupResult['errors'] as List).add('Cleanup error: $e');
     }
     
     return cleanupResult;
@@ -281,36 +283,36 @@ class MigrationManager {
     };
     
     if (!userConfirmed) {
-      wizardResult['steps'].add('Migration requires user confirmation');
+      (wizardResult['steps'] as List).add('Migration requires user confirmation');
       return wizardResult;
     }
     
     try {
       // Step 1: Analysis
-      wizardResult['steps'].add('Analyzing current system');
+      (wizardResult['steps'] as List).add('Analyzing current system');
       final analysis = await checkMigrationNeeded();
       wizardResult['analysis'] = analysis;
       
       if (!analysis['migrationNeeded']) {
-        wizardResult['steps'].add('No migration needed');
+        (wizardResult['steps'] as List).add('No migration needed');
         wizardResult['completed'] = true;
         return wizardResult;
       }
       
       // Step 2: Present plan
-      wizardResult['steps'].add('Presenting migration plan');
+      (wizardResult['steps'] as List).add('Presenting migration plan');
       final plan = await DatabaseMigrationService.createMigrationPlan();
       wizardResult['plan'] = plan;
       
       if (!automaticMode) {
         // In interactive mode, we would present the plan to the user
-        wizardResult['decisions'].add('User review required for plan');
-        wizardResult['steps'].add('Waiting for user decision');
+        (wizardResult['decisions'] as List).add('User review required for plan');
+        (wizardResult['steps'] as List).add('Waiting for user decision');
         // For now, we'll assume user approves
       }
       
       // Step 3: Execute migration
-      wizardResult['steps'].add('Executing migration');
+      (wizardResult['steps'] as List).add('Executing migration');
       final migrationResult = await executeMigration(
         backupBeforeMigration: true,
         validateAfterMigration: true,
@@ -318,35 +320,33 @@ class MigrationManager {
       wizardResult['migrationResult'] = migrationResult;
       
       // Step 4: Present results
-      wizardResult['steps'].add('Migration execution completed');
+      (wizardResult['steps'] as List).add('Migration execution completed');
       
       if (migrationResult['finalStatus'] == 'success') {
-        wizardResult['steps'].add('Migration successful');
+        (wizardResult['steps'] as List).add('Migration successful');
         wizardResult['completed'] = true;
       } else if (migrationResult['finalStatus'] == 'partial_success') {
-        wizardResult['steps'].add('Migration partially successful');
+        (wizardResult['steps'] as List).add('Migration partially successful');
         wizardResult['warnings'] = migrationResult['warnings'];
         wizardResult['completed'] = true;
       } else {
-        wizardResult['steps'].add('Migration failed');
+        (wizardResult['steps'] as List).add('Migration failed');
         wizardResult['errors'] = migrationResult['errors'];
       }
       
     } catch (e) {
-      wizardResult['steps'].add('Wizard error: $e');
+      (wizardResult['steps'] as List).add('Wizard error: $e');
       wizardResult['errors'] = [e.toString()];
     }
     
     return wizardResult;
   }
   
-  // Helper method to get preferences (simplified)
+  // Helper method to get preferences
   static Future<SharedPreferences> _getPreferences() async {
-    // In a real implementation, use shared_preferences package
-    // For now, return a mock
-    return MockSharedPreferences();
-  }
-}
+     return await SharedPreferences.getInstance();
+   }
+ }
 
 // Mock SharedPreferences for testing
 class MockSharedPreferences {

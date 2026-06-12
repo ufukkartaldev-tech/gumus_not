@@ -1,19 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../features/notes/repositories/inote_repository.dart';
-import '../features/notes/repositories/sql_note_repository.dart';
-import '../features/notes/repositories/mock_note_repository.dart';
-import '../features/notes/services/note_service.dart';
-import '../features/notes/services/backlink_service.dart';
-import '../features/notes/services/note_search_service.dart';
-import '../features/notes/providers/note_state_provider.dart';
-import '../features/notes/providers/note_action_provider.dart';
-import '../features/media/services/image_service.dart';
-import '../features/media/services/note_image_service.dart';
-import '../features/analytics/services/analytics_service.dart';
-import '../core/database/idatabase_service.dart';
-import '../core/database/sqlite_database_service.dart';
-import '../core/theme/theme_provider.dart';
+import 'package:provider/single_child_widget.dart';
+import '../../features/notes/repositories/note_repository.dart';
+import '../../features/notes/repositories/sql_note_repository.dart';
+import '../../features/notes/repositories/mock_note_repository.dart';
+import '../../features/notes/services/note_service.dart';
+import '../../features/notes/services/backlink_service.dart';
+import '../../features/notes/services/note_search_service.dart';
+import '../../features/notes/providers/note_state_provider.dart';
+import '../../features/notes/providers/note_action_provider.dart';
+import '../../features/media/services/image_service.dart';
+import '../../features/media/services/note_image_service.dart';
+import '../../features/analytics/services/analytics_service.dart';
+import '../database/idatabase_service.dart';
+import '../database/database_service.dart';
+import '../theme/theme_provider.dart';
 
 /// Dependency Injection configuration
 /// Follows Dependency Inversion Principle: High-level modules don't depend on low-level modules
@@ -31,7 +32,7 @@ class DependencyInjection {
   }
 
   /// Get all providers for the application
-  static List<ChangeNotifierProvider> getProviders() {
+  static List<SingleChildWidget> getProviders() {
     return [
       // Theme Provider (should be early as other widgets depend on it)
       ChangeNotifierProvider<ThemeProvider>(
@@ -44,25 +45,25 @@ class DependencyInjection {
       ),
 
       // Repository
-      Provider<INoteRepository>(
+      Provider<NoteRepository>(
         create: (context) => _isTestMode ? MockNoteRepository() : SqlNoteRepository(),
       ),
 
       // Services
       Provider<BacklinkService>(
-        create: (context) => BacklinkService(context.read<INoteRepository>()),
+        create: (context) => BacklinkService(context.read<NoteRepository>()),
       ),
 
       Provider<NoteSearchService>(
         create: (context) => NoteSearchService(
-          context.read<INoteRepository>(),
+          context.read<NoteRepository>(),
           context.read<BacklinkService>(),
         ),
       ),
 
       Provider<NoteService>(
         create: (context) => NoteService(
-          context.read<INoteRepository>(),
+          context.read<NoteRepository>(),
           context.read<BacklinkService>(),
         ),
       ),
@@ -97,7 +98,7 @@ class DependencyInjection {
   }
 
   /// Get providers for testing (uses mocks)
-  static List<ChangeNotifierProvider> getTestProviders() {
+  static List<SingleChildWidget> getTestProviders() {
     enableTestMode();
     return getProviders();
   }
@@ -183,7 +184,7 @@ extension DependencyInjectionExtension on BuildContext {
   NoteActionProvider get noteActionProvider => read<NoteActionProvider>();
 
   /// Get Repository
-  INoteRepository get noteRepository => read<INoteRepository>();
+  NoteRepository get noteRepository => read<NoteRepository>();
 
   /// Get Database Service
   IDatabaseService get databaseService => read<IDatabaseService>();

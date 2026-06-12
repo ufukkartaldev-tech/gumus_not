@@ -1,8 +1,9 @@
 import 'dart:math';
+import 'package:flutter/material.dart';
 import 'package:collection/collection.dart';
-import 'package:connected_notebook/features/notes/models/note_model.dart';
-import 'package:connected_notebook/features/graph/models/graph_models.dart';
-import 'package:connected_notebook/features/graph/constants/graph_constants.dart';
+import '../../notes/models/note_model.dart';
+import '../models/graph_models.dart';
+import '../constants/graph_constants.dart';
 
 /// Builds graph from notes with backlinks
 class GraphBuilder {

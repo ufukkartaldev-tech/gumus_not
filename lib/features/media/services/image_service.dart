@@ -1,6 +1,6 @@
 import 'dart:io';
-import 'package:path/path.dart' as path;
 import 'package:image_picker/image_picker.dart';
+import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 
 /// Service for handling image operations
@@ -177,7 +177,7 @@ class ImageService {
   Future<Map<String, dynamic>> getImageMetadata(String imagePath) async {
     try {
       final File imageFile = File(imagePath);
-      final Stat stat = await imageFile.stat();
+      final FileStat stat = await imageFile.stat();
       
       return {
         'path': imagePath,

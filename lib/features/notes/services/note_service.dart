@@ -1,11 +1,11 @@
 import '../models/note_model.dart';
-import '../repositories/inote_repository.dart';
+import '../repositories/note_repository.dart';
 import 'backlink_service.dart';
 
 /// Main service for note operations
 /// Follows Single Responsibility Principle: Orchestrates note-related operations
 class NoteService {
-  final INoteRepository _repository;
+  final NoteRepository _repository;
   final BacklinkService _backlinkService;
 
   NoteService(this._repository, this._backlinkService);

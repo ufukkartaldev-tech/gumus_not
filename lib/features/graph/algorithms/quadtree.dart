@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import '../models/graph_models.dart';
 
 /// Quadtree node for spatial partitioning
 /// Used to optimize O(n²) repulsion force calculations to O(n log n)

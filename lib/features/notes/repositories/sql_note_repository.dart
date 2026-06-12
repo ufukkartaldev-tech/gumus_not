@@ -1,48 +1,60 @@
 import '../models/note_model.dart';
+import '../../../core/database/idatabase_service.dart';
 import '../../../core/database/database_service.dart';
+import 'note_repository.dart';
 
-/// Concrete implementation of INoteRepository using SQLite
+/// Concrete implementation of NoteRepository using SQLite
 /// Follows Single Responsibility Principle: Only handles note data operations
-class SqlNoteRepository implements INoteRepository {
+class SqlNoteRepository implements NoteRepository {
+  final IDatabaseService _databaseService;
+
+  SqlNoteRepository([IDatabaseService? databaseService]) 
+      : _databaseService = databaseService ?? SqliteDatabaseService();
   
   @override
   Future<int> insertNote(Note note) async {
-    return await DatabaseService.insertNote(note);
+    return await _databaseService.insertNote(note.toMap());
   }
 
   @override
   Future<Note?> getNoteById(int id) async {
-    return await DatabaseService.getNoteById(id);
+    final maps = await _databaseService.getNoteById(id);
+    if (maps == null || maps.isEmpty) return null;
+    return Note.fromMap(maps.first);
   }
 
   @override
   Future<List<Note>> getAllNotes() async {
-    return await DatabaseService.getAllNotes();
+    final maps = await _databaseService.getAllNotes();
+    return maps.map((m) => Note.fromMap(m)).toList();
   }
 
   @override
   Future<int> updateNote(Note note) async {
-    return await DatabaseService.updateNote(note);
+    return await _databaseService.updateNote(note.toMap());
   }
 
   @override
   Future<int> deleteNote(int id) async {
-    return await DatabaseService.deleteNote(id);
+    return await _databaseService.deleteNote(id);
   }
 
   @override
   Future<List<Note>> searchNotes(String query) async {
-    return await DatabaseService.searchNotes(query);
+    final maps = await _databaseService.searchNotes(query);
+    return maps.map((m) => Note.fromMap(m)).toList();
   }
 
   @override
   Future<List<Note>> getRecentNotes({int limit = 5}) async {
-    return await DatabaseService.getRecentNotes(limit: limit);
+    final maps = await _databaseService.getRecentNotes(limit: limit);
+    return maps.map((m) => Note.fromMap(m)).toList();
   }
 
   @override
   Future<List<Note>> getPendingTasks({int limit = 10}) async {
-    return await DatabaseService.getPendingTasks(limit: limit);
+    final maps = await _databaseService.getPendingTasks(limit: limit);
+    return maps.map((m) => Note.fromMap(m)).toList();
   }
 
   @override
@@ -74,7 +86,10 @@ class SqlNoteRepository implements INoteRepository {
 
   @override
   Future<Map<String, dynamic>> getDatabaseStats() async {
-    return await DatabaseService.getDatabaseStats();
+    return {
+      'totalNotes': (await getAllNotes()).length,
+      'totalTasks': (await getPendingTasks()).length,
+    };
   }
 
   @override
@@ -101,5 +116,37 @@ class SqlNoteRepository implements INoteRepository {
   Future<void> importNotes(List<Map<String, dynamic>> notesData) async {
     final notes = notesData.map((data) => Note.fromJson(data)).toList();
     await insertNotes(notes);
+  }
+
+  @override
+  Future<int> addNote(Note note) async {
+    return await _databaseService.insertNote(note.toMap());
+  }
+
+  @override
+  Future<List<Note>> getBacklinksForNote(int noteId) async {
+    final maps = await _databaseService.getBacklinksForNote(noteId);
+    return maps.map((m) => Backlink.fromMap(m)).toList();
+  }
+
+  @override
+  Future<List<Note>> getOutgoingLinksForNote(int noteId) async {
+    final maps = await _databaseService.getOutgoingLinksForNote(noteId);
+    return maps.map((m) => Backlink.fromMap(m)).toList();
+  }
+
+  @override
+  Future<void> updateBacklinks(Note note, List<Note> allNotes) async {
+    await _databaseService.updateBacklinks(note.id, note.content, allNotes.map((n) => n.toMap()).toList());
+  }
+
+  @override
+  Future<int> getNoteCountInFolder(String folderName) async {
+    return await _databaseService.getNoteCountInFolder(folderName);
+  }
+
+  @override
+  Future<List<String>> getFolders() async {
+    return await getAllFolders();
   }
 }

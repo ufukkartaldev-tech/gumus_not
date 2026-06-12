@@ -18,7 +18,7 @@ void main() {
     });
 
     tearDown(() {
-      mockRepository.clearAll();
+      mockRepository.clear();
     });
 
     group('Note Creation', () {

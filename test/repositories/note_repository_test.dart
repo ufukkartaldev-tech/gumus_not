@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import '../lib/features/notes/repositories/inote_repository.dart';
+import '../lib/features/notes/repositories/note_repository.dart';
 import '../lib/features/notes/repositories/mock_note_repository.dart';
 import '../lib/features/notes/models/note_model.dart';
 
@@ -7,7 +7,7 @@ import '../lib/features/notes/models/note_model.dart';
 /// Following SOLID principles: Testable and maintainable code
 void main() {
   group('NoteRepository Tests', () {
-    late INoteRepository repository;
+    late NoteRepository repository;
 
     setUp(() {
       repository = MockNoteRepository();
@@ -15,7 +15,7 @@ void main() {
 
     tearDown(() {
       if (repository is MockNoteRepository) {
-        (repository as MockNoteRepository).clearAll();
+        (repository as MockNoteRepository).clear();
       }
     });
 

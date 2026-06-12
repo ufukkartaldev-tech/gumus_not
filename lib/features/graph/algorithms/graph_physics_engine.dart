@@ -2,8 +2,9 @@ import 'dart:math';
 import 'dart:async';
 import 'dart:isolate';
 import 'package:flutter/material.dart';
-import 'package:connected_notebook/features/graph/algorithms/quadtree.dart';
-import 'package:connected_notebook/features/graph/constants/graph_constants.dart';
+import '../models/graph_models.dart';
+import 'quadtree.dart';
+import '../constants/graph_constants.dart';
 
 /// Message types for isolate communication
 enum PhysicsMessageType {

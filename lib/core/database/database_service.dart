@@ -1,14 +1,45 @@
-import 'dart:math';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:connected_notebook/features/notes/models/note_model.dart';
 
-class DatabaseService {
+/// Abstract interface for database operations
+/// Follows Dependency Inversion Principle
+abstract class IDatabaseService {
+  Future<Database> get database;
+  Future<void> close();
+  
+  // Note operations
+  Future<int> insertNote(Map<String, dynamic> note);
+  Future<List<Map<String, dynamic>>> getAllNotes();
+  Future<List<Map<String, dynamic>>?> getNoteById(int id);
+  Future<int> updateNote(Map<String, dynamic> note);
+  Future<int> deleteNote(int id);
+  Future<List<Map<String, dynamic>>> searchNotes(String query);
+  
+  // Backlink operations
+  Future<void> insertBacklink(Map<String, dynamic> backlink);
+  Future<List<Map<String, dynamic>>> getBacklinksForNote(int noteId);
+  Future<List<Map<String, dynamic>>> getOutgoingLinksForNote(int noteId);
+  Future<void> updateBacklinks(int? noteId, String content, List<Map<String, dynamic>> allNotes);
+  
+  // Template operations
+  Future<int> insertTemplate(Map<String, dynamic> template);
+  Future<List<Map<String, dynamic>>> getAllTemplates();
+  
+  // Query operations
+  Future<List<Map<String, dynamic>>> getRecentNotes({int limit = 5});
+  Future<List<Map<String, dynamic>>> getPendingTasks({int limit = 10});
+  Future<int> getNoteCountInFolder(String folderName);
+}
+
+/// Concrete implementation using SQLite
+class SqliteDatabaseService implements IDatabaseService {
   static Database? _database;
   static const String _dbName = 'connected_notebook.db';
   static const int _dbVersion = 3;
 
-  static Future<Database> get database async {
+  @override
+  Future<Database> get database async {
     if (_database != null) return _database!;
     _database = await _initDatabase();
     return _database!;
@@ -62,12 +93,10 @@ class DatabaseService {
       )
     ''');
 
-    await db.execute('''
-      CREATE INDEX idx_notes_title ON notes(title);
-      CREATE INDEX idx_notes_created_at ON notes(created_at);
-      CREATE INDEX idx_backlinks_source ON backlinks(source_note_id);
-      CREATE INDEX idx_backlinks_target ON backlinks(target_note_id);
-    ''');
+    await db.execute('CREATE INDEX idx_notes_title ON notes(title)');
+    await db.execute('CREATE INDEX idx_notes_created_at ON notes(created_at)');
+    await db.execute('CREATE INDEX idx_backlinks_source ON backlinks(source_note_id)');
+    await db.execute('CREATE INDEX idx_backlinks_target ON backlinks(target_note_id)');
   }
 
   static Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -79,34 +108,35 @@ class DatabaseService {
     }
   }
 
-  static Future<int> insertNote(Note note) async {
+  @override
+  Future<int> insertNote(Map<String, dynamic> note) async {
     final db = await database;
-    return await db.insert('notes', note.toMap());
+    return await db.insert('notes', note);
   }
 
-  static Future<List<Note>> getAllNotes() async {
+  @override
+  Future<List<Map<String, dynamic>>> getAllNotes() async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
       'notes',
       orderBy: 'updated_at DESC',
     );
-    return List.generate(maps.length, (i) => Note.fromMap(maps[i]));
+    return maps;
   }
 
-  static Future<Note?> getNoteById(int id) async {
+  @override
+  Future<List<Map<String, dynamic>>?> getNoteById(int id) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
       'notes',
       where: 'id = ?',
       whereArgs: [id],
     );
-    if (maps.isNotEmpty) {
-      return Note.fromMap(maps.first);
-    }
-    return null;
+    return maps.isNotEmpty ? maps : null;
   }
 
-  static Future<List<Note>> searchNotes(String query) async {
+  @override
+  Future<List<Map<String, dynamic>>> searchNotes(String query) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
       'notes',
@@ -114,21 +144,22 @@ class DatabaseService {
       whereArgs: ['%$query%', '%$query%'],
       orderBy: 'updated_at DESC',
     );
-    return List.generate(maps.length, (i) => Note.fromMap(maps[i]));
+    return maps;
   }
 
-  static Future<int> updateNote(Note note) async {
+  @override
+  Future<int> updateNote(Map<String, dynamic> note) async {
     final db = await database;
-    note.updatedAt = DateTime.now().millisecondsSinceEpoch;
     return await db.update(
       'notes',
-      note.toMap(),
+      note,
       where: 'id = ?',
-      whereArgs: [note.id],
+      whereArgs: [note['id']],
     );
   }
 
-  static Future<int> deleteNote(int id) async {
+  @override
+  Future<int> deleteNote(int id) async {
     final db = await database;
     return await db.delete(
       'notes',
@@ -137,12 +168,14 @@ class DatabaseService {
     );
   }
 
-  static Future<void> insertBacklink(Backlink backlink) async {
+  @override
+  Future<void> insertBacklink(Map<String, dynamic> backlink) async {
     final db = await database;
-    await db.insert('backlinks', backlink.toMap());
+    await db.insert('backlinks', backlink);
   }
 
-  static Future<List<Backlink>> getBacklinksForNote(int noteId) async {
+  @override
+  Future<List<Map<String, dynamic>>> getBacklinksForNote(int noteId) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
       'backlinks',
@@ -150,10 +183,11 @@ class DatabaseService {
       whereArgs: [noteId],
       orderBy: 'created_at DESC',
     );
-    return List.generate(maps.length, (i) => Backlink.fromMap(maps[i]));
+    return maps;
   }
 
-  static Future<List<Backlink>> getOutgoingLinksForNote(int noteId) async {
+  @override
+  Future<List<Map<String, dynamic>>> getOutgoingLinksForNote(int noteId) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
       'backlinks',
@@ -161,10 +195,11 @@ class DatabaseService {
       whereArgs: [noteId],
       orderBy: 'created_at DESC',
     );
-    return List.generate(maps.length, (i) => Backlink.fromMap(maps[i]));
+    return maps;
   }
 
-  static Future<void> updateBacklinks(int? noteId, String content, List<Note> allNotes) async {
+  @override
+  Future<void> updateBacklinks(int? noteId, String content, List<Map<String, dynamic>> allNotes) async {
     final db = await database;
     
     await db.delete(
@@ -180,39 +215,47 @@ class DatabaseService {
       final linkText = match.group(1)!;
       
       final targetNote = allNotes.firstWhere(
-        (note) => note.title.toLowerCase() == linkText.toLowerCase(),
-        orElse: () => Note(
-          id: -1,
-          title: linkText,
-          content: '',
-          createdAt: DateTime.now().millisecondsSinceEpoch,
-          updatedAt: DateTime.now().millisecondsSinceEpoch,
-        ),
+        (note) => note['title'].toString().toLowerCase() == linkText.toLowerCase(),
+        orElse: () => {'id': -1},
       );
 
-      if (targetNote.id != -1) {
-        final backlink = Backlink(
-          sourceNoteId: noteId!,
-          targetNoteId: targetNote.id!,
-          linkText: linkText,
-          createdAt: DateTime.now().millisecondsSinceEpoch,
-        );
-        await db.insert('backlinks', backlink.toMap());
+      if (targetNote['id'] != -1) {
+        final backlink = {
+          'source_note_id': noteId,
+          'target_note_id': targetNote['id'],
+          'link_text': linkText,
+          'created_at': DateTime.now().millisecondsSinceEpoch,
+        };
+        await db.insert('backlinks', backlink);
       }
     }
   }
 
-  static Future<List<Note>> getRecentNotes({int limit = 5}) async {
+  @override
+  Future<int> insertTemplate(Map<String, dynamic> template) async {
+    final db = await database;
+    return await db.insert('templates', template);
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getAllTemplates() async {
+    final db = await database;
+    return await db.query('templates');
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getRecentNotes({int limit = 5}) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
       'notes',
       orderBy: 'updated_at DESC',
       limit: limit,
     );
-    return List.generate(maps.length, (i) => Note.fromMap(maps[i]));
+    return maps;
   }
 
-  static Future<List<Note>> getPendingTasks({int limit = 10}) async {
+  @override
+  Future<List<Map<String, dynamic>>> getPendingTasks({int limit = 10}) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
       'notes',
@@ -221,24 +264,23 @@ class DatabaseService {
       orderBy: 'updated_at DESC',
       limit: limit,
     );
-    return List.generate(maps.length, (i) => Note.fromMap(maps[i]));
+    return maps;
   }
 
-  static Future<Map<String, dynamic>> getDatabaseStats() async {
+  @override
+  Future<int> getNoteCountInFolder(String folderName) async {
     final db = await database;
     
-    final totalNotesResult = await db.rawQuery('SELECT COUNT(*) as count FROM notes');
-    final totalTasksResult = await db.rawQuery('SELECT COUNT(*) as count FROM notes WHERE content LIKE "% - [ %"');
-    final lastNoteResult = await db.query('notes', orderBy: 'updated_at DESC', limit: 1);
+    final result = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM notes WHERE folder_name = ?',
+      [folderName],
+    );
     
-    return {
-      'totalNotes': totalNotesResult.first['count'],
-      'totalTasks': totalTasksResult.first['count'],
-      'lastNoteDate': lastNoteResult.isNotEmpty ? lastNoteResult.first['updated_at'] : null,
-    };
+    return result.first['count'] as int;
   }
 
-  static Future<void> close() async {
+  @override
+  Future<void> close() async {
     final db = await database;
     await db.close();
     _database = null;

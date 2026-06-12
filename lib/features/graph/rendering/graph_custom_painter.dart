@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:connected_notebook/features/graph/constants/graph_constants.dart';
+import '../models/graph_models.dart';
+import '../constants/graph_constants.dart';
 
 /// Custom painter for graph rendering
 /// Separates rendering logic from UI and physics

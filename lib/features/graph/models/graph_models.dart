@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:collection/collection.dart';
 
 /// Graph node model
 class GraphNode {
@@ -137,15 +138,12 @@ class GraphController extends ChangeNotifier {
 
   /// Find node by ID
   GraphNode? findNodeById(String id) {
-    return nodes.firstWhere((node) => node.id == id, orElse: () => null);
+    return nodes.firstWhereOrNull((node) => node.id == id);
   }
 
   /// Find node by note ID
   GraphNode? findNodeByNoteId(int noteId) {
-    return nodes.firstWhere(
-      (node) => node.noteId == noteId,
-      orElse: () => null,
-    );
+    return nodes.firstWhereOrNull((node) => node.noteId == noteId);
   }
 
   /// Get edges connected to a node

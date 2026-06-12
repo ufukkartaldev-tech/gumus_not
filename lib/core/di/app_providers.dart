@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../core/di/dependency_injection.dart';
+import 'package:provider/provider.dart';
+import 'dependency_injection.dart';
 
 /// Main application wrapper with dependency injection
 /// This should be used as the root of the application

@@ -30,24 +30,11 @@ class OptimizedSqliteNoteRepository implements NoteRepository {
   final Map<String, int> _operationCounts = {};
   final Stopwatch _queryStopwatch = Stopwatch();
   
-  Future<Database> get _db async {
+  Future<Database> get database async {
     if (_database != null) return _database!;
     _database = await _initDatabase();
     return _database!;
   }
-  
-  Future<Database> _initDatabase() async {
-    String path = join(await getDatabasesPath(), _dbName);
-    
-    return await openDatabase(
-      path,
-      version: _dbVersion,
-      onCreate: _onCreate,
-      onUpgrade: _onUpgrade,
-    );
-  }
-  
-  Future<void> _onCreate(Database db, int version) async {
     await _createMainTables(db);
     await _createFts5Table(db);
     await _createIndexes(db);

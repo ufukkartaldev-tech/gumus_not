@@ -4,7 +4,6 @@ import 'package:connected_notebook/features/notes/repositories/note_repository.d
 /// Mock repository for testing
 class MockNoteRepository implements NoteRepository {
   final List<Note> _mockNotes = [];
-  final List<Backlink> _mockBacklinks = [];
 
   @override
   Future<List<Note>> getAllNotes() async {
@@ -13,7 +12,11 @@ class MockNoteRepository implements NoteRepository {
 
   @override
   Future<Note?> getNoteById(int id) async {
-    return _mockNotes.firstWhere((note) => note.id == id, orElse: () => null);
+    try {
+      return _mockNotes.firstWhere((note) => note.id == id);
+    } catch (e) {
+      return null;
+    }
   }
 
   @override
@@ -25,7 +28,7 @@ class MockNoteRepository implements NoteRepository {
   }
 
   @override
-  Future<int> addNote(Note note) async {
+  Future<int> insertNote(Note note) async {
     final newId = _mockNotes.isEmpty ? 1 : (_mockNotes.last.id ?? 0) + 1;
     final newNote = note.copyWith(id: newId);
     _mockNotes.add(newNote);
@@ -33,23 +36,27 @@ class MockNoteRepository implements NoteRepository {
   }
 
   @override
-  Future<void> updateNote(Note note) async {
+  Future<int> updateNote(Note note) async {
     final index = _mockNotes.indexWhere((n) => n.id == note.id);
     if (index != -1) {
       _mockNotes[index] = note;
+      return 1;
     }
+    return 0;
   }
 
   @override
-  Future<void> deleteNote(int id) async {
+  Future<int> deleteNote(int id) async {
+    final initialLength = _mockNotes.length;
     _mockNotes.removeWhere((note) => note.id == id);
+    return initialLength - _mockNotes.length;
   }
 
   @override
   Future<List<Note>> getRecentNotes({int limit = 5}) async {
     final sorted = List.from(_mockNotes)
       ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-    return sorted.take(limit).toList();
+    return sorted.take(limit).toList().cast<Note>();
   }
 
   @override
@@ -72,58 +79,8 @@ class MockNoteRepository implements NoteRepository {
   }
 
   @override
-  Future<List<Backlink>> getBacklinksForNote(int noteId) async {
-    return _mockBacklinks.where((bl) => bl.targetNoteId == noteId).toList();
-  }
-
-  @override
-  Future<List<Backlink>> getOutgoingLinksForNote(int noteId) async {
-    return _mockBacklinks.where((bl) => bl.sourceNoteId == noteId).toList();
-  }
-
-  @override
-  Future<void> updateBacklinks(Note note, List<Note> allNotes) async {
-    // Remove existing backlinks from this note
-    _mockBacklinks.removeWhere((bl) => bl.sourceNoteId == note.id);
-    
-    // Extract links and create new backlinks
-    final RegExp linkRegex = RegExp(r'\[\[([^\]]+)\]\]');
-    final matches = linkRegex.allMatches(note.content);
-    
-    for (final match in matches) {
-      final linkText = match.group(1)!;
-      final targetNote = allNotes.firstWhere(
-        (n) => n.title.toLowerCase() == linkText.toLowerCase(),
-        orElse: () => Note(
-          id: -1,
-          title: linkText,
-          content: '',
-          createdAt: DateTime.now().millisecondsSinceEpoch,
-          updatedAt: DateTime.now().millisecondsSinceEpoch,
-        ),
-      );
-
-      if (targetNote.id != -1) {
-        _mockBacklinks.add(Backlink(
-          sourceNoteId: note.id!,
-          targetNoteId: targetNote.id!,
-          linkText: linkText,
-          createdAt: DateTime.now().millisecondsSinceEpoch,
-        ));
-      }
-    }
-  }
-
-  @override
-  Future<List<String>> getFolders() async {
-    final folderSet = _mockNotes.map((n) => n.folderName).where((f) => f.isNotEmpty).toSet();
-    if (!folderSet.contains('Genel')) folderSet.add('Genel');
-    return folderSet.toList()..sort();
-  }
-
-  @override
-  Future<int> getNoteCountInFolder(String folderName) async {
-    return _mockNotes.where((n) => n.folderName == folderName).length;
+  Future<List<Note>> getNotesByFolder(String folderName) async {
+    return _mockNotes.where((n) => n.folderName == folderName).toList();
   }
 
   @override
@@ -132,14 +89,37 @@ class MockNoteRepository implements NoteRepository {
   }
 
   @override
-  Future<Map<String, int>> getTagFrequency() async {
-    final Map<String, int> tagFrequency = {};
-    for (final note in _mockNotes) {
-      for (final tag in note.tags) {
-        tagFrequency[tag] = (tagFrequency[tag] ?? 0) + 1;
-      }
+  Future<List<String>> getAllFolders() async {
+    final folderSet = _mockNotes.map((n) => n.folderName).where((f) => f.isNotEmpty).toSet();
+    if (!folderSet.contains('Genel')) folderSet.add('Genel');
+    return folderSet.toList()..sort();
+  }
+
+  @override
+  Future<void> insertNotes(List<Note> notes) async {
+    for (final note in notes) {
+      await insertNote(note);
     }
-    return tagFrequency;
+  }
+
+  @override
+  Future<void> deleteNotes(List<int> noteIds) async {
+    for (final id in noteIds) {
+      await deleteNote(id);
+    }
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> exportAllNotes() async {
+    return _mockNotes.map((note) => note.toJson()).toList();
+  }
+
+  @override
+  Future<void> importNotes(List<Map<String, dynamic>> notesData) async {
+    _mockNotes.clear();
+    for (final data in notesData) {
+      _mockNotes.add(Note.fromJson(data));
+    }
   }
 
   /// Helper method to add mock data for testing
@@ -147,9 +127,13 @@ class MockNoteRepository implements NoteRepository {
     _mockNotes.addAll(notes);
   }
 
+  /// Helper method to clear mock data (alias for clear)
+  void clearAll() {
+    clear();
+  }
+
   /// Helper method to clear mock data
   void clear() {
     _mockNotes.clear();
-    _mockBacklinks.clear();
   }
 }

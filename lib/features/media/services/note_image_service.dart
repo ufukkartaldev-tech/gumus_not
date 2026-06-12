@@ -1,6 +1,8 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
-import '../models/note_model.dart';
-import '../services/image_service.dart';
+import 'package:image_picker/image_picker.dart';
+import '../../notes/models/note_model.dart';
+import 'image_service.dart';
 import '../widgets/image_picker_widget.dart';
 
 /// Service for integrating images with notes

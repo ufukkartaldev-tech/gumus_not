@@ -1,10 +1,10 @@
-import '../models/note_model.dart';
-import '../repositories/inote_repository.dart';
+import '../../notes/models/note_model.dart';
+import '../../notes/repositories/note_repository.dart';
 
 /// Service for analytics and statistics
 /// Follows Single Responsibility Principle: Only handles analytics operations
 class AnalyticsService {
-  final INoteRepository _repository;
+  final NoteRepository _repository;
 
   AnalyticsService(this._repository);
 

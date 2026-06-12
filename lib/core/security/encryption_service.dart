@@ -99,14 +99,14 @@ class KeyDerivation {
       // Calculate U1 = HMAC(password, salt || i)
       var hmac = Hmac(sha256, passwordBytes);
       var input = Uint8List.fromList([...salt, ..._intToBytes(i)]);
-      var u = hmac.convert(input).bytes;
+      var u = Uint8List.fromList(hmac.convert(input).bytes);
       
       block = u;
       
       // Calculate U2..Uc
       for (int j = 1; j < iterations; j++) {
         hmac = Hmac(sha256, passwordBytes);
-        u = hmac.convert(u).bytes;
+        u = Uint8List.fromList(hmac.convert(u).bytes);
         
         // XOR block with u
         for (int k = 0; k < block.length; k++) {

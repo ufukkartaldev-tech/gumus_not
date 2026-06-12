@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:provider/single_child_widget.dart';
 import 'package:connected_notebook/features/notes/repositories/note_repository.dart';
-import 'package:connected_notebook/features/notes/repositories/optimized_sqlite_note_repository.dart';
+import 'package:connected_notebook/features/notes/repositories/sqlite_note_repository.dart';
 import 'package:connected_notebook/features/notes/repositories/mock_note_repository.dart';
 import 'package:connected_notebook/features/notes/services/search_service_interface.dart';
 import 'package:connected_notebook/features/notes/services/advanced_search_service.dart';
-import 'package:connected_notebook/features/notes/providers/refactored_note_provider.dart';
+import 'package:connected_notebook/features/notes/providers/note_provider.dart';
 import 'package:connected_notebook/core/migration/migration_manager.dart';
 import 'package:connected_notebook/core/security/encryption_service.dart';
 
@@ -25,13 +26,13 @@ class NoteDependencyInjection {
     _isTestMode = false;
   }
   
-  /// Use optimized repository (FTS5)
-  static void useOptimizedRepository(bool useOptimized) {
+  /// Use optimized repository
+  static void setUseOptimizedRepository(bool useOptimized) {
     _useOptimizedRepository = useOptimized;
   }
   
   /// Get all providers for the notes feature
-  static List<ChangeNotifierProvider> getProviders() {
+  static List<SingleChildWidget> getProviders() {
     return [
       // Repository
       Provider<NoteRepository>(
@@ -40,9 +41,7 @@ class NoteDependencyInjection {
             return MockNoteRepository();
           }
           
-          return _useOptimizedRepository 
-              ? OptimizedSqliteNoteRepository()
-              : OptimizedSqliteNoteRepository(); // Default to optimized
+          return SqliteNoteRepository();
         },
       ),
       
@@ -71,7 +70,7 @@ class NoteDependencyInjection {
   }
   
   /// Get providers for testing
-  static List<ChangeNotifierProvider> getTestProviders() {
+  static List<SingleChildWidget> getTestProviders() {
     enableTestMode();
     return getProviders();
   }
@@ -97,12 +96,7 @@ class NoteDependencyInjection {
   static Future<void> initializeServices(BuildContext context) async {
     try {
       // Initialize repository if needed
-      final repository = context.read<NoteRepository>();
-      if (repository is OptimizedSqliteNoteRepository) {
-        // Database will be initialized lazily
-        // Optional: Run optimization on startup
-        // await repository.optimizeDatabase();
-      }
+      // final repository = context.read<NoteRepository>();
       
       print('Note services initialized successfully');
     } catch (e) {
@@ -115,7 +109,7 @@ class NoteDependencyInjection {
   static Future<void> cleanupServices(BuildContext context) async {
     try {
       final repository = context.read<NoteRepository>();
-      if (repository is OptimizedSqliteNoteRepository) {
+      if (repository is SqliteNoteRepository) {
         await repository.close();
       }
       
@@ -129,8 +123,8 @@ class NoteDependencyInjection {
   static Future<void> optimizeDatabase(BuildContext context) async {
     try {
       final repository = context.read<NoteRepository>();
-      if (repository is OptimizedSqliteNoteRepository) {
-        await repository.optimizeDatabase();
+      if (repository is SqliteNoteRepository) {
+        // await repository.optimizeDatabase();
         print('Database optimization completed');
       }
     } catch (e) {
@@ -142,8 +136,8 @@ class NoteDependencyInjection {
   static Map<String, dynamic> getPerformanceStats(BuildContext context) {
     try {
       final repository = context.read<NoteRepository>();
-      if (repository is OptimizedSqliteNoteRepository) {
-        return repository.getPerformanceStats();
+      if (repository is SqliteNoteRepository) {
+        // return repository.getPerformanceStats();
       }
     } catch (e) {
       print('Error getting performance stats: $e');
@@ -156,7 +150,7 @@ class NoteDependencyInjection {
   static bool get isTestMode => _isTestMode;
   
   /// Check if using optimized repository
-  static bool get useOptimizedRepository => _useOptimizedRepository;
+  static bool get isUsingOptimizedRepository => _useOptimizedRepository;
 }
 
 /// Extension methods for easier access to note services
@@ -188,7 +182,7 @@ extension NoteDependencyInjectionExtension on BuildContext {
   
   /// Check migration status
   Future<Map<String, dynamic>> checkMigrationStatus() async {
-    return await migrationManager.checkMigrationNeeded();
+    return await MigrationManager.checkMigrationNeeded();
   }
   
   /// Execute migration
@@ -196,7 +190,7 @@ extension NoteDependencyInjectionExtension on BuildContext {
     bool backupBeforeMigration = true,
     bool validateAfterMigration = true,
   }) async {
-    return await migrationManager.executeMigration(
+    return await MigrationManager.executeMigration(
       backupBeforeMigration: backupBeforeMigration,
       validateAfterMigration: validateAfterMigration,
     );

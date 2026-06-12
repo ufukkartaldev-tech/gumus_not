@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import '../services/analytics_service.dart';
 import '../widgets/chart_widgets.dart';
 import '../../notes/providers/note_action_provider.dart';
-import '../../core/di/dependency_injection.dart';
+import '../../../core/di/dependency_injection.dart';
 
 /// Analytics Dashboard with comprehensive charts and statistics
 class AnalyticsDashboard extends StatefulWidget {

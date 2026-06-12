@@ -1,14 +1,14 @@
 import '../models/note_model.dart';
-import '../repositories/inote_repository.dart';
+import '../repositories/note_repository.dart';
 import 'backlink_service.dart';
 
 /// Service for advanced note search operations
 /// Follows Single Responsibility Principle: Only handles search and filtering logic
-class SearchService {
-  final INoteRepository _repository;
+class NoteSearchService {
+  final NoteRepository _repository;
   final BacklinkService _backlinkService;
 
-  SearchService(this._repository, this._backlinkService);
+  NoteSearchService(this._repository, this._backlinkService);
 
   /// Advanced search with multiple criteria
   Future<List<Note>> advancedSearch({

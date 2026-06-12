@@ -12,14 +12,14 @@ class LineChartWidget extends StatelessWidget {
   final double? height;
 
   const LineChartWidget({
-    Key? key,
+    super.key,
     required this.data,
     required this.title,
     this.lineColor,
     this.showGrid = true,
     this.showDots = true,
     this.height,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -44,13 +44,13 @@ class LineChartWidget extends StatelessWidget {
               height: height ?? 200,
               child: LineChart(
                 LineChartData(
-                  gridData: showGrid ? _buildGridData(context) : FlGridData(show: false),
+                  gridData: showGrid ? _buildGridData(context) : const FlGridData(show: false),
                   titlesData: _buildTitlesData(),
                   borderData: _buildBorderData(),
-                  lineBarsData: [_buildLineBarData()],
+                  lineBarsData: [_buildLineBarData(context)],
                   lineTouchData: _buildTouchData(),
                   minX: 0,
-                  maxX: (data.length - 1).toDouble(),
+                  maxX: data.length > 1 ? (data.length - 1).toDouble() : 1,
                   minY: 0,
                   maxY: _getMaxY(),
                 ),
@@ -115,19 +115,20 @@ class LineChartWidget extends StatelessWidget {
   FlTitlesData _buildTitlesData() {
     return FlTitlesData(
       show: true,
-      rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-      topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+      rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+      topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
       bottomTitles: AxisTitles(
         sideTitles: SideTitles(
           showTitles: true,
           reservedSize: 30,
-          interval: 1,
+          interval: _getBottomInterval(),
           getTitlesWidget: (value, meta) {
             final index = value.toInt();
             if (index >= 0 && index < data.length) {
               final label = _getBottomLabel(data[index]);
               return SideTitleWidget(
                 axisSide: meta.axisSide,
+                space: 8,
                 child: Text(
                   label,
                   style: const TextStyle(fontSize: 10),
@@ -145,6 +146,7 @@ class LineChartWidget extends StatelessWidget {
           getTitlesWidget: (value, meta) {
             return SideTitleWidget(
               axisSide: meta.axisSide,
+              space: 8,
               child: Text(
                 value.toInt().toString(),
                 style: const TextStyle(fontSize: 10),
@@ -156,6 +158,12 @@ class LineChartWidget extends StatelessWidget {
     );
   }
 
+  double _getBottomInterval() {
+    if (data.length <= 7) return 1;
+    if (data.length <= 14) return 2;
+    return (data.length / 7).ceilToDouble();
+  }
+
   FlBorderData _buildBorderData() {
     return FlBorderData(
       show: true,
@@ -163,7 +171,7 @@ class LineChartWidget extends StatelessWidget {
     );
   }
 
-  LineChartBarData _buildLineBarData() {
+  LineChartBarData _buildLineBarData(BuildContext context) {
     final spots = <FlSpot>[];
     for (int i = 0; i < data.length; i++) {
       spots.add(FlSpot(i.toDouble(), (data[i]['count'] ?? 0).toDouble()));
@@ -180,7 +188,7 @@ class LineChartWidget extends StatelessWidget {
       ),
       barWidth: 3,
       isStrokeCapRound: true,
-      dotData: showDots ? FlDotData(show: true) : FlDotData(show: false),
+      dotData: showDots ? const FlDotData(show: true) : const FlDotData(show: false),
       belowBarData: BarAreaData(
         show: true,
         gradient: LinearGradient(
@@ -198,8 +206,7 @@ class LineChartWidget extends StatelessWidget {
   LineTouchData _buildTouchData() {
     return LineTouchData(
       touchTooltipData: LineTouchTooltipData(
-        tooltipBgColor: Colors.black87,
-        tooltipRoundedRadius: 8,
+        getTooltipColor: (touchedSpot) => Colors.black87,
         getTooltipItems: (touchedSpots) {
           return touchedSpots.map((spot) {
             final index = spot.x.toInt();
@@ -221,22 +228,31 @@ class LineChartWidget extends StatelessWidget {
 
   double _getMaxY() {
     if (data.isEmpty) return 10;
-    final maxValue = data.map((d) => d['count'] ?? 0).reduce((a, b) => a > b ? a : b);
-    return (maxValue * 1.2).ceilToDouble();
+    final maxValue = data
+        .map((d) => (d['count'] ?? 0) as num)
+        .reduce((a, b) => a > b ? a : b)
+        .toDouble();
+    return maxValue == 0 ? 10 : (maxValue * 1.2).ceilToDouble();
   }
 
   String _getBottomLabel(Map<String, dynamic> item) {
     if (item.containsKey('date')) {
-      final date = DateTime.parse(item['date']);
-      return '${date.day}/${date.month}';
+      final dateStr = item['date'];
+      final date = DateTime.tryParse(dateStr);
+      if (date != null) {
+        return '${date.day}/${date.month}';
+      }
     }
     return '';
   }
 
   String _getTooltipLabel(Map<String, dynamic> item) {
     if (item.containsKey('date')) {
-      final date = DateTime.parse(item['date']);
-      return '${date.day}/${date.month}/${date.year}';
+      final dateStr = item['date'];
+      final date = DateTime.tryParse(dateStr);
+      if (date != null) {
+        return '${date.day}/${date.month}/${date.year}';
+      }
     }
     return 'Değer';
   }
@@ -252,14 +268,14 @@ class BarChartWidget extends StatelessWidget {
   final bool horizontal;
 
   const BarChartWidget({
-    Key? key,
+    super.key,
     required this.data,
     required this.title,
     this.barColor,
     this.showGrid = true,
     this.height,
     this.horizontal = false,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -282,7 +298,7 @@ class BarChartWidget extends StatelessWidget {
             const SizedBox(height: 16),
             SizedBox(
               height: height ?? 200,
-              child: horizontal ? _buildHorizontalBarChart() : _buildVerticalBarChart(),
+              child: horizontal ? _buildHorizontalBarChart(context) : _buildVerticalBarChart(context),
             ),
           ],
         ),
@@ -321,7 +337,7 @@ class BarChartWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildVerticalBarChart() {
+  Widget _buildVerticalBarChart(BuildContext context) {
     return BarChart(
       BarChartData(
         alignment: BarChartAlignment.spaceAround,
@@ -329,13 +345,13 @@ class BarChartWidget extends StatelessWidget {
         barTouchData: _buildBarTouchData(),
         titlesData: _buildBarTitlesData(),
         borderData: _buildBorderData(),
-        barGroups: _buildBarGroups(),
-        gridData: showGrid ? _buildGridData(context) : FlGridData(show: false),
+        barGroups: _buildBarGroups(context),
+        gridData: showGrid ? _buildGridData(context) : const FlGridData(show: false),
       ),
     );
   }
 
-  Widget _buildHorizontalBarChart() {
+  Widget _buildHorizontalBarChart(BuildContext context) {
     return BarChart(
       BarChartData(
         alignment: BarChartAlignment.spaceAround,
@@ -343,8 +359,8 @@ class BarChartWidget extends StatelessWidget {
         barTouchData: _buildBarTouchData(),
         titlesData: _buildHorizontalBarTitlesData(),
         borderData: _buildBorderData(),
-        barGroups: _buildBarGroups(),
-        gridData: showGrid ? _buildGridData(context) : FlGridData(show: false),
+        barGroups: _buildBarGroups(context),
+        gridData: showGrid ? _buildGridData(context) : const FlGridData(show: false),
       ),
     );
   }
@@ -372,8 +388,7 @@ class BarChartWidget extends StatelessWidget {
   BarTouchData _buildBarTouchData() {
     return BarTouchData(
       touchTooltipData: BarTouchTooltipData(
-        tooltipBgColor: Colors.black87,
-        tooltipRoundedRadius: 8,
+        getTooltipColor: (group) => Colors.black87,
         getTooltipItem: (group, groupIndex, rod, rodIndex) {
           final label = data[groupIndex]['label'] ?? 'Item ${groupIndex + 1}';
           final value = rod.toY.round();
@@ -390,8 +405,8 @@ class BarChartWidget extends StatelessWidget {
   FlTitlesData _buildBarTitlesData() {
     return FlTitlesData(
       show: true,
-      rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-      topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+      rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+      topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
       bottomTitles: AxisTitles(
         sideTitles: SideTitles(
           showTitles: true,
@@ -402,6 +417,7 @@ class BarChartWidget extends StatelessWidget {
               final label = data[index]['label'] ?? '';
               return SideTitleWidget(
                 axisSide: meta.axisSide,
+                space: 8,
                 child: Text(
                   label.length > 10 ? label.substring(0, 10) : label,
                   style: const TextStyle(fontSize: 10),
@@ -419,6 +435,7 @@ class BarChartWidget extends StatelessWidget {
           getTitlesWidget: (value, meta) {
             return SideTitleWidget(
               axisSide: meta.axisSide,
+              space: 8,
               child: Text(
                 value.toInt().toString(),
                 style: const TextStyle(fontSize: 10),
@@ -433,9 +450,9 @@ class BarChartWidget extends StatelessWidget {
   FlTitlesData _buildHorizontalBarTitlesData() {
     return FlTitlesData(
       show: true,
-      rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-      topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-      bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+      rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+      topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+      bottomTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
       leftTitles: AxisTitles(
         sideTitles: SideTitles(
           showTitles: true,
@@ -446,6 +463,7 @@ class BarChartWidget extends StatelessWidget {
               final label = data[index]['label'] ?? '';
               return SideTitleWidget(
                 axisSide: meta.axisSide,
+                space: 8,
                 child: Text(
                   label.length > 8 ? label.substring(0, 8) : label,
                   style: const TextStyle(fontSize: 10),
@@ -459,7 +477,7 @@ class BarChartWidget extends StatelessWidget {
     );
   }
 
-  List<BarChartGroupData> _buildBarGroups() {
+  List<BarChartGroupData> _buildBarGroups(BuildContext context) {
     return List.generate(data.length, (index) {
       final value = (data[index]['count'] ?? 0).toDouble();
       return BarChartGroupData(
@@ -480,8 +498,11 @@ class BarChartWidget extends StatelessWidget {
 
   double _getMaxY() {
     if (data.isEmpty) return 10;
-    final maxValue = data.map((d) => d['count'] ?? 0).reduce((a, b) => a > b ? a : b);
-    return (maxValue * 1.2).ceilToDouble();
+    final maxValue = data
+        .map((d) => (d['count'] ?? 0) as num)
+        .reduce((a, b) => a > b ? a : b)
+        .toDouble();
+    return maxValue == 0 ? 10 : (maxValue * 1.2).ceilToDouble();
   }
 }
 
@@ -493,12 +514,12 @@ class PieChartWidget extends StatelessWidget {
   final double? height;
 
   const PieChartWidget({
-    Key? key,
+    super.key,
     required this.data,
     required this.title,
     this.colors,
     this.height,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -524,18 +545,21 @@ class PieChartWidget extends StatelessWidget {
               child: Row(
                 children: [
                   Expanded(
-                    flex: 2,
+                    flex: 3,
                     child: PieChart(
                       PieChartData(
-                        pieTouchData: _buildPieTouchData(),
                         sectionsSpace: 2,
-                        centerSpaceRadius: 60,
-                        sections: _buildPieSections(),
+                        centerSpaceRadius: 40,
+                        sections: _buildPieSections(context),
                       ),
                     ),
                   ),
+                  const SizedBox(width: 16),
                   Expanded(
-                    child: _buildLegend(),
+                    flex: 2,
+                    child: SingleChildScrollView(
+                      child: _buildLegend(context),
+                    ),
                   ),
                 ],
               ),
@@ -577,152 +601,75 @@ class PieChartWidget extends StatelessWidget {
     );
   }
 
-  PieTouchData _buildPieTouchData() {
-    return PieTouchData(
-      touchTooltipData: PieTouchTooltipData(
-        tooltipBgColor: Colors.black87,
-        tooltipRoundedRadius: 8,
-        getTooltipItem: (groupIndex, group, rod, rodIndex) {
-          final label = data[groupIndex]['label'] ?? 'Item ${groupIndex + 1}';
-          final value = data[groupIndex]['count'] ?? 0;
-          final total = data.fold<int>(0, (sum, item) => sum + (item['count'] ?? 0));
-          final percentage = total > 0 ? ((value / total) * 100).toStringAsFixed(1) : '0.0';
-          return PieTooltipItem(
-            '$label: $value ($percentage%)',
-            const TextStyle(color: Colors.white, fontSize: 12),
-          );
-        },
-      ),
-    );
-  }
-
-  List<PieChartSectionData> _buildPieSections() {
-    final total = data.fold<int>(0, (sum, item) => sum + (item['count'] ?? 0));
-    final defaultColors = [
+  List<PieChartSectionData> _buildPieSections(BuildContext context) {
+    final total = data.fold<num>(0, (sum, item) => sum + (item['count'] as num? ?? 0));
+    final chartColors = colors ?? [
       Theme.of(context).colorScheme.primary,
       Theme.of(context).colorScheme.secondary,
       Theme.of(context).colorScheme.tertiary,
-      Colors.orange,
-      Colors.purple,
-      Colors.teal,
-      Colors.indigo,
-      Colors.pink,
+      Theme.of(context).colorScheme.primaryContainer,
+      Theme.of(context).colorScheme.secondaryContainer,
     ];
 
-    return List.generate(data.length, (index) {
-      final value = (data[index]['count'] ?? 0).toDouble();
-      final percentage = total > 0 ? value / total : 0.0;
-      final color = (colors ?? defaultColors)[index % (colors ?? defaultColors).length];
+    return List.generate(data.length, (i) {
+      final value = (data[i]['count'] as num? ?? 0).toDouble();
+      final percentage = total > 0 ? (value / total * 100).toStringAsFixed(1) : '0';
 
       return PieChartSectionData(
-        color: color,
+        color: chartColors[i % chartColors.length],
         value: value,
-        title: '${(percentage * 100).toStringAsFixed(1)}%',
+        title: '$percentage%',
         radius: 50,
-        titleStyle: TextStyle(
+        titleStyle: const TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.bold,
           color: Colors.white,
         ),
-        badgeWidget: _Badge(
-          value.toString(),
-          size: 20,
-          color: color,
-        ),
-        badgePositionPercentageOffset: .98,
       );
     });
   }
 
-  Widget _buildLegend() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: List.generate(data.length, (index) {
-        final label = data[index]['label'] ?? 'Item ${index + 1}';
-        final count = data[index]['count'] ?? 0;
-        final defaultColors = [
-          Theme.of(context).colorScheme.primary,
-          Theme.of(context).colorScheme.secondary,
-          Theme.of(context).colorScheme.tertiary,
-          Colors.orange,
-          Colors.purple,
-          Colors.teal,
-          Colors.indigo,
-          Colors.pink,
-        ];
-        final color = (colors ?? defaultColors)[index % (colors ?? defaultColors).length];
+  Widget _buildLegend(BuildContext context) {
+    final chartColors = colors ?? [
+      Theme.of(context).colorScheme.primary,
+      Theme.of(context).colorScheme.secondary,
+      Theme.of(context).colorScheme.tertiary,
+      Theme.of(context).colorScheme.primaryContainer,
+      Theme.of(context).colorScheme.secondaryContainer,
+    ];
+
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: data.length,
+      itemBuilder: (context, i) {
+        final label = data[i]['label'] ?? 'Item ${i + 1}';
+        final count = data[i]['count'] ?? 0;
 
         return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 2),
+          padding: const EdgeInsets.symmetric(vertical: 4),
           child: Row(
             children: [
               Container(
                 width: 12,
                 height: 12,
                 decoration: BoxDecoration(
-                  color: color,
-                  borderRadius: BorderRadius.circular(2),
+                  color: chartColors[i % chartColors.length],
+                  shape: BoxShape.circle,
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  label,
-                  style: Theme.of(context).textTheme.bodySmall,
+                  '$label ($count)',
+                  style: const TextStyle(fontSize: 12),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              Text(
-                count.toString(),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
             ],
           ),
         );
-      }),
-    );
-  }
-}
-
-class _Badge extends StatelessWidget {
-  final String text;
-  final double size;
-  final Color color;
-
-  const _Badge(this.text, {required this.size, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.3),
-            blurRadius: 3,
-            offset: const Offset(2, 2),
-          ),
-        ],
-      ),
-      padding: EdgeInsets.all(size * 0.15),
-      child: Center(
-        child: FittedBox(
-          child: Text(
-            text,
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: size * 0.4,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-      ),
+      },
     );
   }
 }

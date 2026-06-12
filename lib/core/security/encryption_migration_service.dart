@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:encrypt/encrypt.dart';
 import 'package:crypto/crypto.dart';
+import 'package:sqflite/sqflite.dart';
 import 'package:connected_notebook/core/security/encryption_service.dart';
 
 /// Migration service for encryption format upgrades
@@ -145,12 +146,12 @@ class EncryptionMigrationService {
                 whereArgs: [note['id']],
               );
               
-              migrationStats['migratedNotes']++;
+              migrationStats['migratedNotes'] = (migrationStats['migratedNotes'] as int) + 1;
             }
           }
         } catch (e) {
           print('Failed to migrate note ${note['id']}: $e');
-          migrationStats['failedNotes']++;
+          migrationStats['failedNotes'] = (migrationStats['failedNotes'] as int) + 1;
         }
       }
       
@@ -227,17 +228,17 @@ class EncryptionMigrationService {
         final isEncrypted = note['is_encrypted'] as int? ?? 0;
         
         if (isEncrypted == 1 && content.isNotEmpty) {
-          report['encryptedNotes']++;
+          report['encryptedNotes'] = (report['encryptedNotes'] as int) + 1;
           
           if (isLegacyFormat(content)) {
-            report['legacyFormatNotes']++;
+            report['legacyFormatNotes'] = (report['legacyFormatNotes'] as int) + 1;
           } else {
-            report['currentFormatNotes']++;
+            report['currentFormatNotes'] = (report['currentFormatNotes'] as int) + 1;
           }
         }
       }
       
-      report['migrationRequired'] = report['legacyFormatNotes'] > 0;
+      report['migrationRequired'] = (report['legacyFormatNotes'] as int) > 0;
       
       return report;
     } catch (e) {
