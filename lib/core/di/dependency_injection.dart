@@ -1,92 +1,138 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
-import '../../features/notes/repositories/note_repository.dart';
-import '../../features/notes/repositories/sql_note_repository.dart';
-import '../../features/notes/repositories/mock_note_repository.dart';
-import '../../features/notes/services/note_service.dart';
-import '../../features/notes/services/backlink_service.dart';
-import '../../features/notes/services/note_search_service.dart';
-import '../../features/notes/providers/note_state_provider.dart';
-import '../../features/notes/providers/note_action_provider.dart';
+
+import '../../features/analytics/services/analytics_service.dart';
 import '../../features/media/services/image_service.dart';
 import '../../features/media/services/note_image_service.dart';
-import '../../features/analytics/services/analytics_service.dart';
+import '../../features/notes/providers/note_action_provider.dart';
+import '../../features/notes/providers/note_state_provider.dart';
+import '../../features/notes/repositories/mock_note_repository.dart';
+import '../../features/notes/repositories/note_repository.dart';
+import '../../features/notes/repositories/sql_note_repository.dart';
+import '../../features/notes/services/backlink_service.dart';
+import '../../features/notes/services/note_search_service.dart';
+import '../../features/notes/services/note_service.dart';
 import '../database/idatabase_service.dart';
-import '../database/database_service.dart';
+import '../database/legacy_database_service_adapter.dart';
+import '../database/secure_database_service.dart';
+import '../security/crypto_engine.dart';
+import '../security/key_derivation_component.dart';
+import '../security/legacy_encryption_service_adapter.dart';
+import '../security/vault_service_v2.dart';
 import '../theme/theme_provider.dart';
 
 /// Dependency Injection configuration
-/// Follows Dependency Inversion Principle: High-level modules don't depend on low-level modules
+///
+/// The application is wired in a staged manner so legacy UI and repository
+/// flows keep working while new secure database and vault services operate
+/// underneath through adapters.
 class DependencyInjection {
   static bool _isTestMode = false;
 
-  /// Enable test mode (uses mock repositories)
+  /// Enable test mode (uses mock repositories).
   static void enableTestMode() {
     _isTestMode = true;
   }
 
-  /// Disable test mode (uses real repositories)
+  /// Disable test mode (uses real repositories).
   static void disableTestMode() {
     _isTestMode = false;
   }
 
-  /// Get all providers for the application
+  /// Get all providers for the application.
   static List<SingleChildWidget> getProviders() {
     return [
-      // Theme Provider (should be early as other widgets depend on it)
+      // Theme Provider should be available early in the widget tree.
       ChangeNotifierProvider<ThemeProvider>(
         create: (_) => ThemeProvider()..loadTheme(),
       ),
 
-      // Database service
+      // Shared secure storage for vault metadata.
+      Provider<FlutterSecureStorage>(
+        create: (_) => const FlutterSecureStorage(),
+      ),
+
+      // New cryptographic building blocks.
+      Provider<IKeyDerivationComponent>(
+        create: (_) => Pbkdf2KeyDerivationComponent(),
+      ),
+      Provider<ICryptoEngine>(
+        create: (context) => Aes256GcmCryptoEngine(
+          keyDerivation: context.read<IKeyDerivationComponent>(),
+        ),
+      ),
+      Provider<IVaultServiceV2>(
+        create: (context) => VaultServiceV2(
+          cryptoEngine: context.read<ICryptoEngine>(),
+          secureStorage: context.read<FlutterSecureStorage>(),
+        ),
+      ),
+      Provider<LegacyEncryptionServiceAdapter>(
+        create: (context) => LegacyEncryptionServiceAdapter(
+          vaultService: context.read<IVaultServiceV2>(),
+          cryptoEngine: context.read<ICryptoEngine>(),
+        ),
+      ),
+
+      // New secure database implementation.
+      Provider<ISecureDatabaseService>(
+        create: (_) => SecureSqliteDatabaseService(),
+      ),
+
+      // Legacy database contract bridged onto the new secure database layer.
       Provider<IDatabaseService>(
-        create: (_) => _isTestMode ? _createMockDatabaseService() : SqliteDatabaseService(),
+        create: (context) => _isTestMode
+            ? _createMockDatabaseService()
+            : LegacyDatabaseServiceAdapter(
+                context.read<ISecureDatabaseService>(),
+              ),
       ),
 
-      // Repository
+      // Repository remains unchanged at call sites, but is now backed by the
+      // new secure database via the legacy adapter contract.
       Provider<NoteRepository>(
-        create: (context) => _isTestMode ? MockNoteRepository() : SqlNoteRepository(),
+        create: (context) => _isTestMode
+            ? MockNoteRepository()
+            : SqlNoteRepository(context.read<IDatabaseService>()),
       ),
 
-      // Services
+      // Note services.
       Provider<BacklinkService>(
         create: (context) => BacklinkService(context.read<NoteRepository>()),
       ),
-
       Provider<NoteSearchService>(
         create: (context) => NoteSearchService(
           context.read<NoteRepository>(),
           context.read<BacklinkService>(),
         ),
       ),
-
       Provider<NoteService>(
         create: (context) => NoteService(
           context.read<NoteRepository>(),
           context.read<BacklinkService>(),
+          encryptionAdapter: context.read<LegacyEncryptionServiceAdapter>(),
         ),
       ),
 
-      // Media Services
+      // Media Services.
       Provider<ImageService>(
         create: (_) => ImageService(),
       ),
-
       Provider<NoteImageService>(
-        create: (context) => NoteImageService(),
+        create: (_) => NoteImageService(),
       ),
 
-      // Analytics Service
+      // Analytics.
       Provider<AnalyticsService>(
-        create: (context) => AnalyticsService(context.read<INoteRepository>()),
+        create: (context) => AnalyticsService(context.read<NoteRepository>()),
       ),
 
-      // Providers
+      // UI state providers.
       ChangeNotifierProvider<NoteStateProvider>(
         create: (_) => NoteStateProvider(),
       ),
-
       ChangeNotifierProvider<NoteActionProvider>(
         create: (context) => NoteActionProvider(
           context.read<NoteService>(),
@@ -97,20 +143,18 @@ class DependencyInjection {
     ];
   }
 
-  /// Get providers for testing (uses mocks)
+  /// Get providers for testing (uses mocks).
   static List<SingleChildWidget> getTestProviders() {
     enableTestMode();
     return getProviders();
   }
 
-  /// Create mock database service for testing
+  /// Create mock database service for testing.
   static IDatabaseService _createMockDatabaseService() {
-    // This would be a mock implementation of IDatabaseService
-    // For now, we'll use the real one but in a test scenario
-    return SqliteDatabaseService();
+    return LegacyDatabaseServiceAdapter(SecureSqliteDatabaseService());
   }
 
-  /// Setup providers for a specific widget tree
+  /// Setup providers for a specific widget tree.
   static Widget setupProviders({required Widget child, bool isTestMode = false}) {
     if (isTestMode) {
       enableTestMode();
@@ -122,87 +166,64 @@ class DependencyInjection {
     );
   }
 
-  /// Get a specific service (for manual injection if needed)
+  /// Get a specific service (for manual injection if needed).
   static T getService<T>(BuildContext context) {
     return context.read<T>();
   }
 
-  /// Initialize all services
+  /// Initialize all services.
   static Future<void> initializeServices(BuildContext context) async {
     try {
-      // Initialize database
+      // Ensure database is opened and ready.
       final databaseService = context.read<IDatabaseService>();
       await databaseService.database;
 
-      // Preload any necessary data
-      final noteService = context.read<NoteService>();
-      // await noteService.loadInitialData(); // If needed
-
-      print('Services initialized successfully');
+      debugPrint('Services initialized successfully');
     } catch (e) {
-      print('Error initializing services: $e');
+      debugPrint('Error initializing services: $e');
       rethrow;
     }
   }
 
-  /// Cleanup services
+  /// Cleanup services.
   static Future<void> cleanupServices(BuildContext context) async {
     try {
-      final databaseService = context.read<IDatabaseService>();
-      await databaseService.close();
-      print('Services cleaned up successfully');
+      await context.read<IDatabaseService>().close();
+      await context.read<IVaultServiceV2>().lock();
+      debugPrint('Services cleaned up successfully');
     } catch (e) {
-      print('Error cleaning up services: $e');
+      debugPrint('Error cleaning up services: $e');
     }
   }
 
-  /// Reset all providers (useful for testing)
+  /// Reset all providers (useful for testing).
   static void resetProviders(BuildContext context) {
-    // Reset state providers
     context.read<NoteStateProvider>().clearAll();
   }
 
-  /// Check if we're in test mode
+  /// Check if we're in test mode.
   static bool get isTestMode => _isTestMode;
 }
 
-/// Extension methods for easier access to services
+/// Extension methods for easier access to services.
 extension DependencyInjectionExtension on BuildContext {
-  /// Get Note Service
   NoteService get noteService => read<NoteService>();
-
-  /// Get Search Service
   NoteSearchService get searchService => read<NoteSearchService>();
-
-  /// Get Backlink Service
   BacklinkService get backlinkService => read<BacklinkService>();
-
-  /// Get Note State Provider
   NoteStateProvider get noteStateProvider => read<NoteStateProvider>();
-
-  /// Get Note Action Provider
   NoteActionProvider get noteActionProvider => read<NoteActionProvider>();
-
-  /// Get Repository
   NoteRepository get noteRepository => read<NoteRepository>();
-
-  /// Get Database Service
   IDatabaseService get databaseService => read<IDatabaseService>();
-
-  /// Get Image Service
+  ISecureDatabaseService get secureDatabaseService => read<ISecureDatabaseService>();
+  LegacyEncryptionServiceAdapter get encryptionAdapter => read<LegacyEncryptionServiceAdapter>();
+  IVaultServiceV2 get vaultServiceV2 => read<IVaultServiceV2>();
   ImageService get imageService => read<ImageService>();
-
-  /// Get Note Image Service
   NoteImageService get noteImageService => read<NoteImageService>();
-
-  /// Get Analytics Service
   AnalyticsService get analyticsService => read<AnalyticsService>();
-
-  /// Get Theme Provider
   ThemeProvider get themeProvider => read<ThemeProvider>();
 }
 
-/// Provider configuration for different environments
+/// Provider configuration for different environments.
 enum Environment { development, production, test }
 
 class ProviderConfig {

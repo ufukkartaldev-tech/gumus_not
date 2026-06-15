@@ -3,13 +3,13 @@ import 'package:sqflite/sqflite.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:connected_notebook/core/security/encryption_migration_service.dart';
 import 'package:connected_notebook/core/database/database_migration_service.dart';
-import 'package:connected_notebook/core/security/encryption_service.dart';
+import 'package:connected_notebook/core/security/legacy/legacy_encryption_service.dart';
 
 /// Comprehensive migration manager for the application
 class MigrationManager {
   static const String _migrationVersionKey = 'app_migration_version';
   static const int _currentMigrationVersion = 2; // Version 2 includes FTS5 and PBKDF2
-  
+
   /// Check if migration is needed
   static Future<Map<String, dynamic>> checkMigrationNeeded() async {
     final result = {
@@ -18,56 +18,57 @@ class MigrationManager {
       'details': {},
       'recommendations': <String>[],
     };
-    
+
     try {
       // Check database migration
       final dbMigrationPlan = await DatabaseMigrationService.createMigrationPlan();
       final details = result['details'] as Map<String, dynamic>;
       details['database'] = dbMigrationPlan;
-      
+
       if (dbMigrationPlan['migrationRequired'] == true) {
         result['migrationNeeded'] = true;
         (result['recommendations'] as List).addAll(dbMigrationPlan['recommendations'] as Iterable);
       }
-      
+
       // Check encryption migration (requires database access)
       final oldDbExists = await DatabaseMigrationService.oldDatabaseExists();
       if (oldDbExists) {
         final oldPath = await DatabaseMigrationService.getOldDatabasePath();
         final oldDb = await openDatabase(oldPath);
-        
+
         final encryptionReport = await EncryptionMigrationService.createMigrationReport(
           database: oldDb,
         );
-        
+
         details['encryption'] = encryptionReport;
-        
+
         if (encryptionReport['migrationRequired'] == true) {
           result['migrationNeeded'] = true;
           (result['recommendations'] as List).add('Encryption format migration required');
         }
-        
+
         await oldDb.close();
       }
-      
+
       // Check if we've already completed migration
       final prefs = await _getPreferences();
       final lastMigrationVersion = prefs.getInt(_migrationVersionKey) ?? 0;
-      
+
       if (lastMigrationVersion < _currentMigrationVersion) {
         result['migrationNeeded'] = true;
         (result['recommendations'] as List).add('App migration from version $lastMigrationVersion to $_currentMigrationVersion');
       }
-      
+
     } catch (e) {
       result['migrationNeeded'] = true;
-      result['details']['error'] = e.toString();
+      final details = result['details'] as Map<String, dynamic>;
+      details['error'] = e.toString();
       (result['recommendations'] as List).add('Error checking migration status: $e');
     }
-    
+
     return result;
   }
-  
+
   /// Execute comprehensive migration
   static Future<Map<String, dynamic>> executeMigration({
     bool backupBeforeMigration = true,
@@ -81,29 +82,29 @@ class MigrationManager {
       'durationMs': 0,
       'finalStatus': 'unknown',
     };
-    
+
     final stopwatch = Stopwatch()..start();
-    
+
     try {
       (migrationResult['steps'] as List).add('Starting comprehensive migration');
-      
+
       // Step 1: Backup if requested
       if (backupBeforeMigration) {
         (migrationResult['steps'] as List).add('Creating backup');
         final backupSuccess = await DatabaseMigrationService.createBackup();
-        
+
         if (backupSuccess) {
           (migrationResult['steps'] as List).add('Backup created successfully');
         } else {
           (migrationResult['warnings'] as List).add('Backup creation failed or skipped');
         }
       }
-      
+
       // Step 2: Database migration
       (migrationResult['steps'] as List).add('Starting database migration');
       final dbMigrationResult = await DatabaseMigrationService.migrateToOptimizedDatabase();
       migrationResult['databaseMigration'] = dbMigrationResult;
-      
+
       if (dbMigrationResult['status'] == 'completed') {
         (migrationResult['steps'] as List).add('Database migration completed');
       } else if (dbMigrationResult['status'] == 'skipped') {
@@ -112,25 +113,25 @@ class MigrationManager {
         (migrationResult['errors'] as List).add('Database migration failed: ${dbMigrationResult['errors']}');
         migrationResult['status'] = 'failed';
       }
-      
+
       // Step 3: Encryption migration (if database migration succeeded)
       if (migrationResult['status'] != 'failed' && dbMigrationResult['status'] == 'completed') {
         (migrationResult['steps'] as List).add('Starting encryption migration');
-        
+
         // We need the master key for encryption migration
         // This assumes the vault is already initialized
         try {
           final encryptionService = EnhancedEncryptionService.instance;
-          
+
           if (encryptionService.isUnlocked()) {
             // Open new database for encryption migration
             final newPath = await DatabaseMigrationService.getNewDatabasePath();
             final newDb = await openDatabase(newPath);
-            
+
             // Get master key (this is a simplification - in reality, you'd need to handle this carefully)
             // For now, we'll skip encryption migration if we can't get the key
             (migrationResult['warnings'] as List).add('Encryption migration requires master key access. Skipping.');
-            
+
             await newDb.close();
           } else {
             (migrationResult['warnings'] as List).add('Vault is locked. Encryption migration skipped.');
@@ -139,13 +140,13 @@ class MigrationManager {
           (migrationResult['warnings'] as List).add('Encryption migration error: $e');
         }
       }
-      
+
       // Step 4: Validation
       if (validateAfterMigration && migrationResult['status'] != 'failed') {
         (migrationResult['steps'] as List).add('Validating migration');
         final validationResult = await DatabaseMigrationService.validateMigration();
         migrationResult['validation'] = validationResult;
-        
+
         if (validationResult['valid'] == true) {
           (migrationResult['steps'] as List).add('Migration validation passed');
         } else {
@@ -153,7 +154,7 @@ class MigrationManager {
           (migrationResult['warnings'] as List).add('Migration validation failed');
         }
       }
-      
+
       // Step 5: Update migration version
       if ((migrationResult['errors'] as List).isEmpty) {
         final prefs = await _getPreferences();
@@ -163,14 +164,14 @@ class MigrationManager {
       } else {
         migrationResult['finalStatus'] = 'partial_success';
       }
-      
+
       migrationResult['status'] = 'completed';
-      
+
     } catch (e) {
       migrationResult['status'] = 'failed';
       migrationResult['finalStatus'] = 'failed';
       (migrationResult['errors'] as List).add('Migration failed with exception: $e');
-      
+
       // Attempt rollback
       (migrationResult['steps'] as List).add('Attempting rollback');
       try {
@@ -187,10 +188,10 @@ class MigrationManager {
       stopwatch.stop();
       migrationResult['durationMs'] = stopwatch.elapsedMilliseconds;
     }
-    
+
     return migrationResult;
   }
-  
+
   /// Get migration status report
   static Future<Map<String, dynamic>> getMigrationStatus() async {
     final status = {
@@ -199,22 +200,22 @@ class MigrationManager {
       'migrationHistory': [],
       'systemStatus': 'unknown',
     };
-    
+
     try {
       final prefs = await _getPreferences();
       final lastVersion = prefs.getInt(_migrationVersionKey) ?? 0;
       status['lastMigrationVersion'] = lastVersion;
-      
+
       // Check database status
       final oldDbExists = await DatabaseMigrationService.oldDatabaseExists();
       final newDbExists = await DatabaseMigrationService.oldDatabaseExists(); // Check new DB path
-      
+
       status['databaseStatus'] = {
         'oldDatabaseExists': oldDbExists,
         'newDatabaseExists': newDbExists,
         'recommendation': oldDbExists && !newDbExists ? 'migration_needed' : 'up_to_date',
       };
-      
+
       // Determine system status
       if (lastVersion < _currentMigrationVersion) {
         status['systemStatus'] = 'migration_needed';
@@ -223,15 +224,15 @@ class MigrationManager {
       } else {
         status['systemStatus'] = 'up_to_date';
       }
-      
+
     } catch (e) {
       status['systemStatus'] = 'error';
       status['error'] = e.toString();
     }
-    
+
     return status;
   }
-  
+
   /// Clean up old migration artifacts
   static Future<Map<String, dynamic>> cleanupMigrationArtifacts() async {
     final cleanupResult = {
@@ -239,36 +240,36 @@ class MigrationManager {
       'errors': [],
       'warnings': [],
     };
-    
+
     try {
       // Check for old database
       final oldDbExists = await DatabaseMigrationService.oldDatabaseExists();
-      
+
       if (oldDbExists) {
         // In a production app, you might want to keep the old database
         // for a while before deleting it
         (cleanupResult['warnings'] as List).add('Old database exists. Manual cleanup recommended.');
         (cleanupResult['cleanedItems'] as List).add('Old database marked for review');
       }
-      
+
       // Check for backup files
       (cleanupResult['warnings'] as List).add('Backup file cleanup requires manual intervention');
-      
+
       // Clear migration preferences if needed
       final prefs = await _getPreferences();
       final lastVersion = prefs.getInt(_migrationVersionKey) ?? 0;
-      
+
       if (lastVersion < _currentMigrationVersion) {
         (cleanupResult['warnings'] as List).add('Migration not completed. Cleanup not recommended.');
       }
-      
+
     } catch (e) {
       (cleanupResult['errors'] as List).add('Cleanup error: $e');
     }
-    
+
     return cleanupResult;
   }
-  
+
   /// Migration wizard for user interaction
   static Future<Map<String, dynamic>> migrationWizard({
     required bool userConfirmed,
@@ -281,36 +282,36 @@ class MigrationManager {
       'steps': [],
       'decisions': [],
     };
-    
+
     if (!userConfirmed) {
       (wizardResult['steps'] as List).add('Migration requires user confirmation');
       return wizardResult;
     }
-    
+
     try {
       // Step 1: Analysis
       (wizardResult['steps'] as List).add('Analyzing current system');
       final analysis = await checkMigrationNeeded();
       wizardResult['analysis'] = analysis;
-      
+
       if (!analysis['migrationNeeded']) {
         (wizardResult['steps'] as List).add('No migration needed');
         wizardResult['completed'] = true;
         return wizardResult;
       }
-      
+
       // Step 2: Present plan
       (wizardResult['steps'] as List).add('Presenting migration plan');
       final plan = await DatabaseMigrationService.createMigrationPlan();
       wizardResult['plan'] = plan;
-      
+
       if (!automaticMode) {
         // In interactive mode, we would present the plan to the user
         (wizardResult['decisions'] as List).add('User review required for plan');
         (wizardResult['steps'] as List).add('Waiting for user decision');
         // For now, we'll assume user approves
       }
-      
+
       // Step 3: Execute migration
       (wizardResult['steps'] as List).add('Executing migration');
       final migrationResult = await executeMigration(
@@ -318,10 +319,10 @@ class MigrationManager {
         validateAfterMigration: true,
       );
       wizardResult['migrationResult'] = migrationResult;
-      
+
       // Step 4: Present results
       (wizardResult['steps'] as List).add('Migration execution completed');
-      
+
       if (migrationResult['finalStatus'] == 'success') {
         (wizardResult['steps'] as List).add('Migration successful');
         wizardResult['completed'] = true;
@@ -333,15 +334,15 @@ class MigrationManager {
         (wizardResult['steps'] as List).add('Migration failed');
         wizardResult['errors'] = migrationResult['errors'];
       }
-      
+
     } catch (e) {
       (wizardResult['steps'] as List).add('Wizard error: $e');
       wizardResult['errors'] = [e.toString()];
     }
-    
+
     return wizardResult;
   }
-  
+
   // Helper method to get preferences
   static Future<SharedPreferences> _getPreferences() async {
      return await SharedPreferences.getInstance();
@@ -351,21 +352,21 @@ class MigrationManager {
 // Mock SharedPreferences for testing
 class MockSharedPreferences {
   final Map<String, dynamic> _storage = {};
-  
+
   Future<bool> setInt(String key, int value) async {
     _storage[key] = value;
     return true;
   }
-  
+
   int? getInt(String key) {
     return _storage[key] as int?;
   }
-  
+
   Future<bool> remove(String key) async {
     _storage.remove(key);
     return true;
   }
-  
+
   Future<bool> clear() async {
     _storage.clear();
     return true;
@@ -376,7 +377,7 @@ class MockSharedPreferences {
 class MigrationUIHelper {
   static String getMigrationStatusMessage(Map<String, dynamic> status) {
     final systemStatus = status['systemStatus'] ?? 'unknown';
-    
+
     switch (systemStatus) {
       case 'up_to_date':
         return 'Your app is up to date with the latest improvements.';
@@ -390,16 +391,16 @@ class MigrationUIHelper {
         return 'Migration status: $systemStatus';
     }
   }
-  
+
   static String getMigrationRecommendation(Map<String, dynamic> analysis) {
     final recommendations = analysis['recommendations'] as List<dynamic>? ?? [];
-    
+
     if (recommendations.isEmpty) {
       return 'No migration needed at this time.';
     }
-    
+
     final primaryRecommendation = recommendations.isNotEmpty ? recommendations.first : '';
-    
+
     if (primaryRecommendation.toString().contains('backup')) {
       return 'We recommend creating a backup before proceeding with migration.';
     } else if (primaryRecommendation.toString().contains('large')) {
@@ -408,7 +409,7 @@ class MigrationUIHelper {
       return 'Migration is recommended to improve performance and security.';
     }
   }
-  
+
   static Map<String, dynamic> getMigrationProgressSteps() {
     return {
       'steps': [

@@ -10,7 +10,7 @@ class TagCloudWidget extends StatelessWidget {
     return Consumer<NoteProvider>(
       builder: (context, noteProvider, child) {
         final tagFrequency = noteProvider.getTagFrequency();
-        
+
         if (tagFrequency.isEmpty) {
           return Container(
             padding: const EdgeInsets.all(16),
@@ -66,16 +66,16 @@ class TagCloudWidget extends StatelessWidget {
                   final count = entry.value;
                   final maxCount = sortedTags.first.value;
                   final minCount = sortedTags.last.value;
-                  
+
                   // Calculate font size based on frequency
                   double fontSize = 12;
                   if (maxCount != minCount) {
                     final ratio = (count - minCount) / (maxCount - minCount);
-                    fontSize = 12 + (ratio * 8); // 12-20 font size range
+                    fontSize = 12 + (ratio * 8).toDouble(); // 12-20 font size range
                   } else {
                     fontSize = 14;
                   }
-                  
+
                   // Calculate opacity based on frequency
                   double opacity = 0.6;
                   if (maxCount != minCount) {
@@ -173,7 +173,7 @@ class _TagFilteredScreenState extends State<TagFilteredScreen> {
       body: Consumer<NoteProvider>(
         builder: (context, noteProvider, child) {
           final notes = noteProvider.getNotesByTag(widget.tag);
-          
+
           if (notes.isEmpty) {
             return Center(
               child: Column(

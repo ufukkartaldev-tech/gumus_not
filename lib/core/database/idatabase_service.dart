@@ -31,6 +31,7 @@ abstract class IDatabaseService {
   // Query operations
   Future<List<Map<String, dynamic>>> getRecentNotes({int limit = 5});
   Future<List<Map<String, dynamic>>> getPendingTasks({int limit = 10});
+  Future<int> getNoteCountInFolder(String folderName);
   Future<Map<String, dynamic>> getDatabaseStats();
 
   // Batch operations

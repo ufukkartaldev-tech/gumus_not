@@ -2,18 +2,21 @@ import 'package:home_widget/home_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:connected_notebook/features/notes/models/note_model.dart';
 import 'package:connected_notebook/core/database/database_service.dart';
+import 'package:connected_notebook/features/notes/repositories/sql_note_repository.dart';
 
 class WidgetService {
   static final WidgetService _instance = WidgetService._internal();
   factory WidgetService() => _instance;
   WidgetService._internal();
 
+  final SqlNoteRepository _repository = SqlNoteRepository();
+
   // Widget'ı güncellemek için ana fonksiyon
   Future<void> updateWidget() async {
     try {
       // Son notları ve görevleri getir
-      final recentNotes = await DatabaseService.getRecentNotes(limit: 3);
-      final pendingTasks = await DatabaseService.getPendingTasks(limit: 5);
+      final recentNotes = await _repository.getRecentNotes(limit: 3);
+      final pendingTasks = await _repository.getPendingTasks(limit: 5);
 
       // Widget verisini hazırla
       final widgetData = {
@@ -25,7 +28,7 @@ class WidgetService {
       // Widget'ı güncelle
       await HomeWidget.saveWidgetData('widget_data', widgetData);
       await HomeWidget.updateWidget(name: 'GumusNotWidget');
-      
+
       print('✅ Widget başarıyla güncellendi');
     } catch (e) {
       print('❌ Widget güncelleme hatası: $e');
@@ -35,8 +38,8 @@ class WidgetService {
   // Hızlı not widget'ı için
   Future<void> updateQuickNoteWidget() async {
     try {
-      final stats = await DatabaseService.getDatabaseStats();
-      
+      final stats = await _repository.getDatabaseStats();
+
       final quickNoteData = {
         'totalNotes': stats['totalNotes'] ?? 0,
         'totalTasks': stats['totalTasks'] ?? 0,
@@ -47,7 +50,7 @@ class WidgetService {
 
       await HomeWidget.saveWidgetData('quick_note_data', quickNoteData);
       await HomeWidget.updateWidget(name: 'QuickNoteWidget');
-      
+
       print('✅ Hızlı not widget\'ı güncellendi');
     } catch (e) {
       print('❌ Hızlı not widget güncelleme hatası: $e');
@@ -63,7 +66,7 @@ class WidgetService {
       "Başarı, iyi alışkanlıkların birikimidir.",
       "Bugün yazdığın, yarının bilgisidir.",
     ];
-    
+
     final dayOfYear = DateTime.now().difference(DateTime(DateTime.now().year, 1, 1)).inDays;
     return quotes[dayOfYear % quotes.length];
   }
@@ -89,6 +92,14 @@ class WidgetService {
     } catch (e) {
       print('❌ Widget konfigürasyon hatası: $e');
     }
+  }
+
+  Future<List<Note>> getAllNotes() async {
+    return _repository.getAllNotes();
+  }
+
+  Future<Map<String, dynamic>> getQuickNoteData() async {
+    return _repository.getDatabaseStats();
   }
 
   // Widget verisi getir

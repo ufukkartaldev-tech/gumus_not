@@ -1,16 +1,31 @@
 import '../models/note_model.dart';
 import '../repositories/note_repository.dart';
 import 'backlink_service.dart';
+import '../../../core/security/legacy_encryption_service_adapter.dart';
 
-/// Main service for note operations
-/// Follows Single Responsibility Principle: Orchestrates note-related operations
+/// Main orchestration service for note operations.
+///
+/// Responsibilities:
+/// - decide whether note content should be encrypted,
+/// - keep backlink extraction in plaintext phase,
+/// - delegate persistence to the repository layer,
+/// - preserve the existing UI-facing API so screens do not break.
 class NoteService {
+  NoteService(
+    this._repository,
+    this._backlinkService, {
+    LegacyEncryptionServiceAdapter? encryptionAdapter,
+  }) : _encryptionAdapter = encryptionAdapter;
+
   final NoteRepository _repository;
   final BacklinkService _backlinkService;
+  final LegacyEncryptionServiceAdapter? _encryptionAdapter;
 
-  NoteService(this._repository, this._backlinkService);
-
-  /// Create a new note with proper backlink processing
+  /// Create a new note with optional vault encryption.
+  ///
+  /// Backlinks are extracted from plaintext content before encryption so the
+  /// relational graph remains usable even when the stored note body is
+  /// encrypted at rest.
   Future<Note> createNote({
     required String title,
     required String content,
@@ -20,9 +35,17 @@ class NoteService {
     bool isEncrypted = false,
   }) async {
     final now = DateTime.now().millisecondsSinceEpoch;
+
+    // Backlink extraction must happen before encryption.
+    final plainTextContent = content;
+    final persistedContent = await _prepareContentForPersistence(
+      content: plainTextContent,
+      isEncrypted: isEncrypted,
+    );
+
     final note = Note(
       title: title,
-      content: content,
+      content: persistedContent,
       tags: tags,
       folderName: folderName,
       color: color,
@@ -31,72 +54,79 @@ class NoteService {
       updatedAt: now,
     );
 
-    final id = await _repository.insertNote(note);
+    final id = await _repository.addNote(note);
     final createdNote = note.copyWith(id: id);
 
-    // Update backlinks for this note
-    await _backlinkService.updateBacklinks(id, content);
+    // Preserve backlink graph using plaintext content.
+    await _backlinkService.updateBacklinks(id, plainTextContent);
 
     return createdNote;
   }
 
-  /// Update an existing note with backlink processing
+  /// Update an existing note with optional re-encryption.
+  ///
+  /// The incoming [note] is treated as the UI/domain representation. If the
+  /// note is marked encrypted, plaintext content is encrypted only at the final
+  /// persistence stage and backlinks are still derived from plaintext.
   Future<Note> updateNote(Note note) async {
+    final plainTextContent = note.content;
+    final persistedContent = await _prepareContentForPersistence(
+      content: plainTextContent,
+      isEncrypted: note.isEncrypted,
+    );
+
     final updatedNote = note.copyWith(
+      content: persistedContent,
       updatedAt: DateTime.now().millisecondsSinceEpoch,
     );
 
     await _repository.updateNote(updatedNote);
 
-    // Update backlinks since content might have changed
-    await _backlinkService.updateBacklinks(note.id, updatedNote.content);
+    // Backlinks are recalculated from plaintext content before-at-rest encryption.
+    await _backlinkService.updateBacklinks(note.id, plainTextContent);
 
     return updatedNote;
   }
 
-  /// Delete a note and clean up its backlinks
+  /// Delete a note.
   Future<void> deleteNote(int noteId) async {
-    // In a full implementation, we would also clean up backlinks
-    // For now, just delete the note
     await _repository.deleteNote(noteId);
   }
 
-  /// Get a note by ID
+  /// Get a note by ID.
   Future<Note?> getNoteById(int id) async {
-    return await _repository.getNoteById(id);
+    return _repository.getNoteById(id);
   }
 
-  /// Get all notes
+  /// Get all notes as stored.
+  ///
+  /// This method intentionally does not decrypt content eagerly. Doing so would
+  /// widen plaintext lifetime in memory and make list loading more expensive.
   Future<List<Note>> getAllNotes() async {
-    return await _repository.getAllNotes();
+    return _repository.getAllNotes();
   }
 
-  /// Get notes in a specific folder
   Future<List<Note>> getNotesByFolder(String folderName) async {
-    return await _repository.getNotesByFolder(folderName);
+    final allNotes = await _repository.getAllNotes();
+    return allNotes.where((note) => note.folderName == folderName).toList();
   }
 
-  /// Get notes with specific tag
   Future<List<Note>> getNotesByTag(String tag) async {
-    return await _repository.getNotesByTag(tag);
+    return _repository.getNotesByTag(tag);
   }
 
-  /// Get all available folders
   Future<List<String>> getAllFolders() async {
-    return await _repository.getAllFolders();
+    return _repository.getFolders();
   }
 
-  /// Get recent notes
   Future<List<Note>> getRecentNotes({int limit = 5}) async {
-    return await _repository.getRecentNotes(limit: limit);
+    return _repository.getRecentNotes(limit: limit);
   }
 
-  /// Get pending tasks
   Future<List<Note>> getPendingTasks({int limit = 10}) async {
-    return await _repository.getPendingTasks(limit: limit);
+    return _repository.getPendingTasks(limit: limit);
   }
 
-  /// Get tag frequency statistics
   Future<Map<String, int>> getTagFrequency() async {
     final allNotes = await _repository.getAllNotes();
     final tagFrequency = <String, int>{};
@@ -110,7 +140,6 @@ class NoteService {
     return tagFrequency;
   }
 
-  /// Get folder statistics
   Future<Map<String, int>> getFolderStats() async {
     final allNotes = await _repository.getAllNotes();
     final folderStats = <String, int>{};
@@ -122,45 +151,40 @@ class NoteService {
     return folderStats;
   }
 
-  /// Get notes linked to a specific note
   Future<List<Note>> getLinkedNotes(int noteId) async {
-    return await _backlinkService.getLinkedNotes(noteId);
+    return _backlinkService.getLinkedNotes(noteId);
   }
 
-  /// Get notes that refer to a specific note
   Future<List<Note>> getReferringNotes(int noteId) async {
-    return await _backlinkService.getReferringNotes(noteId);
+    return _backlinkService.getReferringNotes(noteId);
   }
 
-  /// Get link statistics for a note
   Future<Map<String, dynamic>> getLinkStats(int noteId) async {
-    return await _backlinkService.getLinkStats(noteId);
+    return _backlinkService.getLinkStats(noteId);
   }
 
-  /// Find orphaned notes
   Future<List<Note>> getOrphanedNotes() async {
-    return await _backlinkService.getOrphanedNotes();
+    return _backlinkService.getOrphanedNotes();
   }
 
-  /// Find hub notes
   Future<List<Note>> getHubNotes({int minimumLinks = 3}) async {
-    return await _backlinkService.getHubNotes(minimumLinks: minimumLinks);
+    return _backlinkService.getHubNotes(minimumLinks: minimumLinks);
   }
 
-  /// Suggest related notes
   Future<List<Note>> suggestRelatedNotes(int noteId, {int limit = 5}) async {
-    return await _backlinkService.suggestRelatedNotes(noteId, limit: limit);
+    return _backlinkService.suggestRelatedNotes(noteId, limit: limit);
   }
 
-  /// Batch operations
   Future<void> createMultipleNotes(List<Note> notes) async {
-    await _repository.insertNotes(notes);
-    
-    // Update backlinks for all created notes
     for (final note in notes) {
-      if (note.id != null) {
-        await _backlinkService.updateBacklinks(note.id, note.content);
-      }
+      await createNote(
+        title: note.title,
+        content: note.content,
+        tags: note.tags,
+        folderName: note.folderName,
+        color: note.color,
+        isEncrypted: note.isEncrypted,
+      );
     }
   }
 
@@ -170,26 +194,26 @@ class NoteService {
     }
   }
 
-  /// Export/Import operations
   Future<List<Map<String, dynamic>>> exportNotes() async {
-    return await _repository.exportAllNotes();
+    final notes = await _repository.getAllNotes();
+    return notes.map((note) => note.toJson()).toList();
   }
 
   Future<void> importNotes(List<Map<String, dynamic>> notesData) async {
-    await _repository.importNotes(notesData);
+    for (final noteData in notesData) {
+      await _repository.addNote(Note.fromJson(noteData));
+    }
   }
 
-  /// Search operations (delegated to SearchService)
   Future<List<Note>> searchNotes(String query) async {
-    return await _repository.searchNotes(query);
+    return _repository.searchNotes(query);
   }
 
-  /// Get database statistics
   Future<Map<String, dynamic>> getDatabaseStats() async {
     final stats = await _repository.getDatabaseStats();
     final tagFrequency = await getTagFrequency();
     final folderStats = await getFolderStats();
-    
+
     return {
       ...stats,
       'tagFrequency': tagFrequency,
@@ -199,29 +223,24 @@ class NoteService {
     };
   }
 
-  /// Validate note data
   bool validateNote(Note note) {
     if (note.title.trim().isEmpty) return false;
     if (note.content.trim().isEmpty) return false;
-    if (note.title.length > 200) return false; // Reasonable limit
-    if (note.content.length > 1000000) return false; // 1MB limit
-    
+    if (note.title.length > 200) return false;
+    if (note.content.length > 1000000) return false;
     return true;
   }
 
-  /// Auto-tag suggestions based on content
   Future<List<String>> suggestTags(String content) async {
     final allNotes = await _repository.getAllNotes();
     final contentLower = content.toLowerCase();
     final suggestions = <String>{};
-
-    // Extract common words from existing notes
     final allTags = <String>{};
+
     for (final note in allNotes) {
       allTags.addAll(note.tags);
     }
 
-    // Simple keyword matching (could be enhanced with NLP)
     for (final tag in allTags) {
       if (contentLower.contains(tag.toLowerCase())) {
         suggestions.add(tag);
@@ -229,5 +248,42 @@ class NoteService {
     }
 
     return suggestions.toList();
+  }
+
+  /// Resolve the readable content for a note when the vault is unlocked.
+  ///
+  /// This helper is intended for note detail screens and other explicit read
+  /// flows. List loading intentionally stays ciphertext-safe.
+  Future<String> resolveReadableContent(Note note) async {
+    if (!note.isEncrypted) {
+      return note.content;
+    }
+
+    final adapter = _encryptionAdapter;
+    if (adapter == null || !adapter.isUnlocked()) {
+      throw StateError('Vault is locked. Encrypted note content cannot be resolved.');
+    }
+
+    return adapter.decrypt(note.content);
+  }
+
+  Future<String> _prepareContentForPersistence({
+    required String content,
+    required bool isEncrypted,
+  }) async {
+    if (!isEncrypted) {
+      return content;
+    }
+
+    final adapter = _encryptionAdapter;
+    if (adapter == null) {
+      throw StateError('Encryption adapter is not configured.');
+    }
+
+    if (!adapter.isUnlocked()) {
+      throw StateError('Vault must be unlocked before saving encrypted notes.');
+    }
+
+    return adapter.encrypt(content);
   }
 }

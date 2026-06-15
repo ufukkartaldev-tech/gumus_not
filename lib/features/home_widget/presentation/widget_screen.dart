@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:home_widget/home_widget.dart';
 import 'package:connected_notebook/features/home_widget/services/widget_service.dart';
-import 'package:connected_notebook/core/database/database_service.dart';
+
 import 'package:connected_notebook/features/notes/models/note_model.dart';
 
 class WidgetScreen extends StatefulWidget {
@@ -25,14 +25,18 @@ class _WidgetScreenState extends State<WidgetScreen> {
 
   Future<void> _loadWidgetData() async {
     setState(() => _isLoading = true);
-    
+
     try {
       final widgetData = await _widgetService.getWidgetData();
-      final quickNoteData = await DatabaseService.getDatabaseStats();
-      
+      final quickNoteData = await _widgetService.getQuickNoteData();
+      final notes = await _widgetService.getAllNotes();
+
       setState(() {
         _widgetData = widgetData;
-        _quickNoteData = quickNoteData;
+        _quickNoteData = {
+          ...quickNoteData,
+          'totalNotes': notes.length,
+        };
         _isLoading = false;
       });
     } catch (e) {
@@ -45,15 +49,15 @@ class _WidgetScreenState extends State<WidgetScreen> {
 
   Future<void> _updateWidgets() async {
     setState(() => _isLoading = true);
-    
+
     try {
       await _widgetService.updateWidget();
       await _widgetService.updateQuickNoteWidget();
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('✅ Widget\'lar başarıyla güncellendi')),
       );
-      
+
       _loadWidgetData();
     } catch (e) {
       setState(() => _isLoading = false);
@@ -71,7 +75,7 @@ class _WidgetScreenState extends State<WidgetScreen> {
       "Başarı, iyi alışkanlıkların birikimidir.",
       "Bugün yazdığın, yarının bilgisidir.",
     ];
-    
+
     final dayOfYear = DateTime.now().difference(DateTime(DateTime.now().year, 1, 1)).inDays;
     return quotes[dayOfYear % quotes.length];
   }
@@ -194,7 +198,7 @@ class _WidgetScreenState extends State<WidgetScreen> {
 
   Widget _buildRecentNotesWidget() {
     final recentNotes = _widgetData?['recentNotes'] as List<dynamic>? ?? [];
-    
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -234,7 +238,7 @@ class _WidgetScreenState extends State<WidgetScreen> {
 
   Widget _buildTasksWidget() {
     final pendingTasks = _widgetData?['pendingTasks'] as List<dynamic>? ?? [];
-    
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),

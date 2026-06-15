@@ -1,102 +1,105 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
+
 import 'package:file_picker/file_picker.dart';
-import 'package:connected_notebook/core/database/database_service.dart';
-import 'package:connected_notebook/core/security/encryption_service.dart';
+import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
+
 import 'package:connected_notebook/features/notes/models/note_model.dart';
+import 'package:connected_notebook/features/notes/providers/note_provider.dart';
+import 'package:connected_notebook/features/notes/providers/vault_provider.dart';
 
 class BackupShareService {
   static final BackupShareService _instance = BackupShareService._internal();
   factory BackupShareService() => _instance;
   BackupShareService._internal();
 
-  // Veritabanını şifrele ve temp klasörüne kaydedip paylaş
-  Future<bool> exportAndShareBackup() async {
+  /// Export notes using the active vault encryption flow.
+  Future<bool> exportAndShareBackup(BuildContext context) async {
     try {
-      // 1. Veritabanını al
-      final notes = await DatabaseService.getAllNotes();
+      final noteProvider = context.read<NoteProvider>();
+      final vaultProvider = context.read<VaultProvider>();
+
+      await noteProvider.loadNotes();
+      final notes = noteProvider.notes;
       if (notes.isEmpty) return false;
+      if (!vaultProvider.isUnlocked) {
+        throw StateError('Yedek dışa aktarmak için önce kasayı açın.');
+      }
 
       final backupData = {
-        'version': '1.0',
+        'version': '2.0',
         'timestamp': DateTime.now().toIso8601String(),
         'notes': notes.map((note) => note.toJson()).toList(),
         'encrypted': true,
       };
 
-      // 2. Veriyi şifrele
-      final encryptedData = EncryptionService.encrypt(json.encode(backupData));
+      final encryptedData = await context.read<VaultProvider>().resolveReadableBackupEnvelope(
+            json.encode(backupData),
+          );
 
-      // 3. Geçici dosya oluştur
       final tempDir = await getTemporaryDirectory();
-      final String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+      final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
       final backupFile = File('${tempDir.path}/gumusnot_backup_$timestamp.gnb');
-      
       await backupFile.writeAsString(encryptedData);
 
-      // 4. Dosyayı paylaş
-      final xFile = XFile(backupFile.path);
       await Share.shareXFiles(
-        [xFile],
+        [XFile(backupFile.path)],
         text: 'GümüşNot Yedek Dosyası',
       );
 
       return true;
     } catch (e) {
-      print("Yedekleme ve paylaşma hatası: $e");
+      debugPrint('Yedekleme ve paylaşma hatası: $e');
       return false;
     }
   }
 
-  // Kullanıcıdan dosya seçtir ve geri yükle
-  Future<Map<String, dynamic>> importAndRestoreBackup() async {
+  /// Import backup using the active vault decryption flow.
+  Future<Map<String, dynamic>> importAndRestoreBackup(BuildContext context) async {
     try {
-      // 1. Dosya seçiciyi aç
-      FilePickerResult? result = await FilePicker.platform.pickFiles(
-        type: FileType.any, // .gnb uzantısı Android/iOS'ta özel tanımlı olmayabilir
-      );
-
+      final result = await FilePicker.platform.pickFiles(type: FileType.any);
       if (result == null || result.files.single.path == null) {
         return {'success': false, 'message': 'Dosya seçimi iptal edildi.'};
       }
 
-      final file = File(result.files.single.path!);
-      
-      if (!file.path.endsWith('.gnb')) {
-         return {'success': false, 'message': 'Lütfen geçerli bir .gnb yedek dosyası seçin.'};
+      final vaultProvider = context.read<VaultProvider>();
+      final noteProvider = context.read<NoteProvider>();
+      if (!vaultProvider.isUnlocked) {
+        return {'success': false, 'message': 'Yedek geri yüklemek için önce kasayı açın.'};
       }
 
-      // 2. Dosyayı oku ve şifreyi çöz
+      final file = File(result.files.single.path!);
+      if (!file.path.endsWith('.gnb')) {
+        return {'success': false, 'message': 'Lütfen geçerli bir .gnb yedek dosyası seçin.'};
+      }
+
       final encryptedContent = await file.readAsString();
-      final decryptedData = EncryptionService.decrypt(encryptedContent);
-      
-      final backupData = json.decode(decryptedData);
-      
-      // 3. Verileri dönüştür ve ekle
+      final decryptedData = await vaultProvider.decryptExternalPayload(encryptedContent);
+      final backupData = json.decode(decryptedData) as Map<String, dynamic>;
+
       final notes = (backupData['notes'] as List)
-          .map((noteJson) => Note.fromJson(noteJson))
+          .map((noteJson) => Note.fromJson(noteJson as Map<String, dynamic>))
           .toList();
-      
-      int restoredCount = 0;
+
       for (final note in notes) {
-        // İsteğe bağlı: Eklemeden önce aynı id'li not var mı kontrol edilebilir 
-        // veya DatabaseService.insertNote içinde id yoksayılabilir (yeni id alır).
-        // Şu anki yapıya göre ID manuel olarak çakışmayı önlemek için silinip yeniden atanabilir
-        // veya üzerine yazılabilir. Direkt insert edelim.
-        await DatabaseService.insertNote(note);
-        restoredCount++;
+        if (note.id == null) {
+          await noteProvider.addNote(note);
+        } else {
+          await noteProvider.updateNote(note);
+        }
       }
 
       return {
-        'success': true, 
-        'message': '$restoredCount not başarıyla geri yüklendi.',
-        'count': restoredCount,
+        'success': true,
+        'message': '${notes.length} not başarıyla geri yüklendi.',
+        'count': notes.length,
       };
     } catch (e) {
-      print("Geri yükleme hatası: $e");
-      return {'success': false, 'message': 'Dosya bozuk olabilir veya şifreleme/okuma hatası: $e'};
+      debugPrint('Geri yükleme hatası: $e');
+      return {'success': false, 'message': 'Dosya bozuk olabilir veya çözme hatası: $e'};
     }
   }
 }

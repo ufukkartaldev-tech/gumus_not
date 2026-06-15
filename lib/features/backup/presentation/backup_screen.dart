@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:connected_notebook/features/backup/services/backup_share_service.dart';
-import 'package:connected_notebook/core/database/database_service.dart';
+import 'package:connected_notebook/core/database/sqlite_database_service.dart';
 
 class BackupScreen extends StatefulWidget {
   const BackupScreen({super.key});
@@ -22,7 +22,7 @@ class _BackupScreenState extends State<BackupScreen> {
 
   Future<void> _loadNoteCount() async {
     try {
-      final notes = await DatabaseService.getAllNotes();
+      final notes = await SqliteDatabaseService().getAllNotes();
       setState(() {
         _totalNotes = notes.length;
       });
@@ -33,9 +33,9 @@ class _BackupScreenState extends State<BackupScreen> {
 
   Future<void> _exportBackup() async {
     setState(() => _isLoading = true);
-    
+
     try {
-      final success = await _backupService.exportAndShareBackup();
+      final success = await _backupService.exportAndShareBackup(context);
       if (success) {
         _showSuccessMessage("Yedekleme dosyası hazırlandı ve paylaşım ekranı açıldı.");
       } else {
@@ -54,9 +54,9 @@ class _BackupScreenState extends State<BackupScreen> {
     if (!confirmed) return;
 
     setState(() => _isLoading = true);
-    
+
     try {
-      final result = await _backupService.importAndRestoreBackup();
+      final result = await _backupService.importAndRestoreBackup(context);
       if (result['success'] == true) {
         await _loadNoteCount();
         _showSuccessMessage(result['message']);
@@ -209,9 +209,9 @@ class _BackupScreenState extends State<BackupScreen> {
                       ),
                     ),
                   ),
-                  
+
                   const SizedBox(height: 16),
-                  
+
                   // Bilgi Kartı
                   Card(
                     color: Theme.of(context).colorScheme.surfaceVariant,

@@ -19,7 +19,7 @@ class ImageService {
       );
 
       if (pickedFile != null) {
-        return await _saveImageToAppDirectory(pickedFile);
+        return await saveImageToAppDirectory(pickedFile);
       }
       return null;
     } catch (e) {
@@ -39,7 +39,7 @@ class ImageService {
       );
 
       if (pickedFile != null) {
-        return await _saveImageToAppDirectory(pickedFile);
+        return await saveImageToAppDirectory(pickedFile);
       }
       return null;
     } catch (e) {
@@ -49,12 +49,12 @@ class ImageService {
   }
 
   /// Save image to app's private directory
-  Future<String> _saveImageToAppDirectory(XFile imageFile) async {
+  Future<String> saveImageToAppDirectory(XFile imageFile) async {
     try {
       // Get app's documents directory
       final Directory appDir = await getApplicationDocumentsDirectory();
       final Directory imagesDir = Directory(path.join(appDir.path, 'images'));
-      
+
       // Create images directory if it doesn't exist
       if (!await imagesDir.exists()) {
         await imagesDir.create(recursive: true);
@@ -66,7 +66,7 @@ class ImageService {
 
       // Copy image to app directory
       final File savedImage = await File(imageFile.path).copy(savedImagePath);
-      
+
       return savedImage.path;
     } catch (e) {
       print('Error saving image: $e');
@@ -117,7 +117,7 @@ class ImageService {
     try {
       final Directory appDir = await getApplicationDocumentsDirectory();
       final Directory imagesDir = Directory(path.join(appDir.path, 'images'));
-      
+
       if (!await imagesDir.exists()) {
         return [];
       }
@@ -139,7 +139,7 @@ class ImageService {
   Future<void> cleanupUnusedImages(List<String> referencedImagePaths) async {
     try {
       final allImages = await getAllImages();
-      
+
       for (final imagePath in allImages) {
         if (!referencedImagePaths.contains(imagePath)) {
           await deleteImage(imagePath);
@@ -178,7 +178,7 @@ class ImageService {
     try {
       final File imageFile = File(imagePath);
       final FileStat stat = await imageFile.stat();
-      
+
       return {
         'path': imagePath,
         'fileName': path.basename(imagePath),
@@ -196,7 +196,7 @@ class ImageService {
   Future<String?> compressImage(String imagePath, {double maxSizeMB = 5.0}) async {
     try {
       final double currentSize = await getImageFileSize(imagePath);
-      
+
       if (currentSize <= maxSizeMB) {
         return imagePath; // No compression needed
       }
@@ -216,7 +216,7 @@ class ImageService {
     try {
       final allImages = await getAllImages();
       final Directory exportDir = Directory(exportDirectory);
-      
+
       if (!await exportDir.exists()) {
         await exportDir.create(recursive: true);
       }
@@ -225,7 +225,7 @@ class ImageService {
         final File imageFile = File(imagePath);
         final String fileName = path.basename(imagePath);
         final String exportPath = path.join(exportDirectory, fileName);
-        
+
         await imageFile.copy(exportPath);
       }
     } catch (e) {

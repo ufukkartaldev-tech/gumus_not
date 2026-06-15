@@ -5,6 +5,8 @@ import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:connected_notebook/features/notes/models/note_model.dart';
 import 'package:connected_notebook/features/notes/providers/note_provider.dart';
+import 'package:connected_notebook/features/notes/providers/note_editor_provider.dart';
+import 'package:connected_notebook/features/notes/providers/vault_provider.dart';
 import 'package:connected_notebook/features/media/services/image_service.dart';
 import 'package:connected_notebook/features/media/widgets/image_picker_widget.dart';
 import 'package:connected_notebook/features/media/services/note_image_service.dart';
@@ -15,7 +17,7 @@ import 'package:connected_notebook/features/tools/widgets/cross_reference_tracke
 import 'package:connected_notebook/features/tools/widgets/tag_manager_widget.dart';
 import 'package:connected_notebook/features/tools/widgets/pomodoro_timer.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
-import 'package:connected_notebook/core/security/encryption_service.dart';
+
 import 'package:connected_notebook/features/export/services/pdf_service.dart';
 
 class MarkdownEditor extends StatefulWidget {
@@ -38,7 +40,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
   late TextEditingController _titleController;
   late TextEditingController _contentController;
   late TabController _toolbarTabController;
-  
+
   bool _isPreviewMode = false;
   bool _isFocusMode = false;
   bool _isLoading = false;
@@ -47,7 +49,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
   bool _isPomodoroVisible = false;
   final ImagePicker _picker = ImagePicker();
   List<String> _tags = [];
-  
+
   final FocusNode _contentFocusNode = FocusNode();
 
   final List<Color> _noteColors = [
@@ -78,17 +80,20 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
     _toolbarTabController = TabController(length: 2, vsync: this);
     _titleController = TextEditingController(text: widget.note?.title ?? '');
     _tags = widget.note?.tags ?? [];
-    
+
     String content = widget.note?.content ?? '';
     _isEncrypted = widget.note?.isEncrypted ?? false;
-    
-    // Şifreli notlar otomatik olarak çözülmez, şifre istenir
+
     if (_isEncrypted) {
-      content = '🔒 Bu not şifreli. İçeriği görmek için şifre giriniz.';
+      content = '🔒 Bu not şifreli. İçeriği görmek için kasayı açın.';
     }
-    
+
     _contentController = TextEditingController(text: content);
     _selectedColor = widget.note?.color;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<NoteEditorProvider>().initialize(widget.note);
+    });
   }
 
   @override
@@ -127,20 +132,18 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
 
     try {
       String? imagePath;
-      
+
+      final imageService = context.read<ImageService>();
       if (source == ImageSource.gallery) {
-        imagePath = await ImageService.pickImageFromGallery();
+        imagePath = await imageService.pickImageFromGallery();
       } else {
-        imagePath = await ImageService.pickImageFromCamera();
+        imagePath = await imageService.pickImageFromCamera();
       }
 
       if (imagePath != null) {
-        final markdownImage = ImageService.createMarkdownImageLink(
-          imagePath,
-          altText: 'Resim ${DateTime.now().toString().substring(0, 10)}',
-        );
+        final markdownImage = '![Resim ${DateTime.now().toString().substring(0, 10)}]($imagePath)';
         _insertMarkdownSyntax('\n$markdownImage\n');
-        
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -163,25 +166,41 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
     }
     setState(() => _isLoading = true);
     try {
-      String contentToSave = _contentController.text;
-      if (_isEncrypted) {
-        if (!EncryptionService.isInitialized()) throw Exception('Kasa kilitli.');
-        contentToSave = EncryptionService.encrypt(contentToSave);
-      }
+      final editorProvider = context.read<NoteEditorProvider>();
+      final vaultProvider = context.read<VaultProvider>();
+      final plaintextContent = _contentController.text;
+
       final note = Note(
         id: widget.note?.id,
         title: _titleController.text.trim(),
-        content: contentToSave,
+        content: plaintextContent,
         createdAt: widget.note?.createdAt ?? DateTime.now().millisecondsSinceEpoch,
         updatedAt: DateTime.now().millisecondsSinceEpoch,
         isEncrypted: _isEncrypted,
         tags: _tags,
         color: _selectedColor,
       );
-      if (widget.note == null) {
-        await Provider.of<NoteProvider>(context, listen: false).addNote(note);
+      if (note.isEncrypted) {
+        if (widget.note == null) {
+          await vaultProvider.createPrivateNote(
+            title: note.title,
+            content: plaintextContent,
+            tags: note.tags,
+            color: note.color,
+            folderName: note.folderName,
+          );
+        } else {
+          await vaultProvider.updatePrivateNote(
+            note: note,
+            plainTextContent: plaintextContent,
+          );
+        }
       } else {
-        await Provider.of<NoteProvider>(context, listen: false).updateNote(note);
+        if (widget.note == null) {
+          await Provider.of<NoteProvider>(context, listen: false).addNote(note);
+        } else {
+          await Provider.of<NoteProvider>(context, listen: false).updateNote(note);
+        }
       }
       widget.onSave(note);
     } catch (e) {
@@ -195,69 +214,21 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
   }
 
-  Future<void> _showPasswordDialog() async {
-    final passwordController = TextEditingController();
-    return showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('🔒 Şifreli Not'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('Bu notun içeriğini görmek için şifrenizi girin:'),
-              const SizedBox(height: 16),
-              TextField(
-                controller: passwordController,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'Şifre',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.lock),
-                ),
-                onSubmitted: (_) => _unlockNote(passwordController.text),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('İptal'),
-            ),
-            ElevatedButton(
-              onPressed: () => _unlockNote(passwordController.text),
-              child: const Text('Giriş'),
-            ),
-          ],
-        );
-      },
-    );
-  }
+  Future<void> _unlockEncryptedNote() async {
+    final note = widget.note;
+    if (note == null || !note.isEncrypted) return;
 
-  Future<void> _unlockNote(String password) async {
     try {
-      if (!EncryptionService.isInitialized()) {
-        _showError('Şifreleme servisi başlatılmamış. Ayarlardan şifreleyiciyi açın.');
-        Navigator.of(context).pop();
-        return;
+      final resolved = await context.read<NoteEditorProvider>().unlockNote(note);
+      final content = context.read<NoteEditorProvider>().resolvedContent;
+      if (content != null) {
+        setState(() {
+          _contentController.text = content;
+          _isEncrypted = true;
+        });
       }
-
-      // Şifreyi doğrula ve notu çöz
-      final encryptedContent = widget.note?.content ?? '';
-      final decryptedContent = EncryptionService.decrypt(encryptedContent);
-      
-      // Şifre doğrulama başarılı, içeriği güncelle
-      setState(() {
-        _contentController.text = decryptedContent;
-        _isEncrypted = false; // Geçici olarak kilidi aç
-      });
-      
-      Navigator.of(context).pop();
-      _showError('Not başarıyla açıldı');
-      
     } catch (e) {
-      _showError('Şifre hatalı veya not açılamadı: $e');
+      _showError('Not açılamadı: $e');
     }
   }
 
@@ -294,10 +265,10 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgColor = _selectedColor != null 
-        ? Color(_selectedColor!) 
+    final bgColor = _selectedColor != null
+        ? Color(_selectedColor!)
         : Theme.of(context).colorScheme.background;
-        
+
     return Scaffold(
       backgroundColor: bgColor,
       appBar: _isFocusMode ? null : _buildAppBar(context),
@@ -314,7 +285,16 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
                       Expanded(
                         child: _isPreviewMode ? _buildPreview() : _buildEditor(context),
                       ),
-                      if (!_isFocusMode) const SizedBox(height: 80), 
+                      if ((widget.note?.isEncrypted ?? false) && _contentController.text.startsWith('🔒'))
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          child: OutlinedButton.icon(
+                            onPressed: _unlockEncryptedNote,
+                            icon: const Icon(Icons.lock_open),
+                            label: const Text('İçeriği Çöz'),
+                          ),
+                        ),
+                      if (!_isFocusMode) const SizedBox(height: 80),
                     ],
                   ),
                 ),
@@ -391,12 +371,16 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
         IconButton(
           icon: Icon(_isEncrypted ? Icons.lock : Icons.lock_open_outlined, color: _isEncrypted ? Colors.orange : null),
           onPressed: () {
-             if (EncryptionService.isInitialized()) {
-                setState(() => _isEncrypted = !_isEncrypted);
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_isEncrypted ? 'Not Şifrelendi' : 'Şifre Kaldırıldı')));
-             } else {
-                _showError('Kasa kilitli. Ayarlardan açın.');
+             final vaultProvider = context.read<VaultProvider>();
+             if (!vaultProvider.isUnlocked && !_isEncrypted) {
+                _showError('Kasa kilitli. Şifreli not oluşturmak için önce kasayı açın.');
+                return;
              }
+             setState(() => _isEncrypted = !_isEncrypted);
+             context.read<NoteEditorProvider>().setEncrypted(_isEncrypted);
+             ScaffoldMessenger.of(context).showSnackBar(
+               SnackBar(content: Text(_isEncrypted ? 'Not şifreli olarak kaydedilecek' : 'Not düz olarak kaydedilecek')),
+             );
           },
         ),
         IconButton(
@@ -464,7 +448,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
                    unselectedLabelColor: Theme.of(context).disabledColor,
                    isScrollable: true,
                    tabs: const [
-                      Tab(icon: Icon(Icons.text_fields_rounded, size: 20)), 
+                      Tab(icon: Icon(Icons.text_fields_rounded, size: 20)),
                       Tab(icon: Icon(Icons.functions_rounded, size: 20))
                    ],
                  ),
@@ -529,7 +513,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
         content: _contentController.text,
         title: _titleController.text,
       );
-      
+
       await PdfService.exportToPdf(currentNote);
     } catch (e) {
       _showError('PDF oluşturulurken hata: $e');
@@ -573,7 +557,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
       visualDensity: VisualDensity.compact,
     );
   }
-  
+
   Widget _toolMath(String syntax, String label) {
      return Center(
        child: InkWell(
@@ -598,7 +582,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
           Text(
             'Mod:',
             style: TextStyle(
-              color: Theme.of(context).disabledColor, 
+              color: Theme.of(context).disabledColor,
               fontWeight: FontWeight.bold,
               fontSize: 12
             ),
@@ -618,7 +602,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
                   border: isSelected ? Border.all(color: Theme.of(context).primaryColor, width: 1) : null,
                 ),
                 child: Text(
-                  mood, 
+                  mood,
                   style: TextStyle(
                     fontSize: isSelected ? 22 : 18,
                     shadows: isSelected ? [
@@ -676,7 +660,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
             ),
             const SizedBox(height: 32),
             ElevatedButton.icon(
-              onPressed: _showPasswordDialog,
+              onPressed: _unlockEncryptedNote,
               icon: const Icon(Icons.lock_open),
               label: const Text('Şifre ile Aç'),
               style: ElevatedButton.styleFrom(
@@ -711,7 +695,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
             ),
           ),
         ),
-        
+
         Padding(
           padding: const EdgeInsets.fromLTRB(32, 8, 32, 0),
           child: _buildMoodSelector(),
@@ -729,12 +713,12 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
             ),
           ),
         ),
-        
+
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 32),
           child: Divider(color: Theme.of(context).dividerColor.withOpacity(0.1), thickness: 1),
         ),
-        
+
         Expanded(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -746,7 +730,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                 height: 1.8,
                 fontSize: 16,
-                fontFamily: 'Roboto', 
+                fontFamily: 'Roboto',
                 letterSpacing: 0.1,
               ),
               cursorColor: Theme.of(context).primaryColor,
@@ -766,7 +750,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
 
   Widget _buildPreview() {
     return Container(
-      color: Colors.transparent, 
+      color: Colors.transparent,
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: SingleChildScrollView(
@@ -775,7 +759,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
            children: [
               const SizedBox(height: 24),
               Text(
-                _titleController.text, 
+                _titleController.text,
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)
               ),
               const Divider(),

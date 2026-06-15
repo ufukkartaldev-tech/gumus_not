@@ -11,7 +11,7 @@ class BacklinkService {
   /// Update all backlinks for a note when its content changes
   Future<void> updateBacklinks(int? noteId, String content) async {
     if (noteId == null) return;
-    
+
     final allNotes = await _repository.getAllNotes();
     await _updateBacklinksInternal(noteId, content, allNotes);
   }
@@ -20,7 +20,7 @@ class BacklinkService {
   Future<List<Note>> getReferringNotes(int noteId) async {
     final allNotes = await _repository.getAllNotes();
     final referringNotes = <Note>[];
-    
+
     for (final note in allNotes) {
       final links = note.extractLinks();
       final targetNote = allNotes.firstWhere(
@@ -36,12 +36,12 @@ class BacklinkService {
           updatedAt: 0,
         ),
       );
-      
+
       if (targetNote.id == noteId) {
         referringNotes.add(note);
       }
     }
-    
+
     return referringNotes;
   }
 
@@ -49,11 +49,11 @@ class BacklinkService {
   Future<List<Note>> getLinkedNotes(int noteId) async {
     final note = await _repository.getNoteById(noteId);
     if (note == null) return [];
-    
+
     final allNotes = await _repository.getAllNotes();
     final linkedNotes = <Note>[];
     final links = note.extractLinks();
-    
+
     for (final link in links) {
       final targetNote = allNotes.firstWhere(
         (n) => n.title.toLowerCase() == link.toLowerCase(),
@@ -65,12 +65,12 @@ class BacklinkService {
           updatedAt: DateTime.now().millisecondsSinceEpoch,
         ),
       );
-      
+
       if (targetNote.id != -1) {
         linkedNotes.add(targetNote);
       }
     }
-    
+
     return linkedNotes;
   }
 
@@ -78,14 +78,14 @@ class BacklinkService {
   Future<List<Note>> getOrphanedNotes() async {
     final allNotes = await _repository.getAllNotes();
     final orphanedNotes = <Note>[];
-    
+
     for (final note in allNotes) {
       final referringNotes = await getReferringNotes(note.id!);
       if (referringNotes.isEmpty) {
         orphanedNotes.add(note);
       }
     }
-    
+
     return orphanedNotes;
   }
 
@@ -93,21 +93,21 @@ class BacklinkService {
   Future<List<Note>> getHubNotes({int minimumLinks = 3}) async {
     final allNotes = await _repository.getAllNotes();
     final hubNotes = <Note>[];
-    
+
     for (final note in allNotes) {
       final linkedNotes = await getLinkedNotes(note.id!);
       if (linkedNotes.length >= minimumLinks) {
         hubNotes.add(note);
       }
     }
-    
-    // Sort by number of outgoing links (descending)
-    hubNotes.sort((a, b) async {
-      final aLinks = await getLinkedNotes(a.id!);
-      final bLinks = await getLinkedNotes(b.id!);
-      return bLinks.length.compareTo(aLinks.length);
-    });
-    
+
+    // Sort by outgoing link count (descending)
+    final linkCounts = <int, int>{};
+    for (final note in hubNotes) {
+      linkCounts[note.id!] = (await getLinkedNotes(note.id!)).length;
+    }
+    hubNotes.sort((a, b) => (linkCounts[b.id!] ?? 0).compareTo(linkCounts[a.id!] ?? 0));
+
     return hubNotes;
   }
 
@@ -115,7 +115,7 @@ class BacklinkService {
   Future<Map<String, dynamic>> getLinkStats(int noteId) async {
     final linkedNotes = await getLinkedNotes(noteId);
     final referringNotes = await getReferringNotes(noteId);
-    
+
     return {
       'outgoingLinks': linkedNotes.length,
       'incomingLinks': referringNotes.length,
@@ -131,10 +131,10 @@ class BacklinkService {
     // For now, we'll simulate the backlink update logic
     final RegExp linkRegex = RegExp(r'\[\[([^\]]+)\]\]');
     final matches = linkRegex.allMatches(content);
-    
+
     for (final match in matches) {
       final linkText = match.group(1)!;
-      
+
       final targetNote = allNotes.firstWhere(
         (note) => note.title.toLowerCase() == linkText.toLowerCase(),
         orElse: () => Note(
@@ -145,7 +145,7 @@ class BacklinkService {
           updatedAt: DateTime.now().millisecondsSinceEpoch,
         ),
       );
-      
+
       // In a real implementation, this would update the backlinks table
       // For now, we'll just log the operation
       print('Backlink: ${noteId} -> ${targetNote.id} ($linkText)');
@@ -156,33 +156,33 @@ class BacklinkService {
   Future<List<Note>> suggestRelatedNotes(int noteId, {int limit = 5}) async {
     final note = await _repository.getNoteById(noteId);
     if (note == null) return [];
-    
+
     final allNotes = await _repository.getAllNotes();
     final suggestions = <Note>[];
-    
+
     // Find notes with similar tags
     for (final otherNote in allNotes) {
       if (otherNote.id == noteId) continue;
-      
+
       final commonTags = note.tags.where((tag) => otherNote.tags.contains(tag));
       if (commonTags.isNotEmpty) {
         suggestions.add(otherNote);
       }
     }
-    
+
     // Find notes that link to similar targets
     final linkedNotes = await getLinkedNotes(noteId);
     for (final otherNote in allNotes) {
       if (otherNote.id == noteId || suggestions.contains(otherNote)) continue;
-      
+
       final otherLinkedNotes = await getLinkedNotes(otherNote.id!);
       final commonLinks = linkedNotes.where((link) => otherLinkedNotes.contains(link));
-      
+
       if (commonLinks.isNotEmpty) {
         suggestions.add(otherNote);
       }
     }
-    
+
     return suggestions.take(limit).toList();
   }
 }

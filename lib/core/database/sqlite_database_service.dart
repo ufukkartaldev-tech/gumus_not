@@ -18,7 +18,7 @@ class SqliteDatabaseService implements IDatabaseService {
 
   Future<Database> _initDatabase() async {
     String path = join(await getDatabasesPath(), _dbName);
-    
+
     return await openDatabase(
       path,
       version: _dbVersion,
@@ -117,14 +117,14 @@ class SqliteDatabaseService implements IDatabaseService {
   Future<int> insertNote(Map<String, dynamic> note) async {
     final db = await database;
     final id = await db.insert('notes', note);
-    
+
     // Sync with FTS5
     await db.insert('notes_fts', {
       'id': id,
       'title': note['title'],
       'content': note['content'],
     });
-    
+
     return id;
   }
 
@@ -149,7 +149,7 @@ class SqliteDatabaseService implements IDatabaseService {
   Future<int> updateNote(Map<String, dynamic> note) async {
     final db = await database;
     note['updated_at'] = DateTime.now().millisecondsSinceEpoch;
-    
+
     final count = await db.update(
       'notes',
       note,
@@ -175,10 +175,10 @@ class SqliteDatabaseService implements IDatabaseService {
   Future<int> deleteNote(int id) async {
     final db = await database;
     final count = await db.delete('notes', where: 'id = ?', whereArgs: [id]);
-    
+
     // Sync with FTS5
     await db.delete('notes_fts', where: 'id = ?', whereArgs: [id]);
-    
+
     return count;
   }
 
@@ -225,7 +225,7 @@ class SqliteDatabaseService implements IDatabaseService {
   @override
   Future<void> updateBacklinks(int? noteId, String content, List<Map<String, dynamic>> allNotes) async {
     final db = await database;
-    
+
     await db.delete(
       'backlinks',
       where: 'source_note_id = ?',
@@ -234,10 +234,10 @@ class SqliteDatabaseService implements IDatabaseService {
 
     final RegExp linkRegex = RegExp(r'\[\[([^\]]+)\]\]');
     final matches = linkRegex.allMatches(content);
-    
+
     for (final match in matches) {
       final linkText = match.group(1)!;
-      
+
       final targetNote = allNotes.firstWhere(
         (note) => note['title'].toString().toLowerCase() == linkText.toLowerCase(),
         orElse: () => {
@@ -315,13 +315,25 @@ class SqliteDatabaseService implements IDatabaseService {
   }
 
   @override
+  Future<int> getNoteCountInFolder(String folderName) async {
+    final db = await database;
+
+    final result = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM notes WHERE folder_name = ?',
+      [folderName],
+    );
+
+    return result.first['count'] as int;
+  }
+
+  @override
   Future<Map<String, dynamic>> getDatabaseStats() async {
     final db = await database;
-    
+
     final totalNotesResult = await db.rawQuery('SELECT COUNT(*) as count FROM notes');
     final totalTasksResult = await db.rawQuery('SELECT COUNT(*) as count FROM notes WHERE content LIKE "% - [ %"');
     final lastNoteResult = await db.query('notes', orderBy: 'updated_at DESC', limit: 1);
-    
+
     return {
       'totalNotes': totalNotesResult.first['count'],
       'totalTasks': totalTasksResult.first['count'],
@@ -334,11 +346,11 @@ class SqliteDatabaseService implements IDatabaseService {
   Future<void> insertNotes(List<Map<String, dynamic>> notes) async {
     final db = await database;
     final batch = db.batch();
-    
+
     for (final note in notes) {
       batch.insert('notes', note);
     }
-    
+
     await batch.commit();
   }
 
@@ -346,11 +358,11 @@ class SqliteDatabaseService implements IDatabaseService {
   Future<void> deleteNotes(List<int> noteIds) async {
     final db = await database;
     final batch = db.batch();
-    
+
     for (final id in noteIds) {
       batch.delete('notes', where: 'id = ?', whereArgs: [id]);
     }
-    
+
     await batch.commit();
   }
 

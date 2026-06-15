@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:connected_notebook/features/notes/providers/note_provider.dart';
+import 'package:connected_notebook/features/notes/providers/vault_provider.dart';
 import 'package:connected_notebook/core/theme/theme_provider.dart';
 import 'package:connected_notebook/core/theme/app_theme.dart';
-import 'package:connected_notebook/core/security/encryption_service.dart';
 import 'package:connected_notebook/features/settings/presentation/about_screen.dart';
 import 'package:connected_notebook/features/backup/presentation/backup_screen.dart';
 
@@ -35,7 +35,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _checkEncryptionStatus() async {
-    final isEnabled = EncryptionService.isInitialized();
+    final isEnabled = context.read<VaultProvider>().isUnlocked;
     setState(() {
       _isEncryptionEnabled = isEnabled;
     });
@@ -58,14 +58,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
 
     try {
-      await EncryptionService.initialize(_passwordController.text);
+      await context.read<VaultProvider>().initializeVault(
+            password: _passwordController.text,
+          );
       setState(() {
         _isEncryptionEnabled = true;
       });
-      
+
       _passwordController.clear();
       _confirmPasswordController.clear();
-      
+
       _showSuccess('Şifreleme başarıyla etkinleştirildi');
     } catch (e) {
       _showError('Şifreleme etkinleştirilemedi: $e');
@@ -88,11 +90,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           TextButton(
             onPressed: () {
+              context.read<VaultProvider>().lockVault();
               setState(() {
                 _isEncryptionEnabled = false;
               });
               Navigator.of(context).pop();
-              _showSuccess('Şifreleme devre dışı bırakıldı');
+              _showSuccess('Kasa kilitlendi');
             },
             child: const Text('Devre Dışı Bırak', style: TextStyle(color: Colors.red)),
           ),
@@ -123,7 +126,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       final noteProvider = Provider.of<NoteProvider>(context, listen: false);
       await noteProvider.loadNotes();
-      
+
       _showSuccess('Notlar başarıyla dışa aktarıldı');
     } catch (e) {
       _showError('Dışa aktarma başarısız: $e');
@@ -147,7 +150,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           TextButton(
             onPressed: () async {
               Navigator.of(context).pop();
-              
+
               try {
                 final noteProvider = Provider.of<NoteProvider>(context, listen: false);
                 for (final note in noteProvider.notes) {
@@ -240,7 +243,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         decoration: BoxDecoration(
                           color: color.color,
                           shape: BoxShape.circle,
-                          border: isSelected 
+                          border: isSelected
                               ? Border.all(color: Theme.of(context).colorScheme.onSurface, width: 3)
                               : null,
                           boxShadow: [
@@ -251,7 +254,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             ),
                           ],
                         ),
-                        child: isSelected 
+                        child: isSelected
                             ? const Icon(Icons.check, color: Colors.white, size: 20)
                             : null,
                       ),

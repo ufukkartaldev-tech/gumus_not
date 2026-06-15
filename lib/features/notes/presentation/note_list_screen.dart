@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:connected_notebook/features/notes/models/note_model.dart';
 import 'package:connected_notebook/features/notes/providers/note_provider.dart';
+import 'package:connected_notebook/features/notes/providers/vault_provider.dart';
+import 'package:connected_notebook/core/security/legacy_encryption_service_adapter.dart';
 import 'package:connected_notebook/features/notes/widgets/markdown_editor.dart';
 import 'package:connected_notebook/features/notes/widgets/note_card.dart';
 import 'package:connected_notebook/features/notes/widgets/custom_widgets.dart';
@@ -22,7 +24,7 @@ import 'package:connected_notebook/features/notes/widgets/note_template_manager.
 import 'package:connected_notebook/features/tools/widgets/dashboard_stats.dart';
 import 'package:connected_notebook/features/tasks/presentation/task_hub_screen.dart';
 import 'package:connected_notebook/features/export/services/pdf_export_service.dart';
-import 'package:connected_notebook/core/security/encryption_service.dart';
+
 
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
@@ -42,7 +44,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
   String _selectedFolder = ''; // 'Genel' vs. Empty means Show All (or use 'Tümü')
   bool _isGridView = true; // Default to modern grid view
   bool _isTimelineView = false; // New Timeline View Mode
-  
+
   // For split view
   Note? _selectedNote;
   bool _isCreatingNewNote = false;
@@ -58,7 +60,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
   ];
 
   String get _quoteOfTheDay {
-    final dayOfYear = int.parse("${DateTime.now().month}${DateTime.now().day}"); 
+    final dayOfYear = int.parse("${DateTime.now().month}${DateTime.now().day}");
     return _quotes[dayOfYear % _quotes.length];
   }
 
@@ -75,7 +77,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
     _searchController.dispose();
     super.dispose();
   }
-  
+
   void _showCommandPalette() {
     CommandPalette.show(context);
   }
@@ -183,7 +185,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
               ],
             ),
           ),
-          
+
   // 2. Center Panel: Editor with Password Handling Wrapper
   Expanded(
   flex: 3,
@@ -197,27 +199,27 @@ class _NoteListScreenState extends State<NoteListScreen> {
                // We need to know if it requires re-encryption.
                // Hack: We can check if the original note (from provider) was encrypted using ID.
                // Or better: Assume if we are here, we handle it.
-               
+
                // For split view simplicity, let's just use standard save for now,
                // and if user wants encryption support in split view fully, we need more state.
-               // Currently, the prompt mainly focused on the logic. 
+               // Currently, the prompt mainly focused on the logic.
                // Mobile works perfectly with _openEditor logic.
                // Let's adopt a similar strategy for split view save callback.
-               
+
                return MarkdownEditor(
-                    key: ValueKey(_selectedNote?.id ?? 'new_note_${DateTime.now()}'), 
+                    key: ValueKey(_selectedNote?.id ?? 'new_note_${DateTime.now()}'),
                     note: _selectedNote,
                     onSave: (savedNote) async {
                        // Find if original note was encrypted to re-encrypt?
                        // Actually, we don't have the password here easily without state.
-                       // For now, in split view, let's just save. 
+                       // For now, in split view, let's just save.
                        // TODO: Enhance Split View Encryption Support
                        // For now, if it was encrypted, it might be saved as plain if we are not careful.
                        // Let's retrieve the password if we can, or just Ask for Password again on Save?
                        // Or simple: Just update note.
-                       
+
                        // Ideally: NoteProvider.updateNote(savedNote);
-                       
+
                        // FIX: Fetch original note to check encryption status
                        if (savedNote.id != null) {
                           final original = Provider.of<NoteProvider>(context, listen: false).notes.firstWhere((n) => n.id == savedNote.id, orElse: () => savedNote);
@@ -228,7 +230,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Not kaydedildi (Şifreleme henüz bölünmüş ekranda tam desteklenmiyor, lütfen mobil görünümü kullanın)')));
                           }
                        }
-                      
+
                       await _handleSave(savedNote, null);
                       if (mounted) {
                         setState(() {
@@ -250,7 +252,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
           )
         : _buildEmptyState(),
   ),
-          
+
           // 3. Right Panel: Graph View (Desktop Only)
           if (isDesktop)
             Expanded(
@@ -314,7 +316,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
       actions: [
         // Responsive Actions: Hide some on smaller screens or if crowded
         IconButton(
-          icon: const Icon(Icons.search), 
+          icon: const Icon(Icons.search),
           tooltip: 'Komut Paleti / Arama',
           onPressed: _showCommandPalette,
         ),
@@ -448,11 +450,11 @@ class _NoteListScreenState extends State<NoteListScreen> {
         var notes = _selectedTag.isEmpty
             ? noteProvider.searchResults
             : noteProvider.getNotesByTag(_selectedTag);
-            
+
         if (_selectedFolder.isNotEmpty) {
            notes = notes.where((n) => n.folderName == _selectedFolder).toList();
         }
-        
+
         // Sort: Pinned first, then UpdatedAt
         // We create a new list to avoid modifying the provider's list directly if it is used elsewhere
         final sortedNotes = List<Note>.from(notes);
@@ -463,15 +465,15 @@ class _NoteListScreenState extends State<NoteListScreen> {
           if (!aPinned && bPinned) return 1;
           return b.updatedAt.compareTo(a.updatedAt);
         });
-        
+
         // Calculate Activity Data (heatmap)
         final activityData = <DateTime, int>{}; // Declare map here
-        
+
         // Populate if map is empty (first load) or even if notes are empty but user has history?
         // Actually best is to iterate through ALL notes from provider, not just filtered ones, for the heatmap.
         // User wants global productivity view usually.
         for (var note in noteProvider.notes) {
-           final date = DateTime.fromMillisecondsSinceEpoch(note.updatedAt); 
+           final date = DateTime.fromMillisecondsSinceEpoch(note.updatedAt);
            // Normalize date to YMD
            final normalized = DateTime(date.year, date.month, date.day);
            activityData[normalized] = (activityData[normalized] ?? 0) + 1;
@@ -503,7 +505,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
             ),
           );
         }
-        
+
         int crossAxisCount = 2;
         if (isSidebar) {
            crossAxisCount = 1;
@@ -525,7 +527,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
                   ],
                 ),
               ),
-            
+
             // Add Tag Cloud when not searching or filtering
             if (_selectedTag.isEmpty && _searchController.text.isEmpty && _selectedFolder.isEmpty)
               SliverToBoxAdapter(
@@ -534,13 +536,13 @@ class _NoteListScreenState extends State<NoteListScreen> {
                   child: TagCloudWidget(),
                 ),
               ),
-            
+
             if (_isTimelineView)
               _buildTimelineSliver(sortedNotes)
             else
               SliverPadding(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                sliver: _isGridView 
+                sliver: _isGridView
                   ? SliverMasonryGrid.count(
                       crossAxisCount: crossAxisCount,
                       mainAxisSpacing: 8,
@@ -596,7 +598,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
     return Consumer<NoteProvider>(
       builder: (context, noteProvider, child) {
         final tagFrequency = noteProvider.getTagFrequency();
-        
+
         if (tagFrequency.isEmpty) {
           return const SizedBox.shrink();
         }
@@ -612,7 +614,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
               if (index == 0) {
                 return _buildTagChip('Tümü', '', _selectedTag.isEmpty);
               }
-              
+
               final tag = tagFrequency.keys.elementAt(index - 1);
               final count = tagFrequency[tag]!;
               return _buildTagChip('#$tag ($count)', tag, _selectedTag == tag);
@@ -658,13 +660,13 @@ class _NoteListScreenState extends State<NoteListScreen> {
         context,
         MaterialPageRoute(builder: (context) => const TemplateSelectionScreen()),
       );
-      
+
       if (selectedContent == null) return; // Kullanıcı geri bastı
       templateContent = selectedContent;
     }
 
     final width = MediaQuery.of(context).size.width;
-    
+
     // Geçici bir "Yeni Not" oluştur (İçeriği şablonlu veya boş)
     final newNote = Note(
       title: 'Başlıksız Not', // Editörde kullanıcı değiştirecek
@@ -703,40 +705,19 @@ class _NoteListScreenState extends State<NoteListScreen> {
   }
 
   void _selectNote(Note note) async {
-    // Şifreli Not Kontrolü
-    if (note.isEncrypted) {
-      if (!EncryptionService.isInitialized()) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Şifreleme servisi başlatılmamış. Ayarlardan açın.'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-        return;
+    if (note.isEncrypted && !context.read<VaultProvider>().isUnlocked) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Şifreli notu açmak için önce kasayı açın.'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
-
-      // Master key ile şifreli notu doğrudan açmaya çalış
-      try {
-        final decryptedContent = EncryptionService.decrypt(note.content);
-        // Deşifre edilmiş içeriği olan GEÇİCİ bir not oluşturuyoruz
-        final decryptedNote = note.copyWith(content: decryptedContent, isEncrypted: false);
-        
-        _openEditor(decryptedNote, null);
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Bu not açılamıyor. Şifreleme servisi kontrol edin.'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
-    } else {
-      _openEditor(note, null);
+      return;
     }
+
+    _openEditor(note, null);
   }
 
   void _openEditor(Note note, String? encryptionPassword) {
@@ -777,26 +758,32 @@ class _NoteListScreenState extends State<NoteListScreen> {
   Future<void> _handleSave(Note savedNote, String? encryptionPassword) async {
     final noteProvider = Provider.of<NoteProvider>(context, listen: false);
 
-    // Şifreli kayıt gerekiyorsa, içeriği önce şifrele
-    Note noteToPersist;
     if (savedNote.isEncrypted) {
-      if (!EncryptionService.isInitialized()) {
-        throw Exception('Şifreleme servisi başlatılmamış');
+      final vaultProvider = context.read<VaultProvider>();
+      if (!vaultProvider.isUnlocked) {
+        throw Exception('Şifreli not kaydetmek için önce kasayı açın');
       }
-      final encryptedContent = EncryptionService.encrypt(savedNote.content);
-      noteToPersist = savedNote.copyWith(
-        content: encryptedContent,
-        isEncrypted: true,
-      );
-    } else {
-      noteToPersist = savedNote;
-    }
 
-    // Yeni not mu, mevcut not mu?
-    if (noteToPersist.id == null) {
-      await noteProvider.addNote(noteToPersist);
+      if (savedNote.id == null) {
+        await vaultProvider.createPrivateNote(
+          title: savedNote.title,
+          content: savedNote.content,
+          tags: savedNote.tags,
+          folderName: savedNote.folderName,
+          color: savedNote.color,
+        );
+      } else {
+        await vaultProvider.updatePrivateNote(
+          note: savedNote,
+          plainTextContent: savedNote.content,
+        );
+      }
     } else {
-      await noteProvider.updateNote(noteToPersist);
+      if (savedNote.id == null) {
+        await noteProvider.addNote(savedNote);
+      } else {
+        await noteProvider.updateNote(savedNote);
+      }
     }
   }
 
@@ -866,7 +853,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
       ),
     );
   }
-  
+
   void _showImportExport() {
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -931,22 +918,28 @@ class _NoteListScreenState extends State<NoteListScreen> {
                    final password = await _showPasswordDialog(isCreate: false);
                     if (password != null) {
                        try {
-                          final decrypted = EncryptionService.decryptWithPassword(note.content, password);
+                          final decrypted = await context.read<LegacyEncryptionServiceAdapter>().decryptWithPassword(
+                            encryptedPackage: note.content,
+                            password: password,
+                          );
                           final openNote = note.copyWith(content: decrypted, isEncrypted: false);
                           Provider.of<NoteProvider>(context, listen: false).updateNote(openNote);
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Şifre kaldırıldı.')));
-                       } catch (e) {
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Yanlış şifre!')));
+                          if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Notun kilidi açıldı.')));
+                       } catch (_) {
+                          if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Şifre yanlış!'), backgroundColor: Colors.red));
                        }
                     }
                 } else {
                    // Lock logic
                    final password = await _showPasswordDialog(isCreate: true);
                    if (password != null && password.isNotEmpty) {
-                      final encrypted = EncryptionService.encryptWithPassword(note.content, password);
+                      final encrypted = await context.read<LegacyEncryptionServiceAdapter>().encryptWithPassword(
+                        plainText: note.content,
+                        password: password,
+                      );
                       final lockedNote = note.copyWith(content: encrypted, isEncrypted: true);
                       Provider.of<NoteProvider>(context, listen: false).updateNote(lockedNote);
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Not şifrelendi.')));
+                      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Not kilitlendi.')));
                    }
                 }
               },
@@ -1005,7 +998,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
     final now = DateTime.now();
     final title = 'Günlük Not: ${now.day}.${now.month}.${now.year}';
     final notes = Provider.of<NoteProvider>(context, listen: false).notes;
-    
+
     try {
       final existingNote = notes.firstWhere((n) => n.title == title);
       _selectNote(existingNote);
@@ -1017,9 +1010,9 @@ class _NoteListScreenState extends State<NoteListScreen> {
         createdAt: now.millisecondsSinceEpoch,
         updatedAt: now.millisecondsSinceEpoch,
       );
-      
+
       Provider.of<NoteProvider>(context, listen: false).addNote(newNote).then((_) {
-         // After adding, we need to select it. 
+         // After adding, we need to select it.
          // But the provider reload might be async.
          // Let's rely on finding it again or passing the ID if NoteProvider returns it.
          // Assuming basic add, let's find it by title again safely after a small delay or reload
@@ -1039,10 +1032,10 @@ class _NoteListScreenState extends State<NoteListScreen> {
     } else {
       tags.add('sabit');
     }
-    
+
     final updatedNote = note.copyWith(tags: tags);
     Provider.of<NoteProvider>(context, listen: false).updateNote(updatedNote);
-    
+
     // Feedback
     ScaffoldMessenger.of(context).clearSnackBars();
     ScaffoldMessenger.of(context).showSnackBar(
@@ -1064,14 +1057,14 @@ class _NoteListScreenState extends State<NoteListScreen> {
                 image: const AssetImage('assets/header_bg.png'), // Varsa
                 fit: BoxFit.cover,
                 colorFilter: ColorFilter.mode(
-                  Colors.black.withOpacity(0.3), 
+                  Colors.black.withOpacity(0.3),
                   BlendMode.darken
                 ),
                 onError: (_, __) {}, // Hata olursa sadece renk kalsın
               ),
             ),
             accountName: const Text(
-              'GümüşNot', 
+              'GümüşNot',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)
             ),
             accountEmail: Text(
@@ -1081,10 +1074,10 @@ class _NoteListScreenState extends State<NoteListScreen> {
             currentAccountPicture: CircleAvatar(
               backgroundColor: Colors.white,
               child: Text(
-                'GN', 
+                'GN',
                 style: TextStyle(
-                  fontSize: 24, 
-                  fontWeight: FontWeight.bold, 
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
                   color: Theme.of(context).primaryColor
                 )
               ),
@@ -1157,7 +1150,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
     for (var note in notes) {
       tags.addAll(note.tags);
     }
-    
+
     if (tags.isEmpty) {
       return [const ListTile(title: Text('Henüz etiket yok', style: TextStyle(color: Colors.grey)))];
     }
@@ -1186,7 +1179,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
 
   List<Widget> _buildFolderListForDrawer() {
      final folderList = Provider.of<NoteProvider>(context).folders;
-     
+
      if (folderList.isEmpty) {
         return [const ListTile(title: Text('Klasör bulunamadı', style: TextStyle(color: Colors.grey)), contentPadding: EdgeInsets.only(left: 32))];
      }
@@ -1201,7 +1194,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
               Navigator.pop(context);
               setState(() {
                  _selectedFolder = folder;
-                 _selectedTag = ''; 
+                 _selectedTag = '';
                  _searchController.clear();
               });
            },
@@ -1218,10 +1211,10 @@ class _NoteListScreenState extends State<NoteListScreen> {
           final note = notes[index];
           final date = DateTime.fromMillisecondsSinceEpoch(note.updatedAt);
           final prevDate = index > 0 ? DateTime.fromMillisecondsSinceEpoch(notes[index - 1].updatedAt) : null;
-          
-          bool isNewDay = prevDate == null || 
-                         date.day != prevDate.day || 
-                         date.month != prevDate.month || 
+
+          bool isNewDay = prevDate == null ||
+                         date.day != prevDate.day ||
+                         date.month != prevDate.month ||
                          date.year != prevDate.year;
 
           return Column(
