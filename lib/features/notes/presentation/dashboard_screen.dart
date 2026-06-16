@@ -68,13 +68,6 @@ class DashboardScreen extends StatelessWidget {
           color: theme.colorScheme.onSurface.withOpacity(0.9),
         ),
       ),
-      actions: [
-        IconButton(
-          onPressed: () => Navigator.pushNamed(context, '/settings'),
-          icon: const Icon(Icons.settings_outlined),
-          color: theme.colorScheme.onSurface.withOpacity(0.7),
-        ),
-      ],
     );
   }
 
@@ -153,19 +146,60 @@ class DashboardScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 16),
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: theme.primaryColor.withOpacity(
-                        isDark ? 0.15 : 0.08,
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Profil Alanı (Avatar)
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: theme.colorScheme.primary.withOpacity(0.15),
+                          border: Border.all(
+                            color: theme.colorScheme.primary.withOpacity(0.3),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Center(
+                          child: Icon(
+                            Icons.person_outline_rounded,
+                            color: theme.colorScheme.primary,
+                            size: 22,
+                          ),
+                        ),
                       ),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      Icons.auto_awesome_outlined,
-                      color: theme.primaryColor,
-                      size: 20,
-                    ),
+                      const SizedBox(width: 8),
+                      // Ayarlar (Dişli) İkonu - Daha Dengeli, Büyük ve Erişilebilir
+                      Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () =>
+                              Navigator.pushNamed(context, '/settings'),
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.primary.withOpacity(
+                                isDark ? 0.15 : 0.08,
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: theme.colorScheme.primary.withOpacity(
+                                  isDark ? 0.25 : 0.12,
+                                ),
+                                width: 1,
+                              ),
+                            ),
+                            child: Icon(
+                              Icons.settings_rounded,
+                              color: theme.colorScheme.primary,
+                              size: 22,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
