@@ -32,15 +32,15 @@ class DashboardScreen extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 sliver: SliverList(
                   delegate: SliverChildListDelegate([
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 12),
                     _buildGreetingSection(context),
-                    const SizedBox(height: 30),
+                    const SizedBox(height: 28),
                     _buildQuickAccessSection(context, recentNotes),
-                    const SizedBox(height: 30),
+                    const SizedBox(height: 28),
                     _buildStatsGrid(context, tasks, tagFreq),
-                    const SizedBox(height: 30),
+                    const SizedBox(height: 28),
                     _buildUrgentTasksSection(context, pendingTasks),
-                    const SizedBox(height: 40),
+                    const SizedBox(height: 32),
                   ]),
                 ),
               ),
@@ -52,22 +52,27 @@ class DashboardScreen extends StatelessWidget {
   }
 
   Widget _buildAppBar(BuildContext context) {
+    final theme = Theme.of(context);
     return SliverAppBar(
       expandedHeight: 0,
       floating: true,
       backgroundColor: Colors.transparent,
       elevation: 0,
+      surfaceTintColor: Colors.transparent,
       title: Text(
         'GümüşNot Merkezi',
         style: TextStyle(
-          fontWeight: FontWeight.w900,
-          color: Theme.of(context).textTheme.titleLarge?.color,
+          fontWeight: FontWeight.w800,
+          fontSize: 20,
+          letterSpacing: -0.5,
+          color: theme.colorScheme.onSurface.withOpacity(0.9),
         ),
       ),
       actions: [
         IconButton(
           onPressed: () => Navigator.pushNamed(context, '/settings'),
           icon: const Icon(Icons.settings_outlined),
+          color: theme.colorScheme.onSurface.withOpacity(0.7),
         ),
       ],
     );
@@ -82,37 +87,41 @@ class DashboardScreen extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [theme.primaryColor, theme.primaryColor.withOpacity(0.8)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: theme.primaryColor.withOpacity(isDark ? 0.15 : 0.25),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            right: -20,
-            bottom: -20,
-            child: Icon(
-              Icons.blur_on_rounded,
-              size: 150,
-              color: Colors.white.withOpacity(0.12),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+        child: Container(
+          padding: const EdgeInsets.all(22),
+          decoration: BoxDecoration(
+            color: isDark
+                ? theme.primaryColor.withOpacity(0.08)
+                : theme.primaryColor.withOpacity(0.04),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: theme.primaryColor.withOpacity(isDark ? 0.15 : 0.08),
+              width: 1,
             ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(isDark ? 0.12 : 0.03),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+            ],
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Stack(
+            clipBehavior: Clip.none,
             children: [
+              Positioned(
+                right: -40,
+                bottom: -40,
+                child: Icon(
+                  Icons.blur_on_rounded,
+                  size: 140,
+                  color: theme.primaryColor.withOpacity(isDark ? 0.06 : 0.03),
+                ),
+              ),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -122,44 +131,47 @@ class DashboardScreen extends StatelessWidget {
                       children: [
                         Text(
                           '$greeting, Ufuk',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 26,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: -0.5,
+                          style: TextStyle(
+                            color: theme.colorScheme.onSurface.withOpacity(0.9),
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.6,
                           ),
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 6),
                         Text(
-                          'Zihnin berrak, bağlantıların güçlü olsun. Bugün bilgi ağını genişletmeye ne dersin? ✨',
+                          'Zihnin berrak, bağlantıların güçlü olsun. Bugün bilgi ağını genişletmeye ne dersin?',
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.85),
-                            fontSize: 14,
+                            color: theme.colorScheme.onSurface.withOpacity(0.6),
+                            fontSize: 12.5,
                             fontWeight: FontWeight.w500,
-                            height: 1.4,
+                            height: 1.45,
+                            letterSpacing: -0.1,
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 16),
                   Container(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.18),
-                      shape: BoxShape.circle,
+                      color: theme.primaryColor.withOpacity(
+                        isDark ? 0.15 : 0.08,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(
-                      Icons.insights_rounded,
-                      color: Colors.white,
-                      size: 28,
+                    child: Icon(
+                      Icons.auto_awesome_outlined,
+                      color: theme.primaryColor,
+                      size: 20,
                     ),
                   ),
                 ],
               ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -168,22 +180,81 @@ class DashboardScreen extends StatelessWidget {
     BuildContext context,
     List<Note> recentNotes,
   ) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Row(
+        Row(
           children: [
-            Icon(Icons.history_rounded, size: 20),
-            SizedBox(width: 8),
+            Icon(
+              Icons.schedule_rounded,
+              size: 20,
+              color: theme.primaryColor.withOpacity(0.8),
+            ),
+            const SizedBox(width: 12),
             Text(
               'Hızlı Erişim',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.4,
+                color: theme.colorScheme.onSurface.withOpacity(0.85),
+              ),
             ),
           ],
         ),
         const SizedBox(height: 16),
         if (recentNotes.isEmpty)
-          const Text('Henüz notun yok. Haydi başla!')
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
+            decoration: BoxDecoration(
+              color:
+                  theme.cardTheme.color?.withOpacity(0.5) ??
+                  theme.cardColor.withOpacity(0.5),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: theme.dividerColor.withOpacity(isDark ? 0.08 : 0.12),
+              ),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: theme.primaryColor.withOpacity(0.06),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.note_add_outlined,
+                    size: 28,
+                    color: theme.primaryColor.withOpacity(0.6),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Henüz hiç not yok',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                    color: theme.colorScheme.onSurface.withOpacity(0.8),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Düşüncelerini ve fikirlerini kaydetmeye başla.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: theme.disabledColor.withOpacity(0.8),
+                  ),
+                ),
+              ],
+            ),
+          )
         else
           SizedBox(
             height: 200,
@@ -215,8 +286,6 @@ class DashboardScreen extends StatelessWidget {
                       );
                     },
                     onDelete: () {
-                      // Silme onayı alıp silebiliriz veya sessizce silebiliriz
-                      // Ancak dashboard'da güvenli tarafta kalalım.
                       provider.deleteNote(recentNotes[index].id!);
                     },
                   ),
@@ -243,13 +312,22 @@ class DashboardScreen extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Row(
+        Row(
           children: [
-            Icon(Icons.analytics_outlined, size: 20),
-            SizedBox(width: 8),
+            Icon(
+              Icons.analytics_outlined,
+              size: 20,
+              color: theme.primaryColor.withOpacity(0.8),
+            ),
+            const SizedBox(width: 12),
             Text(
               'Verimlilik ve Etiketler',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.4,
+                color: theme.colorScheme.onSurface.withOpacity(0.85),
+              ),
             ),
           ],
         ),
@@ -264,9 +342,14 @@ class DashboardScreen extends StatelessWidget {
                 context,
                 child: Column(
                   children: [
-                    const Text(
+                    Text(
                       'Görev Dağılımı',
-                      style: TextStyle(fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.2,
+                        color: theme.colorScheme.onSurface.withOpacity(0.8),
+                      ),
                     ),
                     const SizedBox(height: 16),
                     SizedBox(
@@ -284,7 +367,7 @@ class DashboardScreen extends StatelessWidget {
                                       : completed.toDouble(),
                                   color: theme.primaryColor,
                                   title: '',
-                                  radius: 18,
+                                  radius: 8,
                                 ),
                                 PieChartSectionData(
                                   value:
@@ -292,13 +375,13 @@ class DashboardScreen extends StatelessWidget {
                                           pending.toDouble() == 0
                                       ? 0
                                       : pending.toDouble(),
-                                  color: theme.primaryColor.withOpacity(0.15),
+                                  color: theme.primaryColor.withOpacity(0.12),
                                   title: '',
-                                  radius: 14,
+                                  radius: 8,
                                 ),
                               ],
-                              sectionsSpace: 3,
-                              centerSpaceRadius: 32,
+                              sectionsSpace: 0,
+                              centerSpaceRadius: 38,
                             ),
                           ),
                           Center(
@@ -308,17 +391,21 @@ class DashboardScreen extends StatelessWidget {
                                 Text(
                                   '$percent%',
                                   style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w900,
-                                    color: theme.colorScheme.onSurface,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w800,
+                                    color: theme.colorScheme.onSurface
+                                        .withOpacity(0.9),
+                                    fontFamily: 'Inter',
+                                    letterSpacing: -0.5,
                                   ),
                                 ),
                                 Text(
-                                  'Tamamlandı',
+                                  'Biten',
                                   style: TextStyle(
                                     fontSize: 9,
                                     color: theme.disabledColor,
-                                    fontWeight: FontWeight.bold,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 0.2,
                                   ),
                                 ),
                               ],
@@ -331,10 +418,11 @@ class DashboardScreen extends StatelessWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        _buildIndicator(theme.primaryColor, 'Biten'),
-                        const SizedBox(width: 10),
+                        _buildIndicator(context, theme.primaryColor, 'Biten'),
+                        const SizedBox(width: 14),
                         _buildIndicator(
-                          theme.primaryColor.withOpacity(0.25),
+                          context,
+                          theme.primaryColor.withOpacity(0.3),
                           'Bekleyen',
                         ),
                       ],
@@ -352,24 +440,47 @@ class DashboardScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Popüler Etiketler',
                       style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.2,
+                        color: theme.colorScheme.onSurface.withOpacity(0.8),
                       ),
                     ),
                     const SizedBox(height: 14),
                     if (tagFreq.isEmpty)
                       Padding(
-                        padding: const EdgeInsets.only(top: 20.0),
+                        padding: const EdgeInsets.symmetric(vertical: 24.0),
                         child: Center(
-                          child: Text(
-                            'Henüz etiket yok',
-                            style: TextStyle(
-                              color: theme.disabledColor,
-                              fontSize: 13,
-                            ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.label_off_outlined,
+                                size: 32,
+                                color: theme.primaryColor.withOpacity(0.4),
+                              ),
+                              const SizedBox(height: 10),
+                              Text(
+                                'Henüz etiket yok',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 12,
+                                  color: theme.colorScheme.onSurface
+                                      .withOpacity(0.7),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Notlarına #etiket ekle.',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: theme.disabledColor,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       )
@@ -394,16 +505,19 @@ class DashboardScreen extends StatelessWidget {
                                     children: [
                                       Text(
                                         '#${entry.key}',
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontSize: 12,
                                           fontWeight: FontWeight.w700,
+                                          color: theme.colorScheme.onSurface
+                                              .withOpacity(0.8),
                                         ),
                                       ),
                                       Text(
                                         '${entry.value} not',
                                         style: TextStyle(
                                           fontSize: 11,
-                                          color: theme.disabledColor,
+                                          color: theme.disabledColor
+                                              .withOpacity(0.8),
                                           fontWeight: FontWeight.w600,
                                         ),
                                       ),
@@ -415,11 +529,11 @@ class DashboardScreen extends StatelessWidget {
                                     child: LinearProgressIndicator(
                                       value: ratio,
                                       backgroundColor: theme.primaryColor
-                                          .withOpacity(0.08),
+                                          .withOpacity(0.06),
                                       valueColor: AlwaysStoppedAnimation<Color>(
                                         theme.primaryColor.withOpacity(0.85),
                                       ),
-                                      minHeight: 6,
+                                      minHeight: 5,
                                     ),
                                   ),
                                 ],
@@ -453,62 +567,94 @@ class DashboardScreen extends StatelessWidget {
             Row(
               children: [
                 Icon(
-                  Icons.assignment_late_rounded,
-                  size: 22,
-                  color: theme.primaryColor,
+                  Icons.assignment_late_outlined,
+                  size: 20,
+                  color: theme.primaryColor.withOpacity(0.8),
                 ),
-                const SizedBox(width: 8),
-                const Text(
+                const SizedBox(width: 12),
+                Text(
                   'Acil Görevler',
                   style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: -0.3,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.4,
+                    color: theme.colorScheme.onSurface.withOpacity(0.85),
                   ),
                 ),
               ],
             ),
             TextButton(
               onPressed: () => Navigator.pushNamed(context, '/task-hub'),
+              style: TextButton.styleFrom(
+                padding: EdgeInsets.zero,
+                minimumSize: const Size(50, 30),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
               child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('Tümünü Gör'),
+                  Text(
+                    'Tümünü Gör',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: theme.primaryColor.withOpacity(0.9),
+                    ),
+                  ),
                   const SizedBox(width: 4),
                   Icon(
-                    Icons.arrow_forward_ios_rounded,
-                    size: 12,
-                    color: theme.primaryColor,
+                    Icons.chevron_right_rounded,
+                    size: 16,
+                    color: theme.primaryColor.withOpacity(0.9),
                   ),
                 ],
               ),
             ),
           ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
         if (pendingTasks.isEmpty)
           Container(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
             width: double.infinity,
             decoration: BoxDecoration(
-              color: theme.cardTheme.color,
+              color:
+                  theme.cardTheme.color?.withOpacity(0.5) ??
+                  theme.cardColor.withOpacity(0.5),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: theme.dividerColor.withOpacity(isDark ? 0.1 : 0.4),
+                color: theme.dividerColor.withOpacity(isDark ? 0.08 : 0.12),
               ),
             ),
             child: Column(
               children: [
-                Icon(
-                  Icons.task_alt_rounded,
-                  size: 36,
-                  color: theme.primaryColor.withOpacity(0.6),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.06),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.check_circle_outline_rounded,
+                    size: 28,
+                    color: Colors.green.withOpacity(0.7),
+                  ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 12),
                 Text(
-                  'Tüm görevler tamamlandı! Harikasın. 🎉',
+                  'Tüm görevler tamamlandı!',
                   style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: theme.textTheme.bodyMedium?.color?.withOpacity(0.8),
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                    color: theme.colorScheme.onSurface.withOpacity(0.8),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Bugün harika bir verimlilik gösterdin. 🎉',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: theme.disabledColor.withOpacity(0.8),
                   ),
                 ),
               ],
@@ -518,19 +664,20 @@ class DashboardScreen extends StatelessWidget {
           ...pendingTasks
               .map(
                 (task) => Container(
-                  margin: const EdgeInsets.only(bottom: 8),
+                  margin: const EdgeInsets.only(bottom: 10),
                   decoration: BoxDecoration(
-                    color: theme.cardTheme.color,
-                    borderRadius: BorderRadius.circular(16),
+                    color: theme.cardTheme.color ?? theme.cardColor,
+                    borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: theme.dividerColor.withOpacity(
-                        isDark ? 0.15 : 0.5,
-                      ),
+                      color: isDark
+                          ? Colors.white.withOpacity(0.04)
+                          : Colors.grey.withOpacity(0.12),
+                      width: 1,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.01),
-                        blurRadius: 4,
+                        color: Colors.black.withOpacity(isDark ? 0.08 : 0.02),
+                        blurRadius: 8,
                         offset: const Offset(0, 2),
                       ),
                     ],
@@ -540,15 +687,24 @@ class DashboardScreen extends StatelessWidget {
                       horizontal: 16,
                       vertical: 4,
                     ),
-                    leading: Icon(
-                      Icons.radio_button_off_rounded,
-                      color: theme.primaryColor.withOpacity(0.8),
+                    leading: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: theme.primaryColor.withOpacity(0.06),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.circle_outlined,
+                        size: 18,
+                        color: theme.primaryColor.withOpacity(0.8),
+                      ),
                     ),
                     title: Text(
                       task.taskText,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.w600,
-                        fontSize: 14,
+                        fontSize: 13.5,
+                        color: theme.colorScheme.onSurface.withOpacity(0.9),
                       ),
                     ),
                     subtitle: Padding(
@@ -556,17 +712,17 @@ class DashboardScreen extends StatelessWidget {
                       child: Row(
                         children: [
                           Icon(
-                            Icons.notes_rounded,
+                            Icons.article_outlined,
                             size: 12,
-                            color: theme.disabledColor,
+                            color: theme.disabledColor.withOpacity(0.8),
                           ),
                           const SizedBox(width: 4),
                           Expanded(
                             child: Text(
                               'Kaynak: ${task.note.title.isEmpty ? "Başlıksız" : task.note.title}',
                               style: TextStyle(
-                                color: theme.disabledColor,
-                                fontSize: 12,
+                                color: theme.disabledColor.withOpacity(0.8),
+                                fontSize: 11.5,
                                 fontWeight: FontWeight.w500,
                               ),
                               overflow: TextOverflow.ellipsis,
@@ -576,8 +732,8 @@ class DashboardScreen extends StatelessWidget {
                       ),
                     ),
                     trailing: Icon(
-                      Icons.arrow_forward_ios_rounded,
-                      size: 14,
+                      Icons.chevron_right_rounded,
+                      size: 18,
                       color: theme.disabledColor.withOpacity(0.5),
                     ),
                     onTap: () => Navigator.pushNamed(
@@ -594,18 +750,24 @@ class DashboardScreen extends StatelessWidget {
   }
 
   Widget _buildGlassCard(BuildContext context, {required Widget child}) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Theme.of(context).cardTheme.color?.withOpacity(0.8),
-        borderRadius: BorderRadius.circular(20),
+        color: theme.cardTheme.color?.withOpacity(0.8) ?? theme.cardColor,
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: Theme.of(context).dividerColor.withOpacity(0.1),
+          color: isDark
+              ? Colors.white.withOpacity(0.04)
+              : Colors.grey.withOpacity(0.12),
+          width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 10,
+            color: Colors.black.withOpacity(isDark ? 0.12 : 0.03),
+            blurRadius: 16,
             offset: const Offset(0, 4),
           ),
         ],
@@ -614,16 +776,25 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildIndicator(Color color, String label) {
+  Widget _buildIndicator(BuildContext context, Color color, String label) {
+    final theme = Theme.of(context);
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 8,
-          height: 8,
+          width: 6,
+          height: 6,
           decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
-        const SizedBox(width: 4),
-        Text(label, style: const TextStyle(fontSize: 10)),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 10.5,
+            fontWeight: FontWeight.w600,
+            color: theme.colorScheme.onSurface.withOpacity(0.6),
+          ),
+        ),
       ],
     );
   }

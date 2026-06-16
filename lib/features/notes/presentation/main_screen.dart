@@ -43,76 +43,101 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Scaffold(
       body: IndexedStack(index: _selectedIndex, children: _screens),
       bottomNavigationBar: SafeArea(
         child: Container(
           margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
           decoration: BoxDecoration(
-            color: Theme.of(context).cardTheme.color?.withOpacity(0.95),
+            color:
+                theme.cardTheme.color?.withOpacity(0.95) ??
+                theme.cardColor.withOpacity(0.95),
             borderRadius: BorderRadius.circular(24),
             border: Border.all(
-              color: Theme.of(context).dividerColor.withOpacity(0.12),
+              color: theme.dividerColor.withOpacity(isDark ? 0.08 : 0.12),
               width: 1,
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.08),
-                blurRadius: 16,
-                offset: const Offset(0, 6),
+                color: Colors.black.withOpacity(isDark ? 0.15 : 0.04),
+                blurRadius: 20,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(24),
-            child: BottomNavigationBar(
-              currentIndex: _selectedIndex,
-              onTap: (index) {
-                setState(() => _selectedIndex = index);
-              },
-              type: BottomNavigationBarType.fixed,
-              backgroundColor: Colors.transparent,
-              elevation: 0,
-              selectedItemColor: Theme.of(context).primaryColor,
-              unselectedItemColor: Theme.of(
-                context,
-              ).disabledColor.withOpacity(0.6),
-              selectedLabelStyle: const TextStyle(
-                fontWeight: FontWeight.w800,
-                fontSize: 11,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildNavItem(0, Icons.space_dashboard_outlined, 'Merkez'),
+              _buildNavItem(1, Icons.article_outlined, 'Notlar'),
+              _buildNavItem(2, Icons.check_circle_outline_rounded, 'Görevler'),
+              _buildNavItem(3, Icons.hub_outlined, 'Zihin'),
+              _buildNavItem(4, Icons.widgets_outlined, 'Widget'),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavItem(int index, IconData icon, String label) {
+    final isSelected = _selectedIndex == index;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Expanded(
+      child: InkWell(
+        onTap: () => setState(() => _selectedIndex = index),
+        borderRadius: BorderRadius.circular(20),
+        highlightColor: Colors.transparent,
+        splashColor: theme.primaryColor.withOpacity(0.08),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Active indicator background or dot
+              Stack(
+                alignment: Alignment.center,
+                children: [
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeInOut,
+                    width: isSelected ? 42 : 0,
+                    height: 26,
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? theme.primaryColor.withOpacity(isDark ? 0.16 : 0.08)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(13),
+                    ),
+                  ),
+                  Icon(
+                    icon,
+                    color: isSelected
+                        ? theme.primaryColor
+                        : theme.colorScheme.onSurface.withOpacity(0.4),
+                    size: 20,
+                  ),
+                ],
               ),
-              unselectedLabelStyle: const TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 11,
+              const SizedBox(height: 3),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  color: isSelected
+                      ? theme.primaryColor
+                      : theme.colorScheme.onSurface.withOpacity(0.4),
+                  letterSpacing: -0.2,
+                ),
               ),
-              items: const [
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.dashboard_rounded),
-                  activeIcon: Icon(Icons.dashboard_rounded),
-                  label: 'Merkez',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.notes_rounded),
-                  activeIcon: Icon(Icons.notes_rounded),
-                  label: 'Notlar',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.task_alt_rounded),
-                  activeIcon: Icon(Icons.task_alt_rounded),
-                  label: 'Görevler',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.hub_rounded),
-                  activeIcon: Icon(Icons.hub_rounded),
-                  label: 'Zihin',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.widgets_rounded),
-                  activeIcon: Icon(Icons.widgets_rounded),
-                  label: 'Widget',
-                ),
-              ],
-            ),
+            ],
           ),
         ),
       ),
