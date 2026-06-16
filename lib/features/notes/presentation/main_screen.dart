@@ -72,7 +72,7 @@ class _MainScreenState extends State<MainScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildNavItem(0, Icons.space_dashboard_outlined, 'Merkez'),
+              _buildNavItem(0, Icons.home_outlined, 'Merkez'),
               _buildNavItem(1, Icons.article_outlined, 'Notlar'),
               _buildNavItem(2, Icons.check_circle_outline_rounded, 'Görevler'),
               _buildNavItem(3, Icons.hub_outlined, 'Zihin'),
@@ -120,7 +120,7 @@ class _MainScreenState extends State<MainScreen> {
                     icon,
                     color: isSelected
                         ? theme.primaryColor
-                        : theme.colorScheme.onSurface.withOpacity(0.4),
+                        : theme.colorScheme.onSurface.withOpacity(0.6),
                     size: 20,
                   ),
                 ],
@@ -133,7 +133,7 @@ class _MainScreenState extends State<MainScreen> {
                   fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                   color: isSelected
                       ? theme.primaryColor
-                      : theme.colorScheme.onSurface.withOpacity(0.4),
+                      : theme.colorScheme.onSurface.withOpacity(0.6),
                   letterSpacing: -0.2,
                 ),
               ),
