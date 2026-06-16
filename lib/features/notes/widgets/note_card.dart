@@ -26,7 +26,8 @@ class NoteCard extends StatefulWidget {
   State<NoteCard> createState() => _NoteCardState();
 }
 
-class _NoteCardState extends State<NoteCard> with SingleTickerProviderStateMixin {
+class _NoteCardState extends State<NoteCard>
+    with SingleTickerProviderStateMixin {
   bool _isHovered = false;
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
@@ -38,7 +39,8 @@ class _NoteCardState extends State<NoteCard> with SingleTickerProviderStateMixin
       vsync: this,
       duration: const Duration(milliseconds: 150),
     );
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 1.01).animate( // Subtle scale up
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 1.01).animate(
+      // Subtle scale up
       CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
     );
   }
@@ -54,11 +56,13 @@ class _NoteCardState extends State<NoteCard> with SingleTickerProviderStateMixin
     final linkCount = widget.note.extractLinks().length;
     final isEncrypted = widget.note.isEncrypted;
     // If note has a custom color, use it. Otherwise use primary color.
-    final noteColor = widget.note.color != null ? Color(widget.note.color!) : null;
-    
+    final noteColor = widget.note.color != null
+        ? Color(widget.note.color!)
+        : null;
+
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    
+
     // Determine the accent color for this card
     final accentColor = noteColor ?? theme.colorScheme.primary;
 
@@ -75,10 +79,8 @@ class _NoteCardState extends State<NoteCard> with SingleTickerProviderStateMixin
         tag: 'note_${widget.note.id ?? 'new_${widget.note.createdAt}'}',
         child: AnimatedBuilder(
           animation: _scaleAnimation,
-          builder: (context, child) => Transform.scale(
-            scale: _scaleAnimation.value,
-            child: child,
-          ),
+          builder: (context, child) =>
+              Transform.scale(scale: _scaleAnimation.value, child: child),
           child: Container(
             margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
             decoration: BoxDecoration(
@@ -99,7 +101,9 @@ class _NoteCardState extends State<NoteCard> with SingleTickerProviderStateMixin
                   ),
               ],
               border: Border.all(
-                color: _isHovered ? accentColor.withOpacity(0.5) : theme.dividerColor.withOpacity(isDark ? 0.2 : 0.6),
+                color: _isHovered
+                    ? accentColor.withOpacity(0.5)
+                    : theme.dividerColor.withOpacity(isDark ? 0.2 : 0.6),
                 width: _isHovered ? 1.5 : 1,
               ),
             ),
@@ -110,28 +114,28 @@ class _NoteCardState extends State<NoteCard> with SingleTickerProviderStateMixin
                 onTap: widget.onTap,
                 borderRadius: BorderRadius.circular(20),
                 splashColor: accentColor.withOpacity(0.1),
-                hoverColor: Colors.transparent, 
+                hoverColor: Colors.transparent,
                 child: Stack(
                   children: [
                     if (noteColor != null)
-                    Positioned.fill(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              noteColor.withOpacity(isDark ? 0.15 : 0.1),
-                              noteColor.withOpacity(isDark ? 0.05 : 0.02),
-                              Colors.transparent,
-                            ],
-                            stops: const [0.0, 0.6, 1.0],
+                      Positioned.fill(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                noteColor.withOpacity(isDark ? 0.15 : 0.1),
+                                noteColor.withOpacity(isDark ? 0.05 : 0.02),
+                                Colors.transparent,
+                              ],
+                              stops: const [0.0, 0.6, 1.0],
+                            ),
+                            borderRadius: BorderRadius.circular(20),
                           ),
-                          borderRadius: BorderRadius.circular(20),
                         ),
                       ),
-                    ),
-                    
+
                     if (isEncrypted)
                       Positioned.fill(
                         child: Opacity(
@@ -157,15 +161,21 @@ class _NoteCardState extends State<NoteCard> with SingleTickerProviderStateMixin
                                     Row(
                                       children: [
                                         if (isEncrypted) ...[
-                                           Container(
-                                              padding: const EdgeInsets.all(4),
-                                              decoration: BoxDecoration(
-                                                 color: Colors.orange.withOpacity(0.2),
-                                                 shape: BoxShape.circle,
+                                          Container(
+                                            padding: const EdgeInsets.all(4),
+                                            decoration: BoxDecoration(
+                                              color: Colors.orange.withOpacity(
+                                                0.2,
                                               ),
-                                              child: const Icon(Icons.lock_rounded, size: 14, color: Colors.orange),
-                                           ),
-                                           const SizedBox(width: 8),
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: const Icon(
+                                              Icons.lock_rounded,
+                                              size: 14,
+                                              color: Colors.orange,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
                                         ] else if (noteColor != null) ...[
                                           Container(
                                             width: 10,
@@ -175,25 +185,33 @@ class _NoteCardState extends State<NoteCard> with SingleTickerProviderStateMixin
                                               shape: BoxShape.circle,
                                               boxShadow: [
                                                 BoxShadow(
-                                                  color: noteColor.withOpacity(0.4),
+                                                  color: noteColor.withOpacity(
+                                                    0.4,
+                                                  ),
                                                   blurRadius: 4,
                                                   spreadRadius: 1,
-                                                )
-                                              ]
+                                                ),
+                                              ],
                                             ),
                                           ),
                                           const SizedBox(width: 10),
                                         ],
-                                        
+
                                         Expanded(
                                           child: Text(
-                                            widget.note.title.isEmpty ? 'Başlıksız Not' : widget.note.title,
-                                            style: theme.textTheme.titleMedium?.copyWith(
-                                              fontWeight: FontWeight.w800,
-                                              fontSize: 18,
-                                              height: 1.2,
-                                              color: theme.textTheme.titleMedium?.color,
-                                            ),
+                                            widget.note.title.isEmpty
+                                                ? 'Başlıksız Not'
+                                                : widget.note.title,
+                                            style: theme.textTheme.titleMedium
+                                                ?.copyWith(
+                                                  fontWeight: FontWeight.w800,
+                                                  fontSize: 18,
+                                                  height: 1.2,
+                                                  color: theme
+                                                      .textTheme
+                                                      .titleMedium
+                                                      ?.color,
+                                                ),
                                             maxLines: 2,
                                             overflow: TextOverflow.ellipsis,
                                           ),
@@ -201,112 +219,187 @@ class _NoteCardState extends State<NoteCard> with SingleTickerProviderStateMixin
                                       ],
                                     ),
                                     const SizedBox(height: 8),
-                                      Row(
-                                        children: [
-                                           Icon(Icons.access_time_rounded, size: 12, color: theme.disabledColor),
-                                           const SizedBox(width: 4),
-                                           Text(
-                                            _formatDate(widget.note.updatedAt),
-                                            style: theme.textTheme.bodySmall?.copyWith(
-                                              fontWeight: FontWeight.w500,
-                                              fontSize: 11,
-                                              color: theme.disabledColor,
-                                            ),
-                                          ),
-                                          if (!isEncrypted) ...[
-                                            const SizedBox(width: 8),
-                                            const Text('•', style: TextStyle(fontSize: 10, color: Colors.grey)),
-                                            const SizedBox(width: 8),
-                                            Text(
-                                              '${_calculateReadingTime(widget.note.content)} dk',
-                                              style: theme.textTheme.bodySmall?.copyWith(
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.access_time_rounded,
+                                          size: 12,
+                                          color: theme.disabledColor,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          _formatDate(widget.note.updatedAt),
+                                          style: theme.textTheme.bodySmall
+                                              ?.copyWith(
+                                                fontWeight: FontWeight.w500,
                                                 fontSize: 11,
                                                 color: theme.disabledColor,
                                               ),
+                                        ),
+                                        if (!isEncrypted) ...[
+                                          const SizedBox(width: 8),
+                                          const Text(
+                                            '•',
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              color: Colors.grey,
                                             ),
-                                          ]
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            '${_calculateReadingTime(widget.note.content)} dk',
+                                            style: theme.textTheme.bodySmall
+                                                ?.copyWith(
+                                                  fontSize: 11,
+                                                  color: theme.disabledColor,
+                                                ),
+                                          ),
                                         ],
-                                      ),
+                                      ],
+                                    ),
                                   ],
                                 ),
                               ),
                             ],
                           ),
-                          
+
                           const SizedBox(height: 12),
                           if (isEncrypted)
-                             Container(
-                                width: double.infinity,
-                                height: 40,
-                                decoration: BoxDecoration(
-                                   borderRadius: BorderRadius.circular(4),
-                                   gradient: LinearGradient(
-                                      colors: [
-                                          theme.disabledColor.withOpacity(0.1),
-                                          theme.disabledColor.withOpacity(0.05),
-                                      ],
-                                   ),
+                            Container(
+                              width: double.infinity,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(4),
+                                gradient: LinearGradient(
+                                  colors: [
+                                    theme.disabledColor.withOpacity(0.1),
+                                    theme.disabledColor.withOpacity(0.05),
+                                  ],
                                 ),
-                                child: Center(
-                                   child: Text(
-                                      '•••••••••••••••••',
-                                       style: TextStyle(letterSpacing: 4, color: theme.disabledColor.withOpacity(0.5)),
-                                   ),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  '•••••••••••••••••',
+                                  style: TextStyle(
+                                    letterSpacing: 4,
+                                    color: theme.disabledColor.withOpacity(0.5),
+                                  ),
                                 ),
-                             )
+                              ),
+                            )
                           else if (widget.note.excerpt.isNotEmpty)
                             Text(
                               widget.note.excerpt,
                               style: theme.textTheme.bodyMedium?.copyWith(
                                 height: 1.6,
                                 fontSize: 14,
-                                color: theme.textTheme.bodyMedium?.color?.withOpacity(0.85),
+                                color: theme.textTheme.bodyMedium?.color
+                                    ?.withOpacity(0.85),
                               ),
                               maxLines: 4,
                               overflow: TextOverflow.ellipsis,
                             ),
 
+                          if (widget.note.tags.isNotEmpty) ...[
+                            const SizedBox(height: 12),
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 6,
+                              children: widget.note.tags
+                                  .where((t) => t != 'sabit' && t.isNotEmpty)
+                                  .take(3)
+                                  .map(
+                                    (tag) => Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: accentColor.withOpacity(0.06),
+                                        borderRadius: BorderRadius.circular(20),
+                                        border: Border.all(
+                                          color: accentColor.withOpacity(0.12),
+                                          width: 1,
+                                        ),
+                                      ),
+                                      child: Text(
+                                        '#$tag',
+                                        style: TextStyle(
+                                          color: isDark
+                                              ? accentColor.withOpacity(0.9)
+                                              : accentColor.withOpacity(0.85),
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          letterSpacing: -0.2,
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                            ),
+                          ],
+
                           const SizedBox(height: 16),
                           Row(
                             children: [
-                               if (widget.isPinned)
-                                 Padding(
-                                   padding: const EdgeInsets.only(right: 8.0),
-                                   child: Tooltip(
-                                     message: 'Sabitlenmiş',
-                                     child: Icon(Icons.push_pin_rounded, size: 16, color: accentColor),
-                                   ),
-                                 ),
+                              if (widget.isPinned)
+                                Padding(
+                                  padding: const EdgeInsets.only(right: 8.0),
+                                  child: Tooltip(
+                                    message: 'Sabitlenmiş',
+                                    child: Icon(
+                                      Icons.push_pin_rounded,
+                                      size: 16,
+                                      color: accentColor,
+                                    ),
+                                  ),
+                                ),
 
-                               if (linkCount > 0) 
-                                 Container(
-                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                   decoration: BoxDecoration(
-                                      color: theme.colorScheme.primary.withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(color: theme.colorScheme.primary.withOpacity(0.2)),
-                                   ),
-                                   child: Row(
-                                     mainAxisSize: MainAxisSize.min,
-                                     children: [
-                                       Icon(Icons.link_rounded, size: 12, color: theme.colorScheme.primary),
-                                       const SizedBox(width: 4),
-                                       Text(
-                                         '$linkCount',
-                                         style: TextStyle(
-                                           color: theme.colorScheme.primary,
-                                           fontWeight: FontWeight.w700,
-                                           fontSize: 11
-                                         ),
-                                       ),
-                                     ],
-                                   ),
-                                 ),
-                              
+                              if (linkCount > 0)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: theme.colorScheme.primary
+                                        .withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: theme.colorScheme.primary
+                                          .withOpacity(0.2),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.link_rounded,
+                                        size: 12,
+                                        color: theme.colorScheme.primary,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        '$linkCount',
+                                        style: TextStyle(
+                                          color: theme.colorScheme.primary,
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 11,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+
                               const Spacer(),
-                              
-                              if (_isHovered || MediaQuery.of(context).size.width < 1200) 
-                                _buildActionButtons(theme, context, isEncrypted),
+
+                              if (_isHovered ||
+                                  MediaQuery.of(context).size.width < 1200)
+                                _buildActionButtons(
+                                  theme,
+                                  context,
+                                  isEncrypted,
+                                ),
                             ],
                           ),
                         ],
@@ -322,23 +415,31 @@ class _NoteCardState extends State<NoteCard> with SingleTickerProviderStateMixin
     );
   }
 
-  Widget _buildActionButtons(ThemeData theme, BuildContext context, bool isEncrypted) {
+  Widget _buildActionButtons(
+    ThemeData theme,
+    BuildContext context,
+    bool isEncrypted,
+  ) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         if (!isEncrypted)
-        _ActionButton(
-          icon: Icons.edit_rounded,
-          onTap: widget.onEdit,
-          color: theme.colorScheme.primary,
-          tooltip: 'Düzenle',
-        ),
+          _ActionButton(
+            icon: Icons.edit_rounded,
+            onTap: widget.onEdit,
+            color: theme.colorScheme.primary,
+            tooltip: 'Düzenle',
+          ),
         if (!isEncrypted) const SizedBox(width: 4),
         if (widget.onTogglePin != null) ...[
           _ActionButton(
-            icon: widget.isPinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
+            icon: widget.isPinned
+                ? Icons.push_pin_rounded
+                : Icons.push_pin_outlined,
             onTap: widget.onTogglePin!,
-            color: widget.isPinned ? theme.colorScheme.primary : theme.disabledColor,
+            color: widget.isPinned
+                ? theme.colorScheme.primary
+                : theme.disabledColor,
             tooltip: widget.isPinned ? 'Sabitlemeyi Kaldır' : 'Sabitle',
           ),
           const SizedBox(width: 4),
@@ -354,7 +455,7 @@ class _NoteCardState extends State<NoteCard> with SingleTickerProviderStateMixin
         _ActionButton(
           icon: Icons.more_horiz_rounded,
           onTap: () {
-             widget.onExport?.call();
+            widget.onExport?.call();
           },
           color: theme.disabledColor,
           tooltip: 'Diğer İşlemler',
@@ -379,6 +480,7 @@ class _NoteCardState extends State<NoteCard> with SingleTickerProviderStateMixin
       return '${date.day}/${date.month}';
     }
   }
+
   String _calculateReadingTime(String content) {
     if (content.isEmpty) return '1';
     final wordCount = content.split(RegExp(r'\s+')).length;
@@ -402,7 +504,7 @@ class GridPainter extends CustomPainter {
     for (double i = 0; i < size.width; i += step) {
       for (double j = 0; j < size.height; j += step) {
         if ((i + j) % (step * 2) == 0) {
-           canvas.drawCircle(Offset(i, j), 1, paint);
+          canvas.drawCircle(Offset(i, j), 1, paint);
         }
       }
     }

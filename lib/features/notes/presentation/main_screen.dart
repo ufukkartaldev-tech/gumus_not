@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:connected_notebook/features/notes/presentation/dashboard_screen.dart';
 import 'package:connected_notebook/features/notes/presentation/note_list_screen.dart';
@@ -33,67 +34,85 @@ class _MainScreenState extends State<MainScreen> {
     // Paylaşım servisini başlat
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _sharingService.initialize(context);
-      _widgetService.startPeriodicUpdates();
+
+      if (!kIsWeb) {
+        _widgetService.startPeriodicUpdates();
+      }
     });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: _screens,
-      ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, -5),
+      body: IndexedStack(index: _selectedIndex, children: _screens),
+      bottomNavigationBar: SafeArea(
+        child: Container(
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          decoration: BoxDecoration(
+            color: Theme.of(context).cardTheme.color?.withOpacity(0.95),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: Theme.of(context).dividerColor.withOpacity(0.12),
+              width: 1,
             ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-          child: BottomNavigationBar(
-            currentIndex: _selectedIndex,
-            onTap: (index) {
-              setState(() => _selectedIndex = index);
-            },
-            type: BottomNavigationBarType.fixed,
-            backgroundColor: Theme.of(context).cardTheme.color,
-            selectedItemColor: Theme.of(context).primaryColor,
-            unselectedItemColor: Colors.grey,
-            selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-            unselectedLabelStyle: const TextStyle(fontSize: 12),
-            items: const [
-              BottomNavigationBarItem(
-                icon: Icon(Icons.dashboard_rounded),
-                activeIcon: Icon(Icons.dashboard_rounded),
-                label: 'Merkez',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.notes_rounded),
-                activeIcon: Icon(Icons.notes_rounded),
-                label: 'Notlar',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.task_alt_rounded),
-                activeIcon: Icon(Icons.task_alt_rounded),
-                label: 'Görevler',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.hub_rounded),
-                activeIcon: Icon(Icons.hub_rounded),
-                label: 'Zihin Haritası',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.widgets_rounded),
-                activeIcon: Icon(Icons.widgets_rounded),
-                label: 'Widget',
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.08),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
               ),
             ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(24),
+            child: BottomNavigationBar(
+              currentIndex: _selectedIndex,
+              onTap: (index) {
+                setState(() => _selectedIndex = index);
+              },
+              type: BottomNavigationBarType.fixed,
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              selectedItemColor: Theme.of(context).primaryColor,
+              unselectedItemColor: Theme.of(
+                context,
+              ).disabledColor.withOpacity(0.6),
+              selectedLabelStyle: const TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 11,
+              ),
+              unselectedLabelStyle: const TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 11,
+              ),
+              items: const [
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.dashboard_rounded),
+                  activeIcon: Icon(Icons.dashboard_rounded),
+                  label: 'Merkez',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.notes_rounded),
+                  activeIcon: Icon(Icons.notes_rounded),
+                  label: 'Notlar',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.task_alt_rounded),
+                  activeIcon: Icon(Icons.task_alt_rounded),
+                  label: 'Görevler',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.hub_rounded),
+                  activeIcon: Icon(Icons.hub_rounded),
+                  label: 'Zihin',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.widgets_rounded),
+                  activeIcon: Icon(Icons.widgets_rounded),
+                  label: 'Widget',
+                ),
+              ],
+            ),
           ),
         ),
       ),

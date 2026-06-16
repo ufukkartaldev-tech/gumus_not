@@ -1,9 +1,11 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
 
 import 'package:connected_notebook/core/database/idatabase_service.dart';
+
 import 'package:connected_notebook/core/database/legacy_database_service_adapter.dart';
 import 'package:connected_notebook/core/database/secure_database_service.dart';
 import 'package:connected_notebook/core/migration/migration_manager.dart';
@@ -76,9 +78,15 @@ class NoteDependencyInjection {
         create: (_) => SecureSqliteDatabaseService(),
       ),
       Provider<IDatabaseService>(
-        create: (context) => LegacyDatabaseServiceAdapter(
-          context.read<ISecureDatabaseService>(),
-        ),
+        create: (context) {
+          if (kIsWeb) {
+            return InMemoryDatabaseService();
+          }
+
+          return LegacyDatabaseServiceAdapter(
+            context.read<ISecureDatabaseService>(),
+          );
+        },
       ),
 
       // Repository chain: UI -> NoteRepository -> legacy contract adapter -> secure DB.
@@ -96,11 +104,10 @@ class NoteDependencyInjection {
         create: (context) => BacklinkService(context.read<NoteRepository>()),
       ),
       Provider<SearchService>(
-        create: (context) => AdvancedSearchService(context.read<NoteRepository>()),
+        create: (context) =>
+            AdvancedSearchService(context.read<NoteRepository>()),
       ),
-      Provider<MigrationManager>(
-        create: (_) => MigrationManager(),
-      ),
+      Provider<MigrationManager>(create: (_) => MigrationManager()),
       Provider<NoteService>(
         create: (context) => NoteService(
           context.read<NoteRepository>(),
@@ -125,9 +132,8 @@ class NoteDependencyInjection {
         ),
       ),
       ChangeNotifierProvider<NoteEditorProvider>(
-        create: (context) => NoteEditorProvider(
-          vaultProvider: context.read<VaultProvider>(),
-        ),
+        create: (context) =>
+            NoteEditorProvider(vaultProvider: context.read<VaultProvider>()),
       ),
     ];
   }
@@ -139,15 +145,15 @@ class NoteDependencyInjection {
   }
 
   /// Setup providers for a specific widget tree.
-  static Widget setupProviders({required Widget child, bool isTestMode = false}) {
+  static Widget setupProviders({
+    required Widget child,
+    bool isTestMode = false,
+  }) {
     if (isTestMode) {
       enableTestMode();
     }
 
-    return MultiProvider(
-      providers: getProviders(),
-      child: child,
-    );
+    return MultiProvider(providers: getProviders(), child: child);
   }
 
   /// Get a specific service (for manual injection if needed).
@@ -214,9 +220,12 @@ extension NoteDependencyInjectionExtension on BuildContext {
   VaultProvider get vaultProvider => read<VaultProvider>();
   NoteEditorProvider get noteEditorProvider => read<NoteEditorProvider>();
   MigrationManager get migrationManager => read<MigrationManager>();
-  LegacyEncryptionServiceAdapter get encryptionService => read<LegacyEncryptionServiceAdapter>();
-  Future<void> optimizeNoteDatabase() async => NoteDependencyInjection.optimizeDatabase(this);
-  Map<String, dynamic> getNotePerformanceStats() => NoteDependencyInjection.getPerformanceStats(this);
+  LegacyEncryptionServiceAdapter get encryptionService =>
+      read<LegacyEncryptionServiceAdapter>();
+  Future<void> optimizeNoteDatabase() async =>
+      NoteDependencyInjection.optimizeDatabase(this);
+  Map<String, dynamic> getNotePerformanceStats() =>
+      NoteDependencyInjection.getPerformanceStats(this);
 
   Future<Map<String, dynamic>> checkMigrationStatus() async {
     return MigrationManager.checkMigrationNeeded();

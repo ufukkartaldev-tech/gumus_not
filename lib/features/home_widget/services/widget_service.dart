@@ -1,10 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:home_widget/home_widget.dart';
-import 'package:flutter/material.dart';
 import 'package:connected_notebook/features/notes/models/note_model.dart';
-import 'package:connected_notebook/core/database/database_service.dart';
 import 'package:connected_notebook/features/notes/repositories/sql_note_repository.dart';
 
 class WidgetService {
+  bool get _isSupportedPlatform => !kIsWeb;
   static final WidgetService _instance = WidgetService._internal();
   factory WidgetService() => _instance;
   WidgetService._internal();
@@ -13,6 +13,8 @@ class WidgetService {
 
   // Widget'ı güncellemek için ana fonksiyon
   Future<void> updateWidget() async {
+    if (!_isSupportedPlatform) return;
+
     try {
       // Son notları ve görevleri getir
       final recentNotes = await _repository.getRecentNotes(limit: 3);
@@ -37,6 +39,8 @@ class WidgetService {
 
   // Hızlı not widget'ı için
   Future<void> updateQuickNoteWidget() async {
+    if (!_isSupportedPlatform) return;
+
     try {
       final stats = await _repository.getDatabaseStats();
 
@@ -67,7 +71,9 @@ class WidgetService {
       "Bugün yazdığın, yarının bilgisidir.",
     ];
 
-    final dayOfYear = DateTime.now().difference(DateTime(DateTime.now().year, 1, 1)).inDays;
+    final dayOfYear = DateTime.now()
+        .difference(DateTime(DateTime.now().year, 1, 1))
+        .inDays;
     return quotes[dayOfYear % quotes.length];
   }
 
@@ -78,6 +84,8 @@ class WidgetService {
     required bool showTasks,
     required bool showNotes,
   }) async {
+    if (!_isSupportedPlatform) return;
+
     try {
       final config = {
         'widgetType': widgetType, // 'quick_note', 'task_list', 'recent_notes'
@@ -104,6 +112,8 @@ class WidgetService {
 
   // Widget verisi getir
   Future<Map<String, dynamic>?> getWidgetData() async {
+    if (!_isSupportedPlatform) return null;
+
     try {
       return await HomeWidget.getWidgetData('widget_data');
     } catch (e) {
@@ -114,6 +124,8 @@ class WidgetService {
 
   // Widget periyodik güncelleme
   void startPeriodicUpdates() {
+    if (!_isSupportedPlatform) return;
+
     // Her 30 dakikada bir widget'ı güncelle
     Stream.periodic(const Duration(minutes: 30)).listen((_) {
       updateWidget();

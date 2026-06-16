@@ -1,13 +1,12 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
-import 'package:connected_notebook/features/notes/models/note_model.dart';
 
 /// Abstract interface for database operations
 /// Follows Dependency Inversion Principle
 abstract class IDatabaseService {
   Future<Database> get database;
   Future<void> close();
-  
+
   // Note operations
   Future<int> insertNote(Map<String, dynamic> note);
   Future<List<Map<String, dynamic>>> getAllNotes();
@@ -15,17 +14,21 @@ abstract class IDatabaseService {
   Future<int> updateNote(Map<String, dynamic> note);
   Future<int> deleteNote(int id);
   Future<List<Map<String, dynamic>>> searchNotes(String query);
-  
+
   // Backlink operations
   Future<void> insertBacklink(Map<String, dynamic> backlink);
   Future<List<Map<String, dynamic>>> getBacklinksForNote(int noteId);
   Future<List<Map<String, dynamic>>> getOutgoingLinksForNote(int noteId);
-  Future<void> updateBacklinks(int? noteId, String content, List<Map<String, dynamic>> allNotes);
-  
+  Future<void> updateBacklinks(
+    int? noteId,
+    String content,
+    List<Map<String, dynamic>> allNotes,
+  );
+
   // Template operations
   Future<int> insertTemplate(Map<String, dynamic> template);
   Future<List<Map<String, dynamic>>> getAllTemplates();
-  
+
   // Query operations
   Future<List<Map<String, dynamic>>> getRecentNotes({int limit = 5});
   Future<List<Map<String, dynamic>>> getPendingTasks({int limit = 10});
@@ -47,7 +50,7 @@ class SqliteDatabaseService implements IDatabaseService {
 
   static Future<Database> _initDatabase() async {
     String path = join(await getDatabasesPath(), _dbName);
-    
+
     return await openDatabase(
       path,
       version: _dbVersion,
@@ -95,16 +98,26 @@ class SqliteDatabaseService implements IDatabaseService {
 
     await db.execute('CREATE INDEX idx_notes_title ON notes(title)');
     await db.execute('CREATE INDEX idx_notes_created_at ON notes(created_at)');
-    await db.execute('CREATE INDEX idx_backlinks_source ON backlinks(source_note_id)');
-    await db.execute('CREATE INDEX idx_backlinks_target ON backlinks(target_note_id)');
+    await db.execute(
+      'CREATE INDEX idx_backlinks_source ON backlinks(source_note_id)',
+    );
+    await db.execute(
+      'CREATE INDEX idx_backlinks_target ON backlinks(target_note_id)',
+    );
   }
 
-  static Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+  static Future<void> _onUpgrade(
+    Database db,
+    int oldVersion,
+    int newVersion,
+  ) async {
     if (oldVersion < 2) {
       await db.execute('ALTER TABLE notes ADD COLUMN color INTEGER');
     }
     if (oldVersion < 3) {
-      await db.execute("ALTER TABLE notes ADD COLUMN folder_name TEXT DEFAULT 'Genel'");
+      await db.execute(
+        "ALTER TABLE notes ADD COLUMN folder_name TEXT DEFAULT 'Genel'",
+      );
     }
   }
 
@@ -161,11 +174,7 @@ class SqliteDatabaseService implements IDatabaseService {
   @override
   Future<int> deleteNote(int id) async {
     final db = await database;
-    return await db.delete(
-      'notes',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    return await db.delete('notes', where: 'id = ?', whereArgs: [id]);
   }
 
   @override
@@ -199,9 +208,13 @@ class SqliteDatabaseService implements IDatabaseService {
   }
 
   @override
-  Future<void> updateBacklinks(int? noteId, String content, List<Map<String, dynamic>> allNotes) async {
+  Future<void> updateBacklinks(
+    int? noteId,
+    String content,
+    List<Map<String, dynamic>> allNotes,
+  ) async {
     final db = await database;
-    
+
     await db.delete(
       'backlinks',
       where: 'source_note_id = ?',
@@ -210,12 +223,13 @@ class SqliteDatabaseService implements IDatabaseService {
 
     final RegExp linkRegex = RegExp(r'\[\[([^\]]+)\]\]');
     final matches = linkRegex.allMatches(content);
-    
+
     for (final match in matches) {
       final linkText = match.group(1)!;
-      
+
       final targetNote = allNotes.firstWhere(
-        (note) => note['title'].toString().toLowerCase() == linkText.toLowerCase(),
+        (note) =>
+            note['title'].toString().toLowerCase() == linkText.toLowerCase(),
         orElse: () => {'id': -1},
       );
 
@@ -270,12 +284,12 @@ class SqliteDatabaseService implements IDatabaseService {
   @override
   Future<int> getNoteCountInFolder(String folderName) async {
     final db = await database;
-    
+
     final result = await db.rawQuery(
       'SELECT COUNT(*) as count FROM notes WHERE folder_name = ?',
       [folderName],
     );
-    
+
     return result.first['count'] as int;
   }
 

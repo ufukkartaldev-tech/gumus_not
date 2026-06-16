@@ -143,18 +143,18 @@ class AppTheme {
   static const Color oneDarkPurple = Color(0xFFC678DD);
 
   // Default Theme Colors (for backward compatibility)
-  static const Color darkBackground = Color(0xFF0B0E14);
-  static const Color darkSurface = Color(0xFF151922);
-  static const Color darkSurfaceHighlight = Color(0xFF1F2430);
-  static const Color darkBorder = Color(0xFF2A303C);
-  static const Color darkTextPrimary = Color(0xFFF8F9FA);
-  static const Color darkTextSecondary = Color(0xFF9CA3AF);
-  
-  static const Color lightBackground = Color(0xFFF3F4F6);
+  static const Color darkBackground = Color(0xFF0A0B10);
+  static const Color darkSurface = Color(0xFF131620);
+  static const Color darkSurfaceHighlight = Color(0xFF1A1E2C);
+  static const Color darkBorder = Color(0xFF222736);
+  static const Color darkTextPrimary = Color(0xFFF1F5F9);
+  static const Color darkTextSecondary = Color(0xFF94A3B8);
+
+  static const Color lightBackground = Color(0xFFF6F8FA);
   static const Color lightSurface = Color(0xFFFFFFFF);
-  static const Color lightBorder = Color(0xFFE5E7EB);
-  static const Color lightTextPrimary = Color(0xFF111827);
-  static const Color lightTextSecondary = Color(0xFF6B7280);
+  static const Color lightBorder = Color(0xFFE2E8F0);
+  static const Color lightTextPrimary = Color(0xFF1E293B);
+  static const Color lightTextSecondary = Color(0xFF64748B);
 
   static const Color errorColor = Color(0xFFEF4444);
 
@@ -294,7 +294,7 @@ class AppTheme {
       useMaterial3: true,
       fontFamily: 'Inter',
       brightness: brightness,
-      
+
       colorScheme: ColorScheme(
         brightness: brightness,
         primary: primaryColor,
@@ -308,9 +308,9 @@ class AppTheme {
         secondaryContainer: surface.withOpacity(0.8),
         outline: border,
       ),
-      
+
       scaffoldBackgroundColor: background,
-      
+
       appBarTheme: AppBarTheme(
         elevation: 0,
         scrolledUnderElevation: 0,
@@ -324,7 +324,7 @@ class AppTheme {
           letterSpacing: -0.5,
         ),
       ),
-      
+
       cardTheme: CardThemeData(
         color: surface,
         elevation: 0,
@@ -335,7 +335,7 @@ class AppTheme {
           side: BorderSide(color: border, width: 1),
         ),
       ),
-      
+
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: primaryColor,
@@ -346,10 +346,13 @@ class AppTheme {
             borderRadius: BorderRadius.circular(12),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-          textStyle: baseTextStyle.copyWith(fontWeight: FontWeight.w600, fontSize: 15),
+          textStyle: baseTextStyle.copyWith(
+            fontWeight: FontWeight.w600,
+            fontSize: 15,
+          ),
         ),
       ),
-      
+
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: primaryColor,
@@ -364,12 +367,15 @@ class AppTheme {
         elevation: 4,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
-      
+
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: surface.withOpacity(0.8),
         isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: border),
@@ -385,43 +391,55 @@ class AppTheme {
         labelStyle: TextStyle(color: textSecondary),
         hintStyle: TextStyle(color: textSecondary.withOpacity(0.5)),
       ),
-      
+
       textTheme: TextTheme(
-        headlineLarge: baseTextStyle.copyWith(fontSize: 32, fontWeight: FontWeight.bold),
-        headlineMedium: baseTextStyle.copyWith(fontSize: 28, fontWeight: FontWeight.bold),
-        titleLarge: baseTextStyle.copyWith(fontSize: 20, fontWeight: FontWeight.w700),
-        titleMedium: baseTextStyle.copyWith(fontSize: 16, fontWeight: FontWeight.w600),
+        headlineLarge: baseTextStyle.copyWith(
+          fontSize: 32,
+          fontWeight: FontWeight.bold,
+        ),
+        headlineMedium: baseTextStyle.copyWith(
+          fontSize: 28,
+          fontWeight: FontWeight.bold,
+        ),
+        titleLarge: baseTextStyle.copyWith(
+          fontSize: 20,
+          fontWeight: FontWeight.w700,
+        ),
+        titleMedium: baseTextStyle.copyWith(
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+        ),
         bodyLarge: baseTextStyle.copyWith(fontSize: 16, height: 1.5),
-        bodyMedium: baseTextStyle.copyWith(fontSize: 14, color: textSecondary, height: 1.5),
-        bodySmall: baseTextStyle.copyWith(fontSize: 12, color: textSecondary.withOpacity(0.7)),
+        bodyMedium: baseTextStyle.copyWith(
+          fontSize: 14,
+          color: textSecondary,
+          height: 1.5,
+        ),
+        bodySmall: baseTextStyle.copyWith(
+          fontSize: 12,
+          color: textSecondary.withOpacity(0.7),
+        ),
       ),
-      
-      dividerTheme: DividerThemeData(
-        color: border,
-        thickness: 1,
-        space: 1,
-      ),
-      
-      iconTheme: IconThemeData(
-        color: textSecondary,
-        size: 22,
-      ),
+
+      dividerTheme: DividerThemeData(color: border, thickness: 1, space: 1),
+
+      iconTheme: IconThemeData(color: textSecondary, size: 22),
     );
   }
 
   static ThemeData getTheme({
-    required ThemeMode mode, 
-    required AppThemeColor color
+    required ThemeMode mode,
+    required AppThemeColor color,
   }) {
     final isDark = mode == ThemeMode.dark;
     final primaryColor = color.color;
-    
+
     final background = isDark ? darkBackground : lightBackground;
     final surface = isDark ? darkSurface : lightSurface;
     final border = isDark ? darkBorder : lightBorder;
     final textPrimary = isDark ? darkTextPrimary : lightTextPrimary;
     final textSecondary = isDark ? darkTextSecondary : lightTextSecondary;
-    
+
     // Define a base text style for consistency
     final baseTextStyle = TextStyle(
       fontFamily: 'Inter',
@@ -433,7 +451,7 @@ class AppTheme {
       useMaterial3: true,
       fontFamily: 'Inter',
       brightness: isDark ? Brightness.dark : Brightness.light,
-      
+
       // Sophisticated Color Scheme
       colorScheme: ColorScheme(
         brightness: isDark ? Brightness.dark : Brightness.light,
@@ -448,9 +466,9 @@ class AppTheme {
         secondaryContainer: isDark ? darkSurfaceHighlight : Color(0xFFF9FAFB),
         outline: border,
       ),
-      
+
       scaffoldBackgroundColor: background,
-      
+
       // Modern AppBar
       appBarTheme: AppBarTheme(
         elevation: 0,
@@ -465,7 +483,7 @@ class AppTheme {
           letterSpacing: -0.5,
         ),
       ),
-      
+
       // Premium Card Theme
       cardTheme: CardThemeData(
         color: surface,
@@ -477,7 +495,7 @@ class AppTheme {
           side: isDark ? BorderSide(color: border, width: 1) : BorderSide.none,
         ),
       ),
-      
+
       // Modern Button Themes
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
@@ -489,10 +507,13 @@ class AppTheme {
             borderRadius: BorderRadius.circular(12),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-          textStyle: baseTextStyle.copyWith(fontWeight: FontWeight.w600, fontSize: 15),
+          textStyle: baseTextStyle.copyWith(
+            fontWeight: FontWeight.w600,
+            fontSize: 15,
+          ),
         ),
       ),
-      
+
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: primaryColor,
@@ -507,13 +528,16 @@ class AppTheme {
         elevation: 4,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
-      
+
       // Clean Input Fields
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: isDark ? darkSurfaceHighlight : Color(0xFFF9FAFB),
         isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: border),
@@ -529,32 +553,46 @@ class AppTheme {
         labelStyle: TextStyle(color: textSecondary),
         hintStyle: TextStyle(color: textSecondary.withOpacity(0.5)),
       ),
-      
+
       // Refined Typography
       textTheme: TextTheme(
-        headlineLarge: baseTextStyle.copyWith(fontSize: 32, fontWeight: FontWeight.bold),
-        headlineMedium: baseTextStyle.copyWith(fontSize: 28, fontWeight: FontWeight.bold),
-        titleLarge: baseTextStyle.copyWith(fontSize: 20, fontWeight: FontWeight.w700),
-        titleMedium: baseTextStyle.copyWith(fontSize: 16, fontWeight: FontWeight.w600),
+        headlineLarge: baseTextStyle.copyWith(
+          fontSize: 32,
+          fontWeight: FontWeight.bold,
+        ),
+        headlineMedium: baseTextStyle.copyWith(
+          fontSize: 28,
+          fontWeight: FontWeight.bold,
+        ),
+        titleLarge: baseTextStyle.copyWith(
+          fontSize: 20,
+          fontWeight: FontWeight.w700,
+        ),
+        titleMedium: baseTextStyle.copyWith(
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+        ),
         bodyLarge: baseTextStyle.copyWith(fontSize: 16, height: 1.5),
-        bodyMedium: baseTextStyle.copyWith(fontSize: 14, color: textSecondary, height: 1.5),
-        bodySmall: baseTextStyle.copyWith(fontSize: 12, color: textSecondary.withOpacity(0.7)),
+        bodyMedium: baseTextStyle.copyWith(
+          fontSize: 14,
+          color: textSecondary,
+          height: 1.5,
+        ),
+        bodySmall: baseTextStyle.copyWith(
+          fontSize: 12,
+          color: textSecondary.withOpacity(0.7),
+        ),
       ),
-      
-      dividerTheme: DividerThemeData(
-        color: border,
-        thickness: 1,
-        space: 1,
-      ),
-      
-      iconTheme: IconThemeData(
-        color: textSecondary,
-        size: 22,
-      ),
+
+      dividerTheme: DividerThemeData(color: border, thickness: 1, space: 1),
+
+      iconTheme: IconThemeData(color: textSecondary, size: 22),
     );
   }
 
   // Backward compatibility
-  static ThemeData get lightTheme => getTheme(mode: ThemeMode.light, color: AppThemeColor.indigo);
-  static ThemeData get darkTheme => getTheme(mode: ThemeMode.dark, color: AppThemeColor.indigo);
+  static ThemeData get lightTheme =>
+      getTheme(mode: ThemeMode.light, color: AppThemeColor.indigo);
+  static ThemeData get darkTheme =>
+      getTheme(mode: ThemeMode.dark, color: AppThemeColor.indigo);
 }
