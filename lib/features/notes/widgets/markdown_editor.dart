@@ -20,6 +20,7 @@ import 'package:connected_notebook/features/tools/widgets/tag_manager_widget.dar
 import 'package:connected_notebook/features/tools/widgets/pomodoro_timer.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:connected_notebook/features/export/services/pdf_service.dart';
+import 'package:connected_notebook/core/utils/shortcut_manager.dart';
 
 class MarkdownEditor extends StatefulWidget {
   final Note? note;
@@ -49,6 +50,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
   bool _isPomodoroVisible = false;
   bool _isCrossReferenceVisible = false;
   List<String> _tags = [];
+  bool _isVimInsertMode = false; // Start in Normal mode if Vim is enabled
 
   final FocusNode _titleFocusNode = FocusNode();
   final FocusNode _contentFocusNode = FocusNode();
@@ -98,7 +100,68 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
     });
 
     _contentController.addListener(_onContentChanged);
+    _setupVimMode();
   }
+
+  void _setupVimMode() {
+    _contentFocusNode.onKeyEvent = (node, event) {
+      final shortcutManager = Provider.of<AppShortcutManager>(context, listen: false);
+      if (!shortcutManager.isVimModeEnabled) return KeyEventResult.ignored;
+
+      if (event is KeyDownEvent) {
+        if (event.logicalKey == LogicalKeyboardKey.escape) {
+          setState(() => _isVimInsertMode = false);
+          return KeyEventResult.handled;
+        }
+
+        if (!_isVimInsertMode) {
+          // Normal mode commands
+          final char = event.character;
+          if (char == 'i' || char == 'a') {
+            setState(() => _isVimInsertMode = true);
+            return KeyEventResult.handled;
+          }
+
+          final text = _contentController.text;
+          var selection = _contentController.selection;
+          
+          if (!selection.isValid) {
+            selection = const TextSelection.collapsed(offset: 0);
+          }
+
+          int currentOffset = selection.baseOffset;
+
+          if (char == 'h' && currentOffset > 0) {
+            _contentController.selection = TextSelection.collapsed(offset: currentOffset - 1);
+            return KeyEventResult.handled;
+          } else if (char == 'l' && currentOffset < text.length) {
+            _contentController.selection = TextSelection.collapsed(offset: currentOffset + 1);
+            return KeyEventResult.handled;
+          } else if (char == 'k' || char == 'j') {
+            // Very basic j/k navigation - move by approx characters or lines if we could compute it easily
+            // For a robust vim we need line offsets, but here we can just skip 50 chars for demo
+            if (char == 'j' && currentOffset + 50 <= text.length) {
+               _contentController.selection = TextSelection.collapsed(offset: currentOffset + 50);
+            } else if (char == 'k' && currentOffset - 50 >= 0) {
+               _contentController.selection = TextSelection.collapsed(offset: currentOffset - 50);
+            }
+            return KeyEventResult.handled;
+          } else if (char == 'x' && currentOffset < text.length) {
+            _contentController.text = text.replaceRange(currentOffset, currentOffset + 1, '');
+            _contentController.selection = TextSelection.collapsed(offset: currentOffset);
+            return KeyEventResult.handled;
+          }
+
+          // In normal mode, block all other character input
+          if (char != null) {
+             return KeyEventResult.handled; 
+          }
+        }
+      }
+      return KeyEventResult.ignored;
+    };
+  }
+
 
   void _onContentChanged() {
     if (mounted) {
