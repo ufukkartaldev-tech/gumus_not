@@ -6,6 +6,7 @@ import 'package:connected_notebook/core/theme/theme_provider.dart';
 import 'package:connected_notebook/core/theme/app_theme.dart';
 import 'package:connected_notebook/features/settings/presentation/about_screen.dart';
 import 'package:connected_notebook/features/backup/presentation/backup_screen.dart';
+import 'package:connected_notebook/features/home_widget/presentation/widget_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({Key? key}) : super(key: key);
@@ -187,6 +188,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 24),
           _buildBackupSection(),
           const SizedBox(height: 24),
+          _buildWidgetSection(),
+          const SizedBox(height: 24),
           _buildAboutSection(),
         ],
       ),
@@ -361,6 +364,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => const BackupScreen()),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildWidgetSection() {
+    return Card(
+      child: ListTile(
+        leading: const Icon(Icons.widgets_outlined),
+        title: const Text('Ana Ekran Widgetı'),
+        subtitle: const Text('Widget görünümü, hızlı not ve senkronizasyon'),
+        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const WidgetScreen()),
           );
         },
       ),

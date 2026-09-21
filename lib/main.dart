@@ -24,6 +24,42 @@ void main() async {
     debugPrintStack(stackTrace: details.stack);
   };
 
+  ErrorWidget.builder = (FlutterErrorDetails details) {
+    return Scaffold(
+      body: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Center(
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.error_outline,
+                  size: 64,
+                  color: Colors.red,
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Uygulama başlatılırken hata oluştu',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  details.exceptionAsString(),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  };
+
   if (!kIsWeb) {
     // Initialize databaseFactory for desktop platforms
     sqfliteFfiInit();
@@ -60,45 +96,6 @@ class ConnectedNotebookApp extends StatelessWidget {
             theme: themeProvider.lightTheme,
             darkTheme: themeProvider.darkTheme,
             themeMode: themeProvider.themeMode,
-            builder: (context, child) {
-              ErrorWidget.builder = (FlutterErrorDetails details) {
-                return Scaffold(
-                  body: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Center(
-                      child: SingleChildScrollView(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(
-                              Icons.error_outline,
-                              size: 64,
-                              color: Colors.red,
-                            ),
-                            const SizedBox(height: 16),
-                            const Text(
-                              'Uygulama başlatılırken hata oluştu',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              details.exceptionAsString(),
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              };
-
-              return child ?? const SizedBox.shrink();
-            },
             initialRoute: kIsWeb ? '/' : '/splash',
             routes: {
               '/splash': (context) => SplashScreen(

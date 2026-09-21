@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:home_widget/home_widget.dart';
 import 'package:connected_notebook/features/notes/models/note_model.dart';
@@ -10,6 +11,7 @@ class WidgetService {
   WidgetService._internal();
 
   final SqlNoteRepository _repository = SqlNoteRepository();
+  StreamSubscription? _periodicSubscription;
 
   // Widget'ı güncellemek için ana fonksiyon
   Future<void> updateWidget() async {
@@ -126,10 +128,16 @@ class WidgetService {
   void startPeriodicUpdates() {
     if (!_isSupportedPlatform) return;
 
+    _periodicSubscription?.cancel();
     // Her 30 dakikada bir widget'ı güncelle
-    Stream.periodic(const Duration(minutes: 30)).listen((_) {
+    _periodicSubscription = Stream.periodic(const Duration(minutes: 30)).listen((_) {
       updateWidget();
       updateQuickNoteWidget();
     });
+  }
+
+  void stopPeriodicUpdates() {
+    _periodicSubscription?.cancel();
+    _periodicSubscription = null;
   }
 }

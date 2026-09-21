@@ -1,10 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:connected_notebook/features/notes/presentation/dashboard_screen.dart';
 import 'package:connected_notebook/features/notes/presentation/note_list_screen.dart';
 import 'package:connected_notebook/features/tasks/presentation/task_hub_screen.dart';
 import 'package:connected_notebook/features/graph/presentation/graph_view_screen.dart';
-import 'package:connected_notebook/features/home_widget/presentation/widget_screen.dart';
 import 'package:connected_notebook/shared/utils/sharing_service.dart';
 import 'package:connected_notebook/features/home_widget/services/widget_service.dart';
 
@@ -21,11 +19,9 @@ class _MainScreenState extends State<MainScreen> {
   final WidgetService _widgetService = WidgetService();
 
   final List<Widget> _screens = [
-    const DashboardScreen(),
     const NoteListScreen(),
     const TaskHubScreen(),
     const GraphViewScreen(),
-    const WidgetScreen(),
   ];
 
   @override
@@ -35,16 +31,32 @@ class _MainScreenState extends State<MainScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _sharingService.initialize(context);
 
-      if (!kIsWeb) {
+      if (!kIsWeb &&
+          (defaultTargetPlatform == TargetPlatform.android ||
+              defaultTargetPlatform == TargetPlatform.iOS)) {
         _widgetService.startPeriodicUpdates();
       }
     });
   }
 
   @override
+  void dispose() {
+    _widgetService.stopPeriodicUpdates();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final isDesktop = MediaQuery.of(context).size.width >= 800;
+
+    if (isDesktop) {
+      // Masaüstünde alt bar tamamen kaldırılır; 3 panelli çalışma alanı doğrudan sunulur.
+      return const Scaffold(
+        body: NoteListScreen(),
+      );
+    }
 
     return Scaffold(
       body: IndexedStack(index: _selectedIndex, children: _screens),
@@ -72,11 +84,9 @@ class _MainScreenState extends State<MainScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildNavItem(0, Icons.home_outlined, 'Merkez'),
-              _buildNavItem(1, Icons.article_outlined, 'Notlar'),
-              _buildNavItem(2, Icons.check_circle_outline_rounded, 'Görevler'),
-              _buildNavItem(3, Icons.hub_outlined, 'Zihin'),
-              _buildNavItem(4, Icons.widgets_outlined, 'Widget'),
+              _buildNavItem(0, Icons.article_outlined, 'Notlar'),
+              _buildNavItem(1, Icons.check_circle_outline_rounded, 'Görevler'),
+              _buildNavItem(2, Icons.hub_outlined, 'Zihin'),
             ],
           ),
         ),

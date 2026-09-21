@@ -53,14 +53,21 @@ class DashboardScreen extends StatelessWidget {
 
   Widget _buildAppBar(BuildContext context) {
     final theme = Theme.of(context);
+    final canPop = Navigator.canPop(context);
     return SliverAppBar(
       expandedHeight: 0,
       floating: true,
       backgroundColor: Colors.transparent,
       elevation: 0,
       surfaceTintColor: Colors.transparent,
+      leading: canPop
+          ? IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => Navigator.of(context).pop(),
+            )
+          : null,
       title: Text(
-        'GümüşNot Merkezi',
+        'Aktivite & Analiz',
         style: TextStyle(
           fontWeight: FontWeight.w800,
           fontSize: 20,
