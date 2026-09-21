@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:connected_notebook/features/notes/models/note_model.dart';
+import 'package:connected_notebook/core/utils/markdown_cleaner.dart';
 // import 'package:intl/intl.dart'; // Removed to avoid dependency error
 
 class NoteCard extends StatefulWidget {
@@ -201,7 +202,7 @@ class _NoteCardState extends State<NoteCard>
                                           child: Text(
                                             widget.note.title.isEmpty
                                                 ? 'Başlıksız Not'
-                                                : widget.note.title,
+                                                : MarkdownCleaner.clean(widget.note.title),
                                             style: theme.textTheme.titleMedium
                                                 ?.copyWith(
                                                   fontWeight: FontWeight.w800,
@@ -249,10 +250,10 @@ class _NoteCardState extends State<NoteCard>
                                           Text(
                                             '${_calculateReadingTime(widget.note.content)} dk',
                                             style: theme.textTheme.bodySmall
-                                                ?.copyWith(
-                                                  fontSize: 11,
-                                                  color: theme.disabledColor,
-                                                ),
+                                              ?.copyWith(
+                                                fontSize: 11,
+                                                color: theme.disabledColor,
+                                              ),
                                           ),
                                         ],
                                       ],
@@ -300,43 +301,10 @@ class _NoteCardState extends State<NoteCard>
                               overflow: TextOverflow.ellipsis,
                             ),
 
-                          if (widget.note.tags.isNotEmpty) ...[
+                          // Capsule Chips (Tags, Folder & Mood)
+                          if (_hasAnyBadges()) ...[
                             const SizedBox(height: 12),
-                            Wrap(
-                              spacing: 6,
-                              runSpacing: 6,
-                              children: widget.note.tags
-                                  .where((t) => t != 'sabit' && t.isNotEmpty)
-                                  .take(3)
-                                  .map(
-                                    (tag) => Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 10,
-                                        vertical: 4,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: accentColor.withOpacity(0.06),
-                                        borderRadius: BorderRadius.circular(20),
-                                        border: Border.all(
-                                          color: accentColor.withOpacity(0.12),
-                                          width: 1,
-                                        ),
-                                      ),
-                                      child: Text(
-                                        '#$tag',
-                                        style: TextStyle(
-                                          color: isDark
-                                              ? accentColor.withOpacity(0.9)
-                                              : accentColor.withOpacity(0.85),
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w600,
-                                          letterSpacing: -0.2,
-                                        ),
-                                      ),
-                                    ),
-                                  )
-                                  .toList(),
-                            ),
+                            _buildCapsuleChipsRow(theme, accentColor, isDark),
                           ],
 
                           const SizedBox(height: 16),
@@ -486,6 +454,141 @@ class _NoteCardState extends State<NoteCard>
     final wordCount = content.split(RegExp(r'\s+')).length;
     final readingTime = (wordCount / 200).ceil();
     return readingTime.toString();
+  }
+
+  bool _hasAnyBadges() {
+    if (widget.note.tags.any((t) => t != 'sabit' && t.trim().isNotEmpty)) {
+      return true;
+    }
+    if (widget.note.folderName.isNotEmpty && widget.note.folderName != 'Genel') {
+      return true;
+    }
+    return false;
+  }
+
+  List<String> _getAllTags() {
+    final tagsSet = <String>{};
+    for (final t in widget.note.tags) {
+      if (t != 'sabit' && t.trim().isNotEmpty) {
+        tagsSet.add(t.trim());
+      }
+    }
+    return tagsSet.toList();
+  }
+
+  Widget _buildCapsuleChipsRow(ThemeData theme, Color accentColor, bool isDark) {
+    final tags = _getAllTags();
+    final hasFolder = widget.note.folderName.isNotEmpty && widget.note.folderName != 'Genel';
+    final visibleTags = tags.take(3).toList();
+    final remainingCount = tags.length - visibleTags.length;
+
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        if (hasFolder)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: theme.dividerColor.withOpacity(isDark ? 0.15 : 0.08),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: theme.dividerColor.withOpacity(isDark ? 0.3 : 0.2),
+                width: 1,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.folder_outlined,
+                  size: 11,
+                  color: theme.disabledColor,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  widget.note.folderName,
+                  style: TextStyle(
+                    color: theme.disabledColor,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ...visibleTags.map((tag) {
+          final isMood = tag.startsWith('mood:');
+          final displayTag = isMood ? tag.substring(5) : tag;
+
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: accentColor.withOpacity(isDark ? 0.12 : 0.08),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: accentColor.withOpacity(isDark ? 0.28 : 0.18),
+                width: 1,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (isMood) ...[
+                  Icon(Icons.mood_outlined, size: 11, color: accentColor),
+                  const SizedBox(width: 3),
+                ] else ...[
+                  Text(
+                    '#',
+                    style: TextStyle(
+                      color: accentColor.withOpacity(0.7),
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(width: 2),
+                ],
+                Text(
+                  displayTag,
+                  style: TextStyle(
+                    color: isDark
+                        ? accentColor.withOpacity(0.95)
+                        : accentColor.withOpacity(0.9),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }),
+        if (remainingCount > 0)
+          Tooltip(
+            message: tags.skip(3).join(', '),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+              decoration: BoxDecoration(
+                color: theme.disabledColor.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: theme.disabledColor.withOpacity(0.18),
+                  width: 1,
+                ),
+              ),
+              child: Text(
+                '+$remainingCount',
+                style: TextStyle(
+                  color: theme.disabledColor,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
   }
 }
 

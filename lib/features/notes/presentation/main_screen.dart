@@ -1,10 +1,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:connected_notebook/features/notes/presentation/note_list_screen.dart';
 import 'package:connected_notebook/features/tasks/presentation/task_hub_screen.dart';
 import 'package:connected_notebook/features/graph/presentation/graph_view_screen.dart';
 import 'package:connected_notebook/shared/utils/sharing_service.dart';
 import 'package:connected_notebook/features/home_widget/services/widget_service.dart';
+import 'package:connected_notebook/features/tools/widgets/command_palette.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -51,45 +53,59 @@ class _MainScreenState extends State<MainScreen> {
     final isDark = theme.brightness == Brightness.dark;
     final isDesktop = MediaQuery.of(context).size.width >= 800;
 
+    Widget content;
     if (isDesktop) {
       // Masaüstünde alt bar tamamen kaldırılır; 3 panelli çalışma alanı doğrudan sunulur.
-      return const Scaffold(
+      content = const Scaffold(
         body: NoteListScreen(),
+      );
+    } else {
+      content = Scaffold(
+        body: IndexedStack(index: _selectedIndex, children: _screens),
+        bottomNavigationBar: SafeArea(
+          child: Container(
+            margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+            decoration: BoxDecoration(
+              color:
+                  theme.cardTheme.color?.withOpacity(0.95) ??
+                  theme.cardColor.withOpacity(0.95),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: theme.dividerColor.withOpacity(isDark ? 0.08 : 0.12),
+                width: 1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(isDark ? 0.15 : 0.04),
+                  blurRadius: 20,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildNavItem(0, Icons.article_outlined, 'Notlar'),
+                _buildNavItem(1, Icons.check_circle_outline_rounded, 'Görevler'),
+                _buildNavItem(2, Icons.hub_outlined, 'Zihin'),
+              ],
+            ),
+          ),
+        ),
       );
     }
 
-    return Scaffold(
-      body: IndexedStack(index: _selectedIndex, children: _screens),
-      bottomNavigationBar: SafeArea(
-        child: Container(
-          margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-          decoration: BoxDecoration(
-            color:
-                theme.cardTheme.color?.withOpacity(0.95) ??
-                theme.cardColor.withOpacity(0.95),
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-              color: theme.dividerColor.withOpacity(isDark ? 0.08 : 0.12),
-              width: 1,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(isDark ? 0.15 : 0.04),
-                blurRadius: 20,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildNavItem(0, Icons.article_outlined, 'Notlar'),
-              _buildNavItem(1, Icons.check_circle_outline_rounded, 'Görevler'),
-              _buildNavItem(2, Icons.hub_outlined, 'Zihin'),
-            ],
-          ),
-        ),
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.keyK, control: true): () =>
+            CommandPalette.show(context),
+        const SingleActivator(LogicalKeyboardKey.keyK, meta: true): () =>
+            CommandPalette.show(context),
+      },
+      child: Focus(
+        autofocus: true,
+        child: content,
       ),
     );
   }

@@ -10,6 +10,7 @@ import 'package:connected_notebook/features/notes/providers/vault_provider.dart'
 import 'package:connected_notebook/core/security/legacy_encryption_service_adapter.dart';
 import 'package:connected_notebook/features/notes/widgets/markdown_editor.dart';
 import 'package:connected_notebook/features/notes/widgets/note_card.dart';
+import 'package:connected_notebook/features/notes/widgets/swipeable_note_card.dart';
 import 'package:connected_notebook/features/notes/widgets/custom_widgets.dart';
 import 'package:connected_notebook/features/tools/widgets/activity_heatmap.dart';
 import 'package:connected_notebook/features/tools/widgets/command_palette.dart';
@@ -1131,14 +1132,21 @@ class _NoteListScreenState extends State<NoteListScreen> {
                                borderRadius: BorderRadius.circular(14),
                                border: Border.all(color: Theme.of(context).primaryColor, width: 2),
                              ) : null,
-                             child: NoteCard(
+                             child: SwipeableNoteCard(
                                note: note,
                                isPinned: note.tags.contains('sabit'),
-                               onTap: () => _selectNote(note),
-                               onEdit: () => _selectNote(note),
-                               onDelete: () => _deleteNote(note),
                                onTogglePin: () => _togglePin(note),
-                               onExport: () => _showExportOptions(note),
+                               onDelete: () => _deleteNoteWithUndo(note),
+                               onArchive: () => _archiveNote(note),
+                               child: NoteCard(
+                                 note: note,
+                                 isPinned: note.tags.contains('sabit'),
+                                 onTap: () => _selectNote(note),
+                                 onEdit: () => _selectNote(note),
+                                 onDelete: () => _deleteNote(note),
+                                 onTogglePin: () => _togglePin(note),
+                                 onExport: () => _showExportOptions(note),
+                               ),
                              ),
                            );
                       },
@@ -1155,14 +1163,21 @@ class _NoteListScreenState extends State<NoteListScreen> {
                               borderRadius: BorderRadius.circular(14),
                               border: Border.all(color: Theme.of(context).primaryColor, width: 2),
                             ) : null,
-                            child: NoteCard(
+                            child: SwipeableNoteCard(
                               note: note,
                               isPinned: note.tags.contains('sabit'),
-                              onTap: () => _selectNote(note),
-                              onEdit: () => _selectNote(note),
-                              onDelete: () => _deleteNote(note),
                               onTogglePin: () => _togglePin(note),
-                              onExport: () => _showExportOptions(note),
+                              onDelete: () => _deleteNoteWithUndo(note),
+                              onArchive: () => _archiveNote(note),
+                              child: NoteCard(
+                                note: note,
+                                isPinned: note.tags.contains('sabit'),
+                                onTap: () => _selectNote(note),
+                                onEdit: () => _selectNote(note),
+                                onDelete: () => _deleteNote(note),
+                                onTogglePin: () => _togglePin(note),
+                                onExport: () => _showExportOptions(note),
+                              ),
                             ),
                           );
                         },
@@ -1424,6 +1439,62 @@ class _NoteListScreenState extends State<NoteListScreen> {
             child: const Text('Sil', style: TextStyle(color: Colors.red)),
           ),
         ],
+      ),
+    );
+  }
+
+  void _archiveNote(Note note) {
+    final tags = List<String>.from(note.tags);
+    final wasArchived = tags.contains('arsiv');
+    if (!wasArchived) {
+      tags.add('arsiv');
+    } else {
+      tags.remove('arsiv');
+    }
+    final updated = note.copyWith(tags: tags);
+    Provider.of<NoteProvider>(context, listen: false).updateNote(updated);
+
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          wasArchived
+              ? '"${note.title.isEmpty ? 'Başlıksız Not' : note.title}" arşivden çıkarıldı.'
+              : '"${note.title.isEmpty ? 'Başlıksız Not' : note.title}" arşivlendi.',
+        ),
+        action: SnackBarAction(
+          label: 'Geri Al',
+          onPressed: () {
+            final revertedTags = List<String>.from(note.tags);
+            final reverted = note.copyWith(tags: revertedTags);
+            Provider.of<NoteProvider>(context, listen: false).updateNote(reverted);
+          },
+        ),
+      ),
+    );
+  }
+
+  void _deleteNoteWithUndo(Note note) {
+    if (note.id == null) return;
+    final noteToDelete = note;
+    Provider.of<NoteProvider>(context, listen: false).deleteNote(note.id!);
+    if (_selectedNote?.id == note.id) {
+      setState(() {
+        _selectedNote = null;
+      });
+    }
+
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('"${note.title.isEmpty ? 'Başlıksız Not' : note.title}" silindi.'),
+        duration: const Duration(seconds: 4),
+        action: SnackBarAction(
+          label: 'Geri Al',
+          onPressed: () {
+            Provider.of<NoteProvider>(context, listen: false).addNote(noteToDelete);
+          },
+        ),
       ),
     );
   }
@@ -1907,19 +1978,26 @@ class _NoteListScreenState extends State<NoteListScreen> {
                             ],
                          ),
                          Expanded(
-                            child: Padding(
-                               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                               child: NoteCard(
-                                  note: note,
-                                  isPinned: note.tags.contains('sabit'),
-                                  onTap: () => _selectNote(note),
-                                  onEdit: () => _selectNote(note),
-                                  onDelete: () => _deleteNote(note),
-                                  onTogglePin: () => _togglePin(note),
-                                  onExport: () => _showExportOptions(note),
-                               ),
-                            ),
-                         )
+                             child: Padding(
+                                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                                child: SwipeableNoteCard(
+                                   note: note,
+                                   isPinned: note.tags.contains('sabit'),
+                                   onTogglePin: () => _togglePin(note),
+                                   onDelete: () => _deleteNoteWithUndo(note),
+                                   onArchive: () => _archiveNote(note),
+                                   child: NoteCard(
+                                      note: note,
+                                      isPinned: note.tags.contains('sabit'),
+                                      onTap: () => _selectNote(note),
+                                      onEdit: () => _selectNote(note),
+                                      onDelete: () => _deleteNote(note),
+                                      onTogglePin: () => _togglePin(note),
+                                      onExport: () => _showExportOptions(note),
+                                   ),
+                                ),
+                             ),
+                          )
                       ],
                    ),
                 )

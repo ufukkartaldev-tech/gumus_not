@@ -174,11 +174,11 @@ void main() {
       expect(note.folderName, 'Genel');
     });
 
-    test('Note excerpt extraction', () {
+    test('Note excerpt extraction strips markdown and truncates cleanly', () {
       final note = Note(
         id: 1,
         title: 'Test Note',
-        content: 'This is a long content that should be truncated when creating an excerpt. It contains multiple sentences and should be properly handled.',
+        content: '# Heading\nThis is a **long content** that should be truncated when creating an excerpt. It contains multiple sentences and should be properly handled with [links](https://example.com).',
         createdAt: 1234567890,
         updatedAt: 1234567890,
         isEncrypted: false,
@@ -188,6 +188,8 @@ void main() {
       final excerpt = note.excerpt;
       expect(excerpt, isNotEmpty);
       expect(excerpt.length, lessThanOrEqualTo(100));
+      expect(excerpt, isNot(contains('#')));
+      expect(excerpt, isNot(contains('**')));
     });
 
     test('Note link extraction', () {
@@ -211,7 +213,7 @@ void main() {
       final note = Note(
         id: 1,
         title: 'Test Note',
-        content: 'This is a test content with five words.',
+        content: 'This is a test note.',
         createdAt: 1234567890,
         updatedAt: 1234567890,
         isEncrypted: false,

@@ -1,3 +1,5 @@
+import 'package:connected_notebook/core/utils/markdown_cleaner.dart';
+
 class Template {
   final int? id;
   final String name;
@@ -186,12 +188,16 @@ class Note {
   }
 
   String get excerpt {
-    final cleanContent = content.replaceAll(RegExp(r'\[\[([^\]]+)\]\]'), '');
-    final words = cleanContent.split(' ');
-    if (words.length <= 20) {
+    final cleanContent = MarkdownCleaner.clean(content);
+    if (cleanContent.length <= 100) {
       return cleanContent;
     }
-    return '${words.take(20).join(' ')}...';
+    final candidate = cleanContent.substring(0, 97);
+    final lastSpace = candidate.lastIndexOf(' ');
+    if (lastSpace > 50) {
+      return '${candidate.substring(0, lastSpace)}...';
+    }
+    return '$candidate...';
   }
 
   int get wordCount {
