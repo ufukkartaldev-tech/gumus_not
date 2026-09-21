@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:connected_notebook/features/notes/models/note_model.dart';
@@ -1525,6 +1527,27 @@ class _NoteListScreenState extends State<NoteListScreen> {
               },
             ),
             const Divider(),
+            ListTile(
+              leading: const Icon(Icons.share_rounded, color: Colors.teal),
+              title: const Text('Notu Paylaş'),
+              subtitle: const Text('Metin olarak paylaş veya panoya kopyala'),
+              onTap: () async {
+                Navigator.pop(context);
+                final paylasilacakMetin = '${note.title}\n\n${note.content}';
+                if (kIsWeb) {
+                  // Webdeysek paylaşım menüsü açılmaz, metni panoya kopyalayalım
+                  await Clipboard.setData(ClipboardData(text: paylasilacakMetin));
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Bağlantı/Metin panoya kopyalandı!')),
+                    );
+                  }
+                } else {
+                  // Mobildeysek normal paylaşım penceresi açılsın
+                  Share.share(paylasilacakMetin);
+                }
+              },
+            ),
             ListTile(
               leading: const Icon(Icons.picture_as_pdf, color: Colors.red),
               title: const Text('PDF Olarak Kaydet'),

@@ -1,3 +1,6 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -392,6 +395,25 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
           icon: const Icon(Icons.fullscreen),
           onPressed: () => setState(() => _isFocusMode = true),
           tooltip: 'Odak Modu',
+        ),
+        IconButton(
+          icon: const Icon(Icons.share_rounded),
+          tooltip: 'Notu Paylaş',
+          onPressed: () async {
+            final paylasilacakMetin = '${_titleController.text.trim()}\n\n${_contentController.text}';
+            if (kIsWeb) {
+              // Webdeysek paylaşım menüsü açılmaz, metni panoya kopyalayalım
+              await Clipboard.setData(ClipboardData(text: paylasilacakMetin));
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Bağlantı/Metin panoya kopyalandı!')),
+                );
+              }
+            } else {
+              // Mobildeysek normal paylaşım penceresi açılsın
+              Share.share(paylasilacakMetin);
+            }
+          },
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12.0),
