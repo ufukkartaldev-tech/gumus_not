@@ -19,6 +19,8 @@ import 'package:connected_notebook/features/notes/providers/note_editor_provider
 import 'package:connected_notebook/features/notes/repositories/mock_note_repository.dart';
 import 'package:connected_notebook/features/notes/repositories/note_repository.dart';
 import 'package:connected_notebook/features/notes/repositories/sql_note_repository.dart';
+import 'package:connected_notebook/features/notes/repositories/markdown_note_repository.dart';
+import 'package:connected_notebook/features/notes/services/git_sync_service.dart';
 import 'package:connected_notebook/features/notes/services/advanced_search_service.dart';
 import 'package:connected_notebook/features/notes/services/backlink_service.dart';
 import 'package:connected_notebook/features/notes/services/note_service.dart';
@@ -89,13 +91,16 @@ class NoteDependencyInjection {
         },
       ),
 
-      // Repository chain: UI -> NoteRepository -> legacy contract adapter -> secure DB.
+      Provider<GitSyncService>(
+        create: (_) => GitSyncService(),
+      ),
+      // Repository chain: UI -> NoteRepository (Markdown)
       Provider<NoteRepository>(
         create: (context) {
           if (_isTestMode) {
             return MockNoteRepository();
           }
-          return SqlNoteRepository(context.read<IDatabaseService>());
+          return MarkdownNoteRepository(context.read<GitSyncService>());
         },
       ),
 
