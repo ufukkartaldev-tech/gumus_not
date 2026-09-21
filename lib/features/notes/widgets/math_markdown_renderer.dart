@@ -1,7 +1,12 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:markdown/markdown.dart' as md;
+import 'package:flutter_highlighter/flutter_highlighter.dart';
+import 'package:flutter_highlighter/themes/github.dart';
+import 'package:flutter_highlighter/themes/darcula.dart';
 import 'package:connected_notebook/features/media/widgets/image_picker_widget.dart';
 
 class MathMarkdownRenderer extends StatelessWidget {
@@ -65,6 +70,7 @@ class MathMarkdownRenderer extends StatelessWidget {
           data: parts[i],
           selectable: selectable,
           shrinkWrap: true,
+          builders: {'code': CodeElementBuilder(context)},
           styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
             p: style ?? Theme.of(context).textTheme.bodyMedium,
             blockquoteDecoration: BoxDecoration(
@@ -150,7 +156,7 @@ class MathMarkdownRenderer extends StatelessWidget {
         children: [
           const Icon(Icons.image_not_supported, color: Colors.orange),
           const SizedBox(width: 8),
-          Text(message ?? 'Resim yüklenemedi', style: const TextStyle(fontSize: 12)),
+          Text(message ?? 'Resim yÃ¼klenemedi', style: const TextStyle(fontSize: 12)),
         ],
       ),
     );
@@ -240,10 +246,10 @@ class MathMarkdownRenderer extends StatelessWidget {
                     children: [
                       const Icon(Icons.error_outline, color: Colors.red),
                       const SizedBox(height: 8),
-                      const Text('Diyagram çizilemedi.'),
+                      const Text('Diyagram Ã§izilemedi.'),
                       TextButton(
                         onPressed: () {}, // Future: Open in browser
-                        child: const Text('Düzenlemede hata olabilir mi?'),
+                        child: const Text('DÃ¼zenlemede hata olabilir mi?'),
                       ),
                     ],
                   );
@@ -334,13 +340,92 @@ class _EnhancedMarkdownEditorState extends State<EnhancedMarkdownEditor> {
         scrollDirection: Axis.horizontal,
         child: Row(
           children: [
-            _buildMathButton(context, 'x^2', 'Üst'),
+            _buildMathButton(context, 'x^2', 'Ãœst'),
             _buildMathButton(context, 'x_2', 'Alt'),
             _buildMathButton(context, '\\frac{x}{y}', 'Kesir'),
-            _buildMathButton(context, r'$$\n$$', 'Matematik Bloğu'),
+            _buildMathButton(context, r'$$\n$$', 'Matematik BloÄŸu'),
             _buildMathButton(context, '```mermaid\ngraph TD\n  A --> B\n```', 'Diyagram (Mermaid)'),
+            _buildFormatButton(context),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildFormatButton(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 4.0),
+      child: Tooltip(
+        message: 'Kodu Formatla (Otomatik Düzelt)',
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: _formatContent,
+            borderRadius: BorderRadius.circular(4),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey.shade300),
+                borderRadius: BorderRadius.circular(4),
+                color: Theme.of(context).primaryColor.withOpacity(0.1),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.format_align_left, size: 14),
+                  SizedBox(width: 4),
+                  Text('Format', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _formatContent() {
+    // Basic formatting: fixing indentation for code blocks
+    String text = _controller.text;
+    
+    // We can simulate Prettier-like formatting by cleaning up excessive spaces,
+    // empty lines, and ensuring code blocks have proper spacing.
+    // For a full implementation, integrating dart_style or prettier.js would be ideal.
+    
+    final lines = text.split('\n');
+    final formattedLines = <String>[];
+    bool inCodeBlock = false;
+    
+    for (var line in lines) {
+      if (line.trim().startsWith('```')) {
+        inCodeBlock = !inCodeBlock;
+        formattedLines.add(line.trim()); // Ensure backticks have no leading spaces
+        continue;
+      }
+      
+      if (!inCodeBlock) {
+        // Clean up trailing spaces in text, but keep Markdown newlines if intentional
+        formattedLines.add(line.trimRight());
+      } else {
+        // Simple code indentation fix: replace hard tabs with spaces
+        formattedLines.add(line.replaceAll('\t', '  '));
+      }
+    }
+    
+    // Remove multiple empty lines outside code blocks
+    String formattedText = formattedLines.join('\n').replaceAll(RegExp(r'\n{3,}'), '\n\n');
+    
+    _controller.value = TextEditingValue(
+      text: formattedText,
+      selection: TextSelection.collapsed(offset: formattedText.length),
+    );
+    
+    widget.onContentChanged(formattedText);
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Markdown ve kod blokları formatlandı!'),
+        duration: Duration(seconds: 2),
       ),
     );
   }
@@ -362,7 +447,7 @@ class _EnhancedMarkdownEditorState extends State<EnhancedMarkdownEditor> {
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(
-                syntax.replaceAll(r'$$\n$$', 'Bloğu'),
+                syntax.replaceAll(r'$$\n$$', 'BloÄŸu'),
                 style: const TextStyle(fontSize: 12),
               ),
             ),
@@ -380,7 +465,7 @@ class _EnhancedMarkdownEditorState extends State<EnhancedMarkdownEditor> {
       decoration: const InputDecoration(
         border: OutlineInputBorder(),
         contentPadding: EdgeInsets.all(16),
-        hintText: 'Markdown yazın...',
+        hintText: 'Markdown yazÄ±n...',
       ),
       style: const TextStyle(
         fontFamily: 'monospace',
@@ -397,6 +482,111 @@ class _EnhancedMarkdownEditorState extends State<EnhancedMarkdownEditor> {
         data: _controller.text,
         style: Theme.of(context).textTheme.bodyMedium,
         selectable: true,
+      ),
+    );
+  }
+}
+
+class CodeElementBuilder extends MarkdownElementBuilder {
+  final BuildContext context;
+  CodeElementBuilder(this.context);
+
+  @override
+  Widget? visitElementAfter(md.Element element, TextStyle? preferredStyle) {
+    var language = '';
+
+    if (element.attributes['class'] != null) {
+      String lg = element.attributes['class'] as String;
+      if (lg.startsWith('language-')) {
+        language = lg.substring(9);
+      } else {
+        language = lg;
+      }
+    }
+    
+    // Check if it's a code block (multiline) or inline code
+    final isCodeBlock = element.textContent.contains('\n');
+    
+    if (!isCodeBlock && language.isEmpty) {
+      // Inline code
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+        decoration: BoxDecoration(
+          color: Theme.of(context).brightness == Brightness.dark 
+              ? Colors.grey.shade800 
+              : Colors.grey.shade200,
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Text(
+          element.textContent,
+          style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+        ),
+      );
+    }
+
+    final codeText = element.textContent.trimRight();
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(
+        color: Theme.of(context).brightness == Brightness.dark 
+            ? const Color(0xff2b2b2b) 
+            : const Color(0xfff8f8f8),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.withOpacity(0.3)),
+      ),
+      child: Stack(
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(16, 32, 16, 16),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: HighlightView(
+                codeText,
+                language: language.isEmpty ? 'plaintext' : language,
+                theme: Theme.of(context).brightness == Brightness.dark 
+                    ? darculaTheme 
+                    : githubTheme,
+                padding: const EdgeInsets.all(0),
+                textStyle: const TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 14,
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            top: 4,
+            right: 4,
+            child: IconButton(
+              icon: const Icon(Icons.copy, size: 18, color: Colors.grey),
+              tooltip: 'Kodu Kopyala',
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: codeText));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Kod panoya kopyalandı!'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              },
+            ),
+          ),
+          if (language.isNotEmpty)
+            Positioned(
+              top: 12,
+              left: 16,
+              child: Text(
+                language.toUpperCase(),
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
