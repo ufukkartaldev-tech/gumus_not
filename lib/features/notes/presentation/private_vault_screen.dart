@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:local_auth/local_auth.dart';
+class LocalAuthentication { Future<bool> canCheckBiometrics = Future.value(false); Future<bool> authenticate({required String localizedReason}) async { return false; } }
 import 'package:provider/provider.dart';
 
 import 'package:connected_notebook/core/security/biometric_service.dart';
