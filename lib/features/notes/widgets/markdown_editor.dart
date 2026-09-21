@@ -11,16 +11,14 @@ import 'package:connected_notebook/features/notes/providers/note_provider.dart';
 import 'package:connected_notebook/features/notes/providers/note_editor_provider.dart';
 import 'package:connected_notebook/features/notes/providers/vault_provider.dart';
 import 'package:connected_notebook/features/media/services/image_service.dart';
-import 'package:connected_notebook/features/media/widgets/image_picker_widget.dart';
-import 'package:connected_notebook/features/media/services/note_image_service.dart';
-
 import 'package:connected_notebook/features/notes/widgets/custom_widgets.dart';
 import 'package:connected_notebook/features/notes/widgets/math_markdown_renderer.dart';
+import 'package:connected_notebook/features/notes/widgets/markdown_live_controller.dart';
+import 'package:connected_notebook/features/notes/widgets/floating_accessory_bar.dart';
 import 'package:connected_notebook/features/tools/widgets/cross_reference_tracker.dart';
 import 'package:connected_notebook/features/tools/widgets/tag_manager_widget.dart';
 import 'package:connected_notebook/features/tools/widgets/pomodoro_timer.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
-
 import 'package:connected_notebook/features/export/services/pdf_service.dart';
 
 class MarkdownEditor extends StatefulWidget {
@@ -39,10 +37,9 @@ class MarkdownEditor extends StatefulWidget {
   State<MarkdownEditor> createState() => _MarkdownEditorState();
 }
 
-class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProviderStateMixin {
+class _MarkdownEditorState extends State<MarkdownEditor> {
   late TextEditingController _titleController;
-  late TextEditingController _contentController;
-  late TabController _toolbarTabController;
+  late MarkdownLivePreviewController _contentController;
 
   bool _isPreviewMode = false;
   bool _isFocusMode = false;
@@ -50,9 +47,10 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
   bool _isEncrypted = false;
   int? _selectedColor;
   bool _isPomodoroVisible = false;
-  final ImagePicker _picker = ImagePicker();
+  bool _isCrossReferenceVisible = false;
   List<String> _tags = [];
 
+  final FocusNode _titleFocusNode = FocusNode();
   final FocusNode _contentFocusNode = FocusNode();
 
   final List<Color> _noteColors = [
@@ -80,9 +78,8 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
   @override
   void initState() {
     super.initState();
-    _toolbarTabController = TabController(length: 2, vsync: this);
     _titleController = TextEditingController(text: widget.note?.title ?? '');
-    _tags = widget.note?.tags ?? [];
+    _tags = List<String>.from(widget.note?.tags ?? []);
 
     String content = widget.note?.content ?? '';
     _isEncrypted = widget.note?.isEncrypted ?? false;
@@ -91,19 +88,30 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
       content = '🔒 Bu not şifreli. İçeriği görmek için kasayı açın.';
     }
 
-    _contentController = TextEditingController(text: content);
+    _contentController = MarkdownLivePreviewController(text: content);
     _selectedColor = widget.note?.color;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<NoteEditorProvider>().initialize(widget.note);
+      if (mounted) {
+        context.read<NoteEditorProvider>().initialize(widget.note);
+      }
     });
+
+    _contentController.addListener(_onContentChanged);
+  }
+
+  void _onContentChanged() {
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   @override
   void dispose() {
+    _contentController.removeListener(_onContentChanged);
     _titleController.dispose();
     _contentController.dispose();
-    _toolbarTabController.dispose();
+    _titleFocusNode.dispose();
     _contentFocusNode.dispose();
     super.dispose();
   }
@@ -112,18 +120,21 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
     final source = await showDialog<ImageSource>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Resim Ekle'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Görsel Ekle'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.photo_library),
+              leading: const Icon(Icons.photo_library_rounded, color: Colors.blue),
               title: const Text('Galeriden Seç'),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               onTap: () => Navigator.pop(context, ImageSource.gallery),
             ),
             ListTile(
-              leading: const Icon(Icons.camera_alt),
+              leading: const Icon(Icons.camera_alt_rounded, color: Colors.green),
               title: const Text('Kamera ile Çek'),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               onTap: () => Navigator.pop(context, ImageSource.camera),
             ),
           ],
@@ -135,7 +146,6 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
 
     try {
       String? imagePath;
-
       final imageService = context.read<ImageService>();
       if (source == ImageSource.gallery) {
         imagePath = await imageService.pickImageFromGallery();
@@ -144,13 +154,13 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
       }
 
       if (imagePath != null) {
-        final markdownImage = '![Resim ${DateTime.now().toString().substring(0, 10)}]($imagePath)';
-        _insertMarkdownSyntax('\n$markdownImage\n');
+        final markdownImage = '![Görsel ${DateTime.now().toString().substring(0, 10)}]($imagePath)';
+        _insertTextAtCursor('\n$markdownImage\n');
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Resim başarıyla eklendi'),
+              content: Text('Görsel başarıyla eklendi'),
               backgroundColor: Colors.green,
               duration: Duration(seconds: 2),
             ),
@@ -158,8 +168,24 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
         }
       }
     } catch (e) {
-      _showError('Resim eklenirken hata oluştu: $e');
+      _showError('Görsel eklenirken hata oluştu: $e');
     }
+  }
+
+  void _insertTextAtCursor(String syntax) {
+    final text = _contentController.text;
+    final selection = _contentController.selection;
+    if (!selection.isValid) {
+      _contentController.text = '$text$syntax';
+      _contentController.selection = TextSelection.collapsed(offset: _contentController.text.length);
+    } else {
+      final newText = text.replaceRange(selection.start, selection.end, syntax);
+      _contentController.value = TextEditingValue(
+        text: newText,
+        selection: TextSelection.collapsed(offset: selection.baseOffset + syntax.length),
+      );
+    }
+    _contentFocusNode.requestFocus();
   }
 
   Future<void> _saveNote() async {
@@ -169,7 +195,6 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
     }
     setState(() => _isLoading = true);
     try {
-      final editorProvider = context.read<NoteEditorProvider>();
       final vaultProvider = context.read<VaultProvider>();
       final plaintextContent = _contentController.text;
 
@@ -209,11 +234,14 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
     } catch (e) {
       _showError('Kayıt hatası: $e');
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
   void _showError(String msg) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
   }
 
@@ -222,7 +250,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
     if (note == null || !note.isEncrypted) return;
 
     try {
-      final resolved = await context.read<NoteEditorProvider>().unlockNote(note);
+      await context.read<NoteEditorProvider>().unlockNote(note);
       final content = context.read<NoteEditorProvider>().resolvedContent;
       if (content != null) {
         setState(() {
@@ -235,22 +263,12 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
     }
   }
 
-  void _insertMarkdownSyntax(String syntax) {
-    final text = _contentController.text;
-    final selection = _contentController.selection;
-    final newText = text.replaceRange(selection.start, selection.end, syntax);
-    _contentController.value = TextEditingValue(
-      text: newText,
-      selection: TextSelection.collapsed(offset: selection.baseOffset + syntax.length),
-    );
-    _contentFocusNode.requestFocus();
-  }
-
   void _showColorPicker() {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Renk Seç'),
+        title: const Text('Kağıt Rengi Seç'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         content: SingleChildScrollView(
           child: BlockPicker(
             pickerColor: _selectedColor != null ? Color(_selectedColor!) : Colors.white,
@@ -264,265 +282,6 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
       ),
     );
   }
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgColor = _selectedColor != null
-        ? Color(_selectedColor!)
-        : Theme.of(context).colorScheme.background;
-
-    return Scaffold(
-      backgroundColor: bgColor,
-      appBar: _isFocusMode ? null : _buildAppBar(context),
-      body: SafeArea(
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: Hero(
-                tag: 'note_${widget.note?.id ?? 'new_${widget.note?.createdAt}'}',
-                child: Material(
-                  color: Colors.transparent,
-                  child: Column(
-                    children: [
-                      Expanded(
-                        child: _isPreviewMode ? _buildPreview() : _buildEditor(context),
-                      ),
-                      if ((widget.note?.isEncrypted ?? false) && _contentController.text.startsWith('🔒'))
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          child: OutlinedButton.icon(
-                            onPressed: _unlockEncryptedNote,
-                            icon: const Icon(Icons.lock_open),
-                            label: const Text('İçeriği Çöz'),
-                          ),
-                        ),
-                      if (!_isFocusMode) const SizedBox(height: 80),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            if (!_isFocusMode && !_isPreviewMode)
-              Positioned(
-                bottom: 20,
-                left: 16,
-                right: 16,
-                child: Center(
-                  child: Container(
-                    constraints: const BoxConstraints(maxWidth: 600),
-                    child: _buildGlassToolbar(context),
-                  ),
-                ),
-              ),
-            if (_isFocusMode)
-              Positioned(
-                top: 20,
-                right: 20,
-                child: FloatingActionButton.small(
-                  onPressed: () => setState(() => _isFocusMode = false),
-                  backgroundColor: Colors.black.withOpacity(0.5),
-                  child: const Icon(Icons.fullscreen_exit, color: Colors.white),
-                ),
-              ),
-            if (_isFocusMode || _isPomodoroVisible)
-               Positioned(
-                 bottom: _isFocusMode ? 30 : null,
-                 top: _isFocusMode ? null : 16,
-                 right: _isFocusMode ? 30 : 16,
-                 child: Opacity(
-                   opacity: _isFocusMode ? 0.8 : 1.0,
-                   child: const PomodoroTimer(),
-                 ),
-               ),
-             if (widget.note != null && !_isPreviewMode && !_isFocusMode)
-               Positioned(
-                  top: 10,
-                  right: 10,
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 280, maxHeight: 300),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: SingleChildScrollView(
-                        child: CrossReferenceTracker(currentNote: widget.note!),
-                      ),
-                    ),
-                  ),
-               ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  PreferredSizeWidget _buildAppBar(BuildContext context) {
-    return CustomAppBar(
-      title: '',
-      showBackButton: true,
-      onBackPressed: widget.onCancel,
-      actions: [
-        IconButton(
-          icon: Icon(Icons.timer, color: _isPomodoroVisible ? Colors.red : null),
-          onPressed: () => setState(() => _isPomodoroVisible = !_isPomodoroVisible),
-          tooltip: 'Pomodoro Sayacı',
-        ),
-        IconButton(
-          icon: Icon(Icons.circle, color: _selectedColor != null ? Color(_selectedColor!) : Colors.grey.shade400),
-          onPressed: _showColorPicker,
-          tooltip: 'Kağıt Rengi',
-        ),
-        IconButton(
-          icon: Icon(_isEncrypted ? Icons.lock : Icons.lock_open_outlined, color: _isEncrypted ? Colors.orange : null),
-          onPressed: () {
-             final vaultProvider = context.read<VaultProvider>();
-             if (!vaultProvider.isUnlocked && !_isEncrypted) {
-                _showError('Kasa kilitli. Şifreli not oluşturmak için önce kasayı açın.');
-                return;
-             }
-             setState(() => _isEncrypted = !_isEncrypted);
-             context.read<NoteEditorProvider>().setEncrypted(_isEncrypted);
-             ScaffoldMessenger.of(context).showSnackBar(
-               SnackBar(content: Text(_isEncrypted ? 'Not şifreli olarak kaydedilecek' : 'Not düz olarak kaydedilecek')),
-             );
-          },
-        ),
-        IconButton(
-          icon: Icon(_isPreviewMode ? Icons.edit_note : Icons.remove_red_eye_outlined),
-          onPressed: () => setState(() => _isPreviewMode = !_isPreviewMode),
-          tooltip: _isPreviewMode ? 'Düzenle' : 'Önizle',
-        ),
-        IconButton(
-          icon: const Icon(Icons.fullscreen),
-          onPressed: () => setState(() => _isFocusMode = true),
-          tooltip: 'Odak Modu',
-        ),
-        IconButton(
-          icon: const Icon(Icons.share_rounded),
-          tooltip: 'Notu Paylaş',
-          onPressed: () async {
-            final paylasilacakMetin = '${_titleController.text.trim()}\n\n${_contentController.text}';
-            if (kIsWeb) {
-              // Webdeysek paylaşım menüsü açılmaz, metni panoya kopyalayalım
-              await Clipboard.setData(ClipboardData(text: paylasilacakMetin));
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Bağlantı/Metin panoya kopyalandı!')),
-                );
-              }
-            } else {
-              // Mobildeysek normal paylaşım penceresi açılsın
-              Share.share(paylasilacakMetin);
-            }
-          },
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12.0),
-          child: ElevatedButton.icon(
-            onPressed: _isLoading ? null : _saveNote,
-            icon: const Icon(Icons.save_rounded, size: 18),
-            label: const Text('Kaydet'),
-            style: ElevatedButton.styleFrom(
-              elevation: 0,
-              backgroundColor: Theme.of(context).primaryColor,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildGlassToolbar(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return ClipRect(
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
-        child: BackdropFilter(
-          filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(
-          height: 60,
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: (isDark ? Colors.grey[900] : Colors.white)!.withOpacity(0.8),
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: Colors.white.withOpacity(0.2)),
-            boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 20, offset: const Offset(0, 5))
-            ],
-          ),
-          child: Row(
-            children: [
-               Container(
-                 decoration: BoxDecoration(
-                    color: Theme.of(context).dividerColor.withOpacity(0.1),
-                   borderRadius: BorderRadius.circular(20),
-                 ),
-                 child: TabBar(
-                   controller: _toolbarTabController,
-                   indicatorSize: TabBarIndicatorSize.label,
-                   indicator: BoxDecoration(
-                      color: Theme.of(context).primaryColor.withOpacity(0.2),
-                     borderRadius: BorderRadius.circular(20),
-                   ),
-                   labelColor: Theme.of(context).primaryColor,
-                   unselectedLabelColor: Theme.of(context).disabledColor,
-                   isScrollable: true,
-                   tabs: const [
-                      Tab(icon: Icon(Icons.text_fields_rounded, size: 20)),
-                      Tab(icon: Icon(Icons.functions_rounded, size: 20))
-                   ],
-                 ),
-               ),
-               const SizedBox(width: 8),
-               Expanded(
-                 child: TabBarView(
-                   controller: _toolbarTabController,
-                   children: [
-                      _buildMarkdownTools(),
-                      _buildMathTools(),
-                   ],
-                 ),
-               )
-            ],
-          ),
-        ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMarkdownTools() {
-    return ListView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      children: [
-        _toolBtn('B', '**', tooltip: 'Kalın', style: const TextStyle(fontWeight: FontWeight.w900)),
-        _toolBtn('I', '*', tooltip: 'İtalik', style: const TextStyle(fontStyle: FontStyle.italic, fontWeight: FontWeight.bold)),
-        _toolBtn('S', '~~', tooltip: 'Üstü Çizili', style: const TextStyle(decoration: TextDecoration.lineThrough)),
-        const VerticalDivider(indent: 12, endIndent: 12),
-        _toolBtn('H1', '# '),
-        _toolBtn('H2', '## '),
-        const VerticalDivider(indent: 12, endIndent: 12),
-        _toolIcon(Icons.format_list_bulleted, '- '),
-        _toolIcon(Icons.check_box_outlined, '- [ ] '),
-        _toolIcon(Icons.format_quote, '> '),
-        _toolIcon(Icons.code, '`'),
-        _toolIcon(Icons.link, '[', suffix: ']'),
-        _toolIcon(Icons.image, '', onPressed: _pickImage),
-        const VerticalDivider(indent: 12, endIndent: 12),
-        IconButton(
-          icon: const Icon(Icons.picture_as_pdf),
-          onPressed: _exportToPdf,
-          tooltip: 'PDF Olarak Kaydet',
-        ),
-
-      ],
-    );
-  }
-
-
 
   Future<void> _exportToPdf() async {
     if (widget.note == null) {
@@ -542,59 +301,146 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
     }
   }
 
-  Widget _buildMathTools() {
-    return ListView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      children: [
-         _toolMath(r'\sum', 'Σ'),
-         _toolMath(r'\int', '∫'),
-         _toolMath(r'\frac{}{}', 'a/b'),
-         _toolMath(r'\sqrt{}', '√'),
-         _toolMath(r'\pi', 'π'),
-         _toolMath(r'x^2', 'x²'),
-         _toolMath('```mermaid\ngraph TD\n  A --> B\n```', 'Mermaid'),
-         const VerticalDivider(indent: 12, endIndent: 12),
-         _toolBtn('EQ', r'$$ ', tooltip: 'Blok Denklem'),
-      ],
+  void _showMathSymbolSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        final theme = Theme.of(context);
+        final isDark = theme.brightness == Brightness.dark;
+
+        final mathItems = [
+          {'label': 'x²', 'syntax': r'x^2'},
+          {'label': 'a/b', 'syntax': r'\frac{a}{b}'},
+          {'label': '√x', 'syntax': r'\sqrt{x}'},
+          {'label': '∑', 'syntax': r'\sum_{i=1}^{n}'},
+          {'label': '∫', 'syntax': r'\int_{a}^{b} f(x) dx'},
+          {'label': 'π', 'syntax': r'\pi'},
+          {'label': 'θ', 'syntax': r'\theta'},
+          {'label': 'lim', 'syntax': r'\lim_{x \to \infty}'},
+          {'label': 'Mermaid', 'syntax': "```mermaid\ngraph TD\n  A[Başla] --> B[Devam]\n```\n"},
+          {'label': r'Blok $$', 'syntax': "\$\$\nE = mc^2\n\$\$\n"},
+        ];
+
+        return ClipRRect(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          child: BackdropFilter(
+            filter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+              color: (isDark ? Colors.grey.shade900 : Colors.white).withOpacity(0.92),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      const Icon(Icons.functions_rounded, color: Colors.purple, size: 22),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Matematik & Diyagram Ekle',
+                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: mathItems.map((item) {
+                      return ActionChip(
+                        label: Text(item['label']!, style: const TextStyle(fontWeight: FontWeight.w600)),
+                        backgroundColor: theme.colorScheme.surface,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _insertTextAtCursor(item['syntax']!);
+                        },
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
-  Widget _toolBtn(String label, String syntax, {String? suffix, String? tooltip, TextStyle? style}) {
-    return Center(
-      child: IconButton(
-        icon: Text(label, style: style ?? TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).textTheme.bodyMedium?.color)),
-        tooltip: tooltip,
-        onPressed: () => _insertMarkdownSyntax(syntax + (suffix ?? '')),
-        visualDensity: VisualDensity.compact,
-      ),
-    );
-  }
+  void _showTagAndMoodSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            final theme = Theme.of(context);
+            final isDark = theme.brightness == Brightness.dark;
 
-  Widget _toolIcon(IconData icon, String syntax, {String? suffix, String? tooltip, VoidCallback? onPressed}) {
-    return IconButton(
-      icon: Icon(icon, size: 20),
-      tooltip: tooltip,
-      onPressed: onPressed ?? () => _insertMarkdownSyntax(syntax + (suffix ?? '')),
-      visualDensity: VisualDensity.compact,
+            return ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              child: BackdropFilter(
+                filter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                child: Container(
+                  height: MediaQuery.of(context).size.height * 0.55,
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                  color: (isDark ? Colors.grey.shade900 : Colors.white).withOpacity(0.95),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: Colors.grey.withOpacity(0.3),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Not Bilgileri & Etiketler',
+                        style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 16),
+                      _buildMoodSelector(),
+                      const SizedBox(height: 16),
+                      Expanded(
+                        child: TagManagerWidget(
+                          initialTags: _tags,
+                          onTagsChanged: (newTags) {
+                            setState(() => _tags = newTags);
+                            setSheetState(() {});
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
-  }
-
-  Widget _toolMath(String syntax, String label) {
-     return Center(
-       child: InkWell(
-         borderRadius: BorderRadius.circular(8),
-         onTap: () => _insertMarkdownSyntax(syntax),
-         child: Padding(
-           padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8),
-           child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
-         ),
-       ),
-     );
   }
 
   Widget _buildMoodSelector() {
-    final moods = ['😊', '😐', '😢', '😡', '🚀'];
+    final moods = ['😊', '😐', '😢', '😡', '🚀', '💡', '🔥'];
     final selectedMood = _findCurrentMood();
 
     return SingleChildScrollView(
@@ -606,31 +452,26 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
             style: TextStyle(
               color: Theme.of(context).disabledColor,
               fontWeight: FontWeight.bold,
-              fontSize: 12
+              fontSize: 13,
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 10),
           ...moods.map((mood) {
             final isSelected = selectedMood == mood;
             return GestureDetector(
               onTap: () => _updateMood(mood),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                 margin: const EdgeInsets.only(right: 8),
                 decoration: BoxDecoration(
-                  color: isSelected ? Theme.of(context).primaryColor.withOpacity(0.2) : Colors.transparent,
+                  color: isSelected ? Theme.of(context).primaryColor.withOpacity(0.18) : Colors.transparent,
                   borderRadius: BorderRadius.circular(12),
-                  border: isSelected ? Border.all(color: Theme.of(context).primaryColor, width: 1) : null,
+                  border: isSelected ? Border.all(color: Theme.of(context).primaryColor, width: 1.5) : null,
                 ),
                 child: Text(
                   mood,
-                  style: TextStyle(
-                    fontSize: isSelected ? 22 : 18,
-                    shadows: isSelected ? [
-                      Shadow(color: Theme.of(context).primaryColor.withOpacity(0.5), blurRadius: 10)
-                    ] : null
-                  )
+                  style: TextStyle(fontSize: isSelected ? 22 : 18),
                 ),
               ),
             );
@@ -642,22 +483,349 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
 
   String? _findCurrentMood() {
     for (var tag in _tags) {
-       if (tag.startsWith('mood:')) {
-          return tag.substring(5);
-       }
+      if (tag.startsWith('mood:')) {
+        return tag.substring(5);
+      }
     }
     return null;
   }
 
   void _updateMood(String mood) {
     setState(() {
-       _tags.removeWhere((tag) => tag.startsWith('mood:'));
-       _tags.add('mood:$mood');
+      _tags.removeWhere((tag) => tag.startsWith('mood:'));
+      _tags.add('mood:$mood');
     });
   }
 
-  Widget _buildEditor(BuildContext context) {
-    // Eğer not şifreliyse ve henüz açılmadıysa şifre dialogunu göster
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgColor = _selectedColor != null
+        ? Color(_selectedColor!)
+        : Theme.of(context).colorScheme.background;
+
+    final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
+    final width = MediaQuery.of(context).size.width;
+    final isDesktop = width >= 800;
+    final hasSelection = _contentController.selection.isValid && !_contentController.selection.isCollapsed;
+
+    return Scaffold(
+      backgroundColor: bgColor,
+      appBar: _isFocusMode ? null : _buildMinimalAppBar(context),
+      body: SafeArea(
+        child: Stack(
+          children: [
+            // Zen Mode Paper Canvas
+            Positioned.fill(
+              child: Hero(
+                tag: 'note_${widget.note?.id ?? 'new_${widget.note?.createdAt}'}',
+                child: Material(
+                  color: Colors.transparent,
+                  child: _isPreviewMode ? _buildPreview() : _buildZenEditor(context),
+                ),
+              ),
+            ),
+
+            // Encrypted lock banner
+            if ((widget.note?.isEncrypted ?? false) && _contentController.text.startsWith('🔒'))
+              Positioned(
+                bottom: 80,
+                left: 20,
+                right: 20,
+                child: Center(
+                  child: ElevatedButton.icon(
+                    onPressed: _unlockEncryptedNote,
+                    icon: const Icon(Icons.lock_open_rounded),
+                    label: const Text('Şifreyi Çöz ve Notu Aç'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                    ),
+                  ),
+                ),
+              ),
+
+            // Mobile Floating Accessory Bar (Docked right above keyboard)
+            if (!_isFocusMode && !_isPreviewMode && (!isDesktop || keyboardHeight > 0))
+              Positioned(
+                bottom: keyboardHeight > 0 ? keyboardHeight + 8 : 16,
+                left: 16,
+                right: 16,
+                child: Center(
+                  child: Container(
+                    constraints: const BoxConstraints(maxWidth: 600),
+                    child: FloatingAccessoryBar(
+                      controller: _contentController,
+                      focusNode: _contentFocusNode,
+                      onPickImage: _pickImage,
+                      onToggleMathSheet: _showMathSymbolSheet,
+                    ),
+                  ),
+                ),
+              ),
+
+            // Desktop Floating Selection Bubble Menu
+            if (!_isFocusMode && !_isPreviewMode && isDesktop && hasSelection)
+              Positioned(
+                top: 20,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: DesktopSelectionBubbleMenu(
+                    controller: _contentController,
+                    focusNode: _contentFocusNode,
+                  ),
+                ),
+              ),
+
+            // Focus Mode (Zen) Exit Button
+            if (_isFocusMode)
+              Positioned(
+                top: 16,
+                right: 16,
+                child: Material(
+                  color: Colors.black.withOpacity(0.4),
+                  borderRadius: BorderRadius.circular(20),
+                  child: IconButton(
+                    icon: const Icon(Icons.fullscreen_exit_rounded, color: Colors.white),
+                    tooltip: 'Odak Modundan Çık',
+                    onPressed: () => setState(() => _isFocusMode = false),
+                  ),
+                ),
+              ),
+
+            // Floating Pomodoro Timer
+            if (_isFocusMode || _isPomodoroVisible)
+              Positioned(
+                top: _isFocusMode ? 60 : 16,
+                right: 16,
+                child: const PomodoroTimer(),
+              ),
+
+            // Cross-Reference Side Panel (Optional toggle)
+            if (widget.note != null && _isCrossReferenceVisible && !_isFocusMode)
+              Positioned(
+                top: 16,
+                right: 16,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 300, maxHeight: 350),
+                  child: Material(
+                    elevation: 6,
+                    borderRadius: BorderRadius.circular(16),
+                    child: Stack(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: SingleChildScrollView(
+                            child: CrossReferenceTracker(currentNote: widget.note!),
+                          ),
+                        ),
+                        Positioned(
+                          top: 6,
+                          right: 6,
+                          child: IconButton(
+                            icon: const Icon(Icons.close_rounded, size: 18),
+                            onPressed: () => setState(() => _isCrossReferenceVisible = false),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  PreferredSizeWidget _buildMinimalAppBar(BuildContext context) {
+    final theme = Theme.of(context);
+    final mood = _findCurrentMood();
+
+    return CustomAppBar(
+      title: '',
+      showBackButton: true,
+      onBackPressed: widget.onCancel,
+      actions: [
+        // Live Preview / Preview Toggle
+        IconButton(
+          icon: Icon(
+            _isPreviewMode ? Icons.edit_note_rounded : Icons.remove_red_eye_outlined,
+            color: _isPreviewMode ? theme.colorScheme.primary : null,
+          ),
+          onPressed: () => setState(() => _isPreviewMode = !_isPreviewMode),
+          tooltip: _isPreviewMode ? 'Düzenleme Modu' : 'Tam Önizleme',
+        ),
+
+        // Save Button (Clean and prominent)
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6.0),
+          child: ElevatedButton.icon(
+            onPressed: _isLoading ? null : _saveNote,
+            icon: const Icon(Icons.check_rounded, size: 18),
+            label: const Text('Kaydet'),
+            style: ElevatedButton.styleFrom(
+              elevation: 0,
+              backgroundColor: theme.primaryColor,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              minimumSize: const Size(0, 36),
+            ),
+          ),
+        ),
+
+        // Overflow Options Menu
+        PopupMenuButton<String>(
+          icon: const Icon(Icons.more_vert_rounded),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          tooltip: 'Daha Fazla Seçenek',
+          onSelected: (value) async {
+            switch (value) {
+              case 'color':
+                _showColorPicker();
+                break;
+              case 'lock':
+                final vaultProvider = context.read<VaultProvider>();
+                if (!vaultProvider.isUnlocked && !_isEncrypted) {
+                  _showError('Kasa kilitli. Şifreli not oluşturmak için önce kasayı açın.');
+                  return;
+                }
+                setState(() => _isEncrypted = !_isEncrypted);
+                context.read<NoteEditorProvider>().setEncrypted(_isEncrypted);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(_isEncrypted ? 'Not şifreli olarak kaydedilecek' : 'Not düz olarak kaydedilecek'),
+                  ),
+                );
+                break;
+              case 'tags':
+                _showTagAndMoodSheet();
+                break;
+              case 'pomodoro':
+                setState(() => _isPomodoroVisible = !_isPomodoroVisible);
+                break;
+              case 'backlinks':
+                setState(() => _isCrossReferenceVisible = !_isCrossReferenceVisible);
+                break;
+              case 'pdf':
+                _exportToPdf();
+                break;
+              case 'share':
+                final textToShare = '${_titleController.text.trim()}\n\n${_contentController.text}';
+                if (kIsWeb) {
+                  await Clipboard.setData(ClipboardData(text: textToShare));
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Metin panoya kopyalandı!')),
+                    );
+                  }
+                } else {
+                  Share.share(textToShare);
+                }
+                break;
+              case 'focus':
+                setState(() => _isFocusMode = true);
+                break;
+            }
+          },
+          itemBuilder: (context) => [
+            PopupMenuItem(
+              value: 'tags',
+              child: Row(
+                children: [
+                  Icon(Icons.label_outline_rounded, size: 20, color: theme.colorScheme.primary),
+                  const SizedBox(width: 12),
+                  const Text('Etiketler & Mod'),
+                ],
+              ),
+            ),
+            PopupMenuItem(
+              value: 'color',
+              child: Row(
+                children: [
+                  Icon(Icons.palette_outlined, size: 20, color: _selectedColor != null ? Color(_selectedColor!) : null),
+                  const SizedBox(width: 12),
+                  const Text('Kağıt Rengi'),
+                ],
+              ),
+            ),
+            PopupMenuItem(
+              value: 'lock',
+              child: Row(
+                children: [
+                  Icon(_isEncrypted ? Icons.lock_rounded : Icons.lock_open_rounded,
+                      size: 20, color: _isEncrypted ? Colors.orange : null),
+                  const SizedBox(width: 12),
+                  Text(_isEncrypted ? 'Şifrelemeyi Kaldır' : 'Notu Şifrele'),
+                ],
+              ),
+            ),
+            PopupMenuItem(
+              value: 'focus',
+              child: const Row(
+                children: [
+                  Icon(Icons.fullscreen_rounded, size: 20),
+                  const SizedBox(width: 12),
+                  Text('Zen Odak Modu'),
+                ],
+              ),
+            ),
+            PopupMenuItem(
+              value: 'pomodoro',
+              child: Row(
+                children: [
+                  Icon(Icons.timer_outlined, size: 20, color: _isPomodoroVisible ? Colors.red : null),
+                  const SizedBox(width: 12),
+                  Text(_isPomodoroVisible ? 'Pomodoro Gizle' : 'Pomodoro Sayacı'),
+                ],
+              ),
+            ),
+            if (widget.note != null)
+              PopupMenuItem(
+                value: 'backlinks',
+                child: const Row(
+                  children: [
+                    Icon(Icons.hub_outlined, size: 20),
+                    const SizedBox(width: 12),
+                    Text('Çapraz Bağlantılar'),
+                  ],
+                ),
+              ),
+            PopupMenuItem(
+              value: 'share',
+              child: const Row(
+                children: [
+                  Icon(Icons.share_rounded, size: 20),
+                  const SizedBox(width: 12),
+                  Text('Notu Paylaş'),
+                ],
+              ),
+            ),
+            PopupMenuItem(
+              value: 'pdf',
+              child: const Row(
+                children: [
+                  Icon(Icons.picture_as_pdf_outlined, size: 20),
+                  const SizedBox(width: 12),
+                  Text('PDF Olarak Kaydet'),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// The Content-First Zen Mode Editor
+  Widget _buildZenEditor(BuildContext context) {
+    final theme = Theme.of(context);
+
+    // If encrypted and not yet unlocked
     if (_isEncrypted && _contentController.text.contains('🔒 Bu not şifreli')) {
       return Center(
         child: Column(
@@ -667,7 +835,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
             const SizedBox(height: 24),
             Text(
               'Bu Not Şifreli',
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+              style: theme.textTheme.headlineMedium?.copyWith(
                 fontWeight: FontWeight.bold,
                 color: Colors.orange,
               ),
@@ -675,15 +843,15 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
             const SizedBox(height: 16),
             Text(
               'İçeriği görmek ve düzenlemek için şifre giriniz.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).disabledColor,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.disabledColor,
               ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 32),
             ElevatedButton.icon(
               onPressed: _unlockEncryptedNote,
-              icon: const Icon(Icons.lock_open),
+              icon: const Icon(Icons.lock_open_rounded),
               label: const Text('Şifre ile Aç'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.orange,
@@ -697,75 +865,152 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
       );
     }
 
+    final mood = _findCurrentMood();
+    final nonMoodTags = _tags.where((t) => !t.startsWith('mood:')).toList();
+
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // Title Field - Large H1 Notion-like header
         Padding(
-          padding: const EdgeInsets.fromLTRB(32, 24, 32, 0),
+          padding: const EdgeInsets.fromLTRB(28, 20, 28, 4),
           child: TextField(
             controller: _titleController,
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+            focusNode: _titleFocusNode,
+            textInputAction: TextInputAction.next,
+            onSubmitted: (_) => _contentFocusNode.requestFocus(),
+            style: theme.textTheme.headlineMedium?.copyWith(
               fontWeight: FontWeight.w800,
-              color: Theme.of(context).textTheme.titleLarge?.color,
               fontSize: 32,
-              letterSpacing: -0.5,
+              letterSpacing: -0.6,
+              color: theme.colorScheme.onSurface,
             ),
             decoration: InputDecoration(
-              hintText: 'Başlık',
-              hintStyle: TextStyle(color: Theme.of(context).disabledColor.withOpacity(0.3)),
+              hintText: 'Başlıksız Not',
+              hintStyle: TextStyle(
+                color: theme.disabledColor.withOpacity(0.28),
+                fontWeight: FontWeight.w800,
+              ),
               border: InputBorder.none,
               contentPadding: EdgeInsets.zero,
             ),
           ),
         ),
 
+        // Subtle, integrated Metadata Strip (Mood & Tag chips)
         Padding(
-          padding: const EdgeInsets.fromLTRB(32, 8, 32, 0),
-          child: _buildMoodSelector(),
-        ),
+          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 4),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                // Mood Chip
+                InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: _showTagAndMoodSheet,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceVariant.withOpacity(0.35),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(mood ?? '😊', style: const TextStyle(fontSize: 14)),
+                        const SizedBox(width: 4),
+                        Text(
+                          mood == null ? 'Mod ekle' : 'Mod',
+                          style: TextStyle(fontSize: 12, color: theme.disabledColor, fontWeight: FontWeight.w500),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
 
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 8),
-          child: SizedBox(
-            height: 120,
-            child: SingleChildScrollView(
-              child: TagManagerWidget(
-                initialTags: _tags,
-                onTagsChanged: (t) => setState(() => _tags = t),
-              ),
+                // Tags chips
+                ...nonMoodTags.map((tag) => Container(
+                      margin: const EdgeInsets.only(right: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primary.withOpacity(0.09),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        '#$tag',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
+                    )),
+
+                // Add Tag Chip
+                InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: _showTagAndMoodSheet,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceVariant.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: theme.dividerColor.withOpacity(0.2), width: 0.8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.add_rounded, size: 14, color: theme.disabledColor),
+                        const SizedBox(width: 2),
+                        Text(
+                          'Etiket',
+                          style: TextStyle(fontSize: 12, color: theme.disabledColor, fontWeight: FontWeight.w500),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
 
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32),
-          child: Divider(color: Theme.of(context).dividerColor.withOpacity(0.1), thickness: 1),
-        ),
+        const SizedBox(height: 10),
 
+        // The Smooth Continuous Canvas Body (No dividers, no boxes)
         Expanded(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32),
+            padding: const EdgeInsets.symmetric(horizontal: 28),
             child: TextField(
               controller: _contentController,
               focusNode: _contentFocusNode,
               maxLines: null,
               expands: true,
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                height: 1.8,
-                fontSize: 16,
-                fontFamily: 'Roboto',
+              style: theme.textTheme.bodyLarge?.copyWith(
+                height: 1.7,
+                fontSize: 16.5,
                 letterSpacing: 0.1,
               ),
-              cursorColor: Theme.of(context).primaryColor,
-              cursorWidth: 2,
+              cursorColor: theme.colorScheme.primary,
+              cursorWidth: 2.2,
               cursorRadius: const Radius.circular(2),
               decoration: InputDecoration(
-                hintText: 'Düşüncelerinizi buraya yazın...',
-                hintStyle: TextStyle(color: Theme.of(context).disabledColor.withOpacity(0.3), fontStyle: FontStyle.italic),
+                hintText: 'Düşüncelerinizi buraya dökün...',
+                hintStyle: TextStyle(
+                  color: theme.disabledColor.withOpacity(0.3),
+                  fontStyle: FontStyle.italic,
+                  fontSize: 16,
+                ),
                 border: InputBorder.none,
+                contentPadding: EdgeInsets.zero,
               ),
             ),
           ),
         ),
+
+        // Bottom spacer to ensure text is never covered by the floating bar
+        const SizedBox(height: 72),
       ],
     );
   }
@@ -773,25 +1018,28 @@ class _MarkdownEditorState extends State<MarkdownEditor> with SingleTickerProvid
   Widget _buildPreview() {
     return Container(
       color: Colors.transparent,
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      margin: const EdgeInsets.symmetric(horizontal: 28),
       child: SingleChildScrollView(
-         child: Column(
-           crossAxisAlignment: CrossAxisAlignment.start,
-           children: [
-              const SizedBox(height: 24),
-              Text(
-                _titleController.text,
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)
-              ),
-              const Divider(),
-              MathMarkdownRenderer(
-                data: _contentController.text,
-                selectable: true,
-              ),
-              const SizedBox(height: 80),
-           ],
-         ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 24),
+            Text(
+              _titleController.text.isEmpty ? 'Başlıksız Not' : _titleController.text,
+              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 32,
+                    letterSpacing: -0.6,
+                  ),
+            ),
+            const SizedBox(height: 16),
+            MathMarkdownRenderer(
+              data: _contentController.text,
+              selectable: true,
+            ),
+            const SizedBox(height: 100),
+          ],
+        ),
       ),
     );
   }
