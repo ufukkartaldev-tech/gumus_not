@@ -310,7 +310,7 @@ class _TaskHubScreenState extends State<TaskHubScreen> with SingleTickerProvider
     
     String oldLine = item.originalLine;
     String newLine = oldLine.replaceFirst(
-      RegExp(r'\[([ xX])\]'), 
+      RegExp(r'\[([ xX\/\-])\]'), 
       newValue ? '[x]' : '[ ]'
     );
 

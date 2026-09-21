@@ -254,6 +254,25 @@ ${'Kitabın ana mesajı'}
 ''',
       createdAt: DateTime.now().millisecondsSinceEpoch,
     ),
+    Template(
+      name: 'Günlük (Daily Stand-up)',
+      category: 'İş',
+      description: 'Günlük değerlendirme ve planlama',
+      content: '''# Günlük (Daily Stand-up)
+
+**Tarih:** \${DateTime.now().day}/\${DateTime.now().month}/\${DateTime.now().year}
+
+## Dün ne yaptım?
+- 
+
+## Bugün ne yapacağım?
+- 
+
+## Engelleyen ne var?
+- 
+''',
+      createdAt: DateTime.now().millisecondsSinceEpoch,
+    ),
   ];
 
   @override

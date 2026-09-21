@@ -1,23 +1,27 @@
 import 'package:connected_notebook/features/notes/models/note_model.dart';
 
+enum TaskStatus { todo, inProgress, done }
+
 class TaskItem {
   final Note note;
   final String taskText;
-  final bool isCompleted;
+  final TaskStatus status;
   final String originalLine;
 
   TaskItem({
     required this.note,
     required this.taskText,
-    required this.isCompleted,
+    required this.status,
     required this.originalLine,
   });
+
+  bool get isCompleted => status == TaskStatus.done;
 }
 
 class TaskService {
   static List<TaskItem> extractTasks(List<Note> notes) {
     List<TaskItem> tasks = [];
-    final regex = RegExp(r'^\s*- \[([ xX])\] (.*)', multiLine: true);
+    final regex = RegExp(r'^\s*- \[([ xX\/\-])\] (.*)', multiLine: true);
 
     for (var note in notes) {
       if (note.isEncrypted) continue;
@@ -25,13 +29,19 @@ class TaskService {
       final matches = regex.allMatches(note.content);
       for (var match in matches) {
         if (match.group(2) != null) {
-          final statusChar = match.group(1)!;
-          final isCompleted = statusChar.toLowerCase() == 'x';
+          final statusChar = match.group(1)!.toLowerCase();
+          
+          TaskStatus status = TaskStatus.todo;
+          if (statusChar == 'x') {
+            status = TaskStatus.done;
+          } else if (statusChar == '/' || statusChar == '-') {
+            status = TaskStatus.inProgress;
+          }
           
           tasks.add(TaskItem(
             note: note,
             taskText: match.group(2)!.trim(),
-            isCompleted: isCompleted,
+            status: status,
             originalLine: match.group(0)!,
           ));
         }
