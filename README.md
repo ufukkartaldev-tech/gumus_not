@@ -23,7 +23,8 @@ GümüşNot, Zettelkasten metodolojisinden ilham alan, **local-first** (önce ye
 *   **Deterministik Kurtarma**: Güvenli ve matematiksel olarak doğrulanabilir şifre kurtarma mekanizması.
 
 ### 4. Profesyonel Editör ve Medya
-*   **Zengin Markdown & LaTeX**: Karmaşık matematiksel formülleri ve zengin metinleri kolayca yazın.
+*   **Görselleştirme ve Diyagramlar (Mermaid.js / PlantUML)**: Yazılımcılar sistem tasarlarken diyagram çizmeyi sever. Markdown içine yazılan mermaid kodunu anında görsel bir akış şemasına veya mimari çizime dönüştüren gelişmiş bir eklenti.
+*   **Matematiksel İfadeler (LaTeX)**: Özellikle veri bilimi veya yapay zeka alanında çalışanlar için formül desteği (KaTeX/MathJax). Karmaşık matematiksel formülleri kolayca yazın.
 *   **Çizim ve Eskiz**: Notlarınıza el yazısı notlar veya hızlı şemalar ekleyin.
 *   **Dinamik Şablonlar**: Sık kullandığınız not formatları için hazır şablonlar oluşturun.
 *   **Resim Desteği**: Kameradan veya galeriden görsel ekleme.
