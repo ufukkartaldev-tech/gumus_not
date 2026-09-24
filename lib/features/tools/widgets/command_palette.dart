@@ -57,17 +57,11 @@ class CommandPalette extends StatefulWidget {
           parent: animation,
           curve: Curves.easeOutCubic,
         );
-        return BackdropFilter(
-          filter: ImageFilter.blur(
-            sigmaX: 10 * curvedAnimation.value,
-            sigmaY: 10 * curvedAnimation.value,
-          ),
-          child: ScaleTransition(
-            scale: Tween<double>(begin: 0.95, end: 1.0).animate(curvedAnimation),
-            child: FadeTransition(
-              opacity: curvedAnimation,
-              child: child,
-            ),
+        return ScaleTransition(
+          scale: Tween<double>(begin: 0.95, end: 1.0).animate(curvedAnimation),
+          child: FadeTransition(
+            opacity: curvedAnimation,
+            child: child,
           ),
         );
       },

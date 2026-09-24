@@ -240,12 +240,10 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) {
     // Glassmorphism effect
     return ClipRRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Container(
-          padding: const EdgeInsets.only(top: 8, bottom: 8),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface.withOpacity(0.7),
+      child: Container(
+        padding: const EdgeInsets.only(top: 8, bottom: 8),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
             border: Border(
               bottom: BorderSide(
                 color: Theme.of(context).colorScheme.onSurface.withOpacity(0.05),

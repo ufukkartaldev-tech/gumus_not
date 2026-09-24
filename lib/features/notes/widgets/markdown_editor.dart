@@ -353,21 +353,19 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
 
         return ClipRRect(
           borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          child: BackdropFilter(
-            filter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-              color: (isDark ? Colors.grey.shade900 : Colors.white).withOpacity(0.92),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.withOpacity(0.3),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+            color: isDark ? const Color(0xFF1E1F24) : Colors.white,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: theme.dividerColor,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -421,15 +419,13 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
 
             return ClipRRect(
               borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-              child: BackdropFilter(
-                filter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                child: Container(
-                  height: MediaQuery.of(context).size.height * 0.55,
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-                  color: (isDark ? Colors.grey.shade900 : Colors.white).withOpacity(0.95),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+              child: Container(
+                height: MediaQuery.of(context).size.height * 0.55,
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                color: isDark ? const Color(0xFF1E1F24) : Colors.white,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                       Center(
                         child: Container(
                           width: 40,

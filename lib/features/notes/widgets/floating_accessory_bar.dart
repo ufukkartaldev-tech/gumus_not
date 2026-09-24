@@ -89,15 +89,13 @@ class FloatingAccessoryBar extends StatelessWidget {
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(20),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-        child: Container(
-          height: 48,
-          decoration: BoxDecoration(
-            color: (isDark ? Colors.grey.shade900 : Colors.white).withOpacity(0.88),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: isDark ? Colors.white12 : Colors.black.withOpacity(0.08),
+      child: Container(
+        height: 48,
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E1F24) : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isDark ? Colors.white12 : Colors.black.withOpacity(0.08),
               width: 0.8,
             ),
             boxShadow: [
@@ -288,12 +286,10 @@ class DesktopSelectionBubbleMenu extends StatelessWidget {
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(14),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-          decoration: BoxDecoration(
-            color: (isDark ? Colors.grey.shade900 : Colors.white).withOpacity(0.92),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF2D2E33) : Colors.white,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: isDark ? Colors.white24 : Colors.black12,

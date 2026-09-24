@@ -65,9 +65,7 @@ class _MainScreenState extends State<MainScreen> {
             margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
             decoration: BoxDecoration(
-              color:
-                  theme.cardTheme.color?.withOpacity(0.95) ??
-                  theme.cardColor.withOpacity(0.95),
+              color: theme.cardTheme.color ?? theme.cardColor,
               borderRadius: BorderRadius.circular(24),
               border: Border.all(
                 color: theme.dividerColor.withOpacity(isDark ? 0.08 : 0.12),
