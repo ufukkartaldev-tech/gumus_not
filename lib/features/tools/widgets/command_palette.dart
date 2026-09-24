@@ -230,16 +230,7 @@ class _CommandPaletteState extends State<CommandPalette> {
         },
       ),
 
-      // Quick Task (Yeni Görev Ekle)
-      PaletteItem(
-        id: 'new_task',
-        title: 'Yeni Görev Ekle',
-        subtitle: 'Görev listesine anında yapılacak iş ekle',
-        icon: Icons.check_circle_outline_rounded,
-        iconColor: Colors.green,
-        category: 'HIZLI EYLEMLER',
-        action: () => _showQuickTaskDialog(context),
-      ),
+
 
       // Vault Lock / Unlock (Kasayı Kilitle / Kilidi Aç)
       PaletteItem(
@@ -267,20 +258,7 @@ class _CommandPaletteState extends State<CommandPalette> {
         },
       ),
 
-      // PDF Export (PDF Dışa Aktar)
-      PaletteItem(
-        id: 'export_pdf',
-        title: 'PDF Olarak Dışa Aktar',
-        subtitle: 'Toplu veya tekil notları PDF belgesine dönüştür',
-        icon: Icons.picture_as_pdf_rounded,
-        iconColor: Colors.redAccent,
-        category: 'DIŞA AKTARMA',
-        action: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (ctx) => const BatchExportScreen()),
-          );
-        },
-      ),
+
 
       // Daily Journal Note (Günün Notu)
       PaletteItem(
@@ -315,16 +293,7 @@ class _CommandPaletteState extends State<CommandPalette> {
         action: () => Navigator.of(context).pushNamed('/graph'),
       ),
 
-      // Task Hub
-      PaletteItem(
-        id: 'task_hub',
-        title: 'Görev Merkezini Aç',
-        subtitle: 'Tüm notlardaki kontrol listelerini ve görevleri yönet',
-        icon: Icons.task_alt_rounded,
-        iconColor: Colors.lightGreen,
-        category: 'GEZİNME',
-        action: () => Navigator.of(context).pushNamed('/task-hub'),
-      ),
+
 
       // Note Template Manager
       PaletteItem(

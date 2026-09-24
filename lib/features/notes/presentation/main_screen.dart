@@ -2,9 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:connected_notebook/features/notes/presentation/note_list_screen.dart';
-import 'package:connected_notebook/features/tasks/presentation/task_hub_screen.dart';
 import 'package:connected_notebook/features/graph/presentation/graph_view_screen.dart';
-import 'package:connected_notebook/features/tools/presentation/code_snippets_screen.dart';
 import 'package:connected_notebook/shared/utils/sharing_service.dart';
 import 'package:connected_notebook/features/home_widget/services/widget_service.dart';
 import 'package:connected_notebook/features/tools/widgets/command_palette.dart';
@@ -23,9 +21,7 @@ class _MainScreenState extends State<MainScreen> {
 
   final List<Widget> _screens = [
     const NoteListScreen(),
-    const TaskHubScreen(),
     const GraphViewScreen(),
-    const CodeSnippetsScreen(),
   ];
 
   @override
@@ -89,9 +85,7 @@ class _MainScreenState extends State<MainScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 _buildNavItem(0, Icons.article_outlined, 'Notlar'),
-                _buildNavItem(1, Icons.check_circle_outline_rounded, 'Görevler'),
-                _buildNavItem(2, Icons.hub_outlined, 'Zihin'),
-                _buildNavItem(3, Icons.code, 'Kod'),
+                _buildNavItem(1, Icons.hub_outlined, 'Zihin'),
               ],
             ),
           ),

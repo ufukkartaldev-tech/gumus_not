@@ -180,11 +180,9 @@ class ConnectedNotebookApp extends StatelessWidget {
                         Navigator.of(context).pushReplacementNamed('/'),
                   ),
                   '/': (context) => const MainScreen(),
-                  '/dashboard': (context) => const DashboardScreen(),
                   '/notes': (context) => const NoteListScreen(),
                   '/graph': (context) => const GraphViewScreen(),
                   '/settings': (context) => const SettingsScreen(),
-                  '/task-hub': (context) => const TaskHubScreen(),
                   '/widgets': (context) => const WidgetScreen(),
                 },
                 onGenerateRoute: (settings) {

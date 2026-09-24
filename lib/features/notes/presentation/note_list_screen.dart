@@ -307,18 +307,6 @@ class _NoteListScreenState extends State<NoteListScreen> {
         // Modules Section
         _buildSectionHeader('MODÜLLER'),
         _buildSidebarItem(
-          icon: Icons.insights_rounded,
-          title: 'Aktivite & Analiz',
-          iconColor: Colors.purpleAccent,
-          onTap: () => Navigator.of(context).pushNamed('/dashboard'),
-        ),
-        _buildSidebarItem(
-          icon: Icons.check_circle_outline_rounded,
-          title: 'Görev Merkezi',
-          iconColor: Colors.green,
-          onTap: () => Navigator.of(context).pushNamed('/task-hub'),
-        ),
-        _buildSidebarItem(
           icon: Icons.hub_outlined,
           title: 'Zihin Haritası',
           iconColor: Colors.indigoAccent,
@@ -439,16 +427,6 @@ class _NoteListScreenState extends State<NoteListScreen> {
             },
           ),
           const Divider(indent: 12, endIndent: 12),
-          IconButton(
-            icon: const Icon(Icons.insights_rounded, color: Colors.purpleAccent),
-            tooltip: 'Aktivite & Analiz',
-            onPressed: () => Navigator.of(context).pushNamed('/dashboard'),
-          ),
-          IconButton(
-            icon: const Icon(Icons.check_circle_outline_rounded, color: Colors.green),
-            tooltip: 'Görev Merkezi',
-            onPressed: () => Navigator.of(context).pushNamed('/task-hub'),
-          ),
           IconButton(
             icon: const Icon(Icons.hub_outlined, color: Colors.indigoAccent),
             tooltip: 'Zihin Haritası',
@@ -909,16 +887,12 @@ class _NoteListScreenState extends State<NoteListScreen> {
             icon: const Icon(Icons.more_vert_rounded),
             onSelected: (value) {
               if (value == 'settings') Navigator.of(context).pushNamed('/settings');
-              if (value == 'batch_export') _showBatchExport();
               if (value == 'tag_management') _showTagManagement();
               if (value == 'templates') _showTemplates();
-              if (value == 'import_export') _showImportExport();
             },
             itemBuilder: (context) => [
               const PopupMenuItem(value: 'templates', child: Text('Not Şablonları')),
               const PopupMenuItem(value: 'tag_management', child: Text('Etiket Yönetimi')),
-              const PopupMenuItem(value: 'import_export', child: Text('İçe/Dışa Aktar')),
-              const PopupMenuItem(value: 'batch_export', child: Text('Toplu Dışa Aktar')),
               const PopupMenuItem(value: 'settings', child: Text('Ayarlar')),
             ],
           ),
