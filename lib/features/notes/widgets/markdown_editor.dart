@@ -938,7 +938,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
 
         const SizedBox(height: 10),
 
-        // The Smooth Continuous Canvas Body (No dividers, no boxes)
+      // The Smooth Continuous Canvas Body (No dividers, no boxes)
         Expanded(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 28),
@@ -969,9 +969,92 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
           ),
         ),
 
+        // Backlinks Section
+        _buildBacklinkSection(),
+
         // Bottom spacer to ensure text is never covered by the floating bar
         const SizedBox(height: 72),
       ],
+    );
+  }
+
+  Widget _buildBacklinkSection() {
+    final theme = Theme.of(context);
+    final noteProvider = Provider.of<NoteProvider>(context, listen: false);
+    final currentTitle = _titleController.text.trim().toLowerCase();
+    
+    if (currentTitle.isEmpty) return const SizedBox.shrink();
+
+    // Find notes that link to this one
+    final backlinks = noteProvider.notes.where((n) {
+      if (n.id == widget.note?.id) return false;
+      return n.content.toLowerCase().contains('\[\[$currentTitle\]\]');
+    }).toList();
+
+    if (backlinks.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.dividerColor.withOpacity(0.1)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.link, size: 18, color: theme.colorScheme.primary),
+              const SizedBox(width: 8),
+              Text(
+                'Geri Bağlantılar (${backlinks.length})',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                  color: theme.colorScheme.primary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ...backlinks.map((n) => Padding(
+                padding: const EdgeInsets.only(bottom: 8.0),
+                child: InkWell(
+                  onTap: () {
+                    Navigator.of(context).pushReplacementNamed('/note-editor', arguments: n);
+                  },
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surface,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: theme.dividerColor.withOpacity(0.2)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          n.title,
+                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          n.content.length > 60 ? '${n.content.substring(0, 60)}...' : n.content,
+                          style: TextStyle(fontSize: 12, color: theme.disabledColor),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              )),
+        ],
+      ),
     );
   }
 

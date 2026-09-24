@@ -8,6 +8,21 @@ import 'package:flutter_highlighter/flutter_highlighter.dart';
 import 'package:flutter_highlighter/themes/github.dart';
 import 'package:flutter_highlighter/themes/darcula.dart';
 import 'package:connected_notebook/features/media/widgets/image_picker_widget.dart';
+import 'package:provider/provider.dart';
+import 'package:connected_notebook/features/notes/providers/note_provider.dart';
+
+class WikilinkSyntax extends md.InlineSyntax {
+  WikilinkSyntax() : super(r'\[\[(.*?)\]\]');
+
+  @override
+  bool onMatch(md.InlineParser parser, Match match) {
+    final title = match.group(1)!;
+    final element = md.Element('a', [md.Text('[[${title}]]')]);
+    element.attributes['href'] = 'zettel://$title';
+    parser.addNode(element);
+    return true;
+  }
+}
 
 class MathMarkdownRenderer extends StatelessWidget {
   final String data;
@@ -70,6 +85,29 @@ class MathMarkdownRenderer extends StatelessWidget {
           data: parts[i],
           selectable: selectable,
           shrinkWrap: true,
+          extensionSet: md.ExtensionSet(
+            md.ExtensionSet.gitHubFlavored.blockSyntaxes,
+            [
+              ...md.ExtensionSet.gitHubFlavored.inlineSyntaxes,
+              WikilinkSyntax(),
+            ],
+          ),
+          onTapLink: (text, href, title) {
+            if (href != null && href.startsWith('zettel://')) {
+              final targetTitle = href.replaceFirst('zettel://', '');
+              // Try to find the note by title
+              final provider = Provider.of<NoteProvider>(context, listen: false);
+              final note = provider.notes.where((n) => n.title.toLowerCase() == targetTitle.toLowerCase()).firstOrNull;
+              if (note != null) {
+                // Navigate to note
+                Navigator.of(context).pushNamed('/note-editor', arguments: note);
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Not bulunamadı: $targetTitle')),
+                );
+              }
+            }
+          },
           builders: {'code': CodeElementBuilder(context)},
           styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
             p: style ?? Theme.of(context).textTheme.bodyMedium,

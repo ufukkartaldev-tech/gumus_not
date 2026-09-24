@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
 
 import 'package:connected_notebook/core/database/idatabase_service.dart';
+import 'package:connected_notebook/core/database/sqlite_database_service.dart';
 import 'package:connected_notebook/features/notes/providers/note_provider.dart';
 import 'package:connected_notebook/features/notes/providers/note_editor_provider.dart';
 import 'package:connected_notebook/features/notes/repositories/mock_note_repository.dart';
@@ -30,7 +31,12 @@ class NoteDependencyInjection {
     return [
       Provider<IDatabaseService>(
         create: (context) {
-          return InMemoryDatabaseService(); // Fallback for removed legacy DB
+          if (kIsWeb) {
+            return InMemoryDatabaseService(); // Web doesn't support sqflite natively yet
+          } else {
+            // Import must be added to file level for SqliteDatabaseService
+            return SqliteDatabaseService();
+          }
         },
       ),
       Provider<GitSyncService>(
