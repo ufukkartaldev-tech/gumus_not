@@ -6,8 +6,6 @@ import 'package:provider/provider.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:connected_notebook/features/notes/models/note_model.dart';
 import 'package:connected_notebook/features/notes/providers/note_provider.dart';
-import 'package:connected_notebook/features/notes/providers/vault_provider.dart';
-import 'package:connected_notebook/core/security/legacy_encryption_service_adapter.dart';
 import 'package:connected_notebook/features/notes/widgets/markdown_editor.dart';
 import 'package:connected_notebook/features/notes/widgets/note_card.dart';
 import 'package:connected_notebook/features/notes/widgets/swipeable_note_card.dart';
@@ -15,7 +13,7 @@ import 'package:connected_notebook/features/notes/widgets/custom_widgets.dart';
 import 'package:connected_notebook/features/tools/widgets/activity_heatmap.dart';
 import 'package:connected_notebook/features/tools/widgets/command_palette.dart';
 import 'package:connected_notebook/features/notes/widgets/tag_cloud_widget.dart';
-import 'package:connected_notebook/features/export/presentation/latex_export_screen.dart';
+
 import 'package:connected_notebook/features/settings/presentation/settings_screen.dart';
 import 'package:connected_notebook/features/export/presentation/batch_export_screen.dart';
 import 'package:connected_notebook/features/graph/presentation/graph_view_screen.dart';
@@ -25,13 +23,7 @@ import 'package:connected_notebook/features/search/presentation/advanced_search_
 import 'package:connected_notebook/features/export/presentation/import_export_screen.dart';
 import 'package:connected_notebook/features/notes/widgets/note_template_manager.dart';
 import 'package:connected_notebook/features/tools/widgets/dashboard_stats.dart';
-import 'package:connected_notebook/features/tasks/presentation/task_hub_screen.dart';
 import 'package:connected_notebook/features/export/services/pdf_export_service.dart';
-
-
-import 'package:image_picker/image_picker.dart';
-import 'dart:io';
-import 'package:connected_notebook/features/notes/presentation/template_selection_screen.dart';
 import 'package:connected_notebook/features/graph/presentation/graph_view_screen.dart';
 
 class NoteListScreen extends StatefulWidget {
@@ -887,12 +879,14 @@ class _NoteListScreenState extends State<NoteListScreen> {
             icon: const Icon(Icons.more_vert_rounded),
             onSelected: (value) {
               if (value == 'settings') Navigator.of(context).pushNamed('/settings');
+              if (value == 'batch_export') _showBatchExport();
               if (value == 'tag_management') _showTagManagement();
               if (value == 'templates') _showTemplates();
             },
             itemBuilder: (context) => [
               const PopupMenuItem(value: 'templates', child: Text('Not Şablonları')),
               const PopupMenuItem(value: 'tag_management', child: Text('Etiket Yönetimi')),
+              const PopupMenuItem(value: 'batch_export', child: Text('Toplu Dışa Aktar')),
               const PopupMenuItem(value: 'settings', child: Text('Ayarlar')),
             ],
           ),
@@ -1276,17 +1270,6 @@ class _NoteListScreenState extends State<NoteListScreen> {
   }
 
   void _selectNote(Note note) async {
-    if (note.isEncrypted && !context.read<VaultProvider>().isUnlocked) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Şifreli notu açmak için önce kasayı açın.'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-      return;
-    }
 
     _openEditor(note, null);
   }
@@ -1329,65 +1312,14 @@ class _NoteListScreenState extends State<NoteListScreen> {
   Future<void> _handleSave(Note savedNote, String? encryptionPassword) async {
     final noteProvider = Provider.of<NoteProvider>(context, listen: false);
 
-    if (savedNote.isEncrypted) {
-      final vaultProvider = context.read<VaultProvider>();
-      if (!vaultProvider.isUnlocked) {
-        throw Exception('Şifreli not kaydetmek için önce kasayı açın');
-      }
-
-      if (savedNote.id == null) {
-        await vaultProvider.createPrivateNote(
-          title: savedNote.title,
-          content: savedNote.content,
-          tags: savedNote.tags,
-          folderName: savedNote.folderName,
-          color: savedNote.color,
-        );
-      } else {
-        await vaultProvider.updatePrivateNote(
-          note: savedNote,
-          plainTextContent: savedNote.content,
-        );
-      }
+    if (savedNote.id == null) {
+      await noteProvider.addNote(savedNote);
     } else {
-      if (savedNote.id == null) {
-        await noteProvider.addNote(savedNote);
-      } else {
-        await noteProvider.updateNote(savedNote);
-      }
+      await noteProvider.updateNote(savedNote);
     }
   }
 
-  // Password Input Dialog
-  Future<String?> _showPasswordDialog({required bool isCreate}) {
-    final controller = TextEditingController();
-    return showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(isCreate ? 'Şifre Belirle' : 'Şifreli Not'),
-        content: TextField(
-          controller: controller,
-          obscureText: true,
-          autofocus: true,
-          decoration: const InputDecoration(
-            labelText: 'Şifre',
-            border: OutlineInputBorder(),
-          ),
-          onSubmitted: (value) => Navigator.of(context).pop(value),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('İptal'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(controller.text),
-            child: Text(isCreate ? 'Kilitle' : 'Aç'),
-          ),
-        ],
-      ),
-    );
-  }
+
 
   void _deleteNote(Note note) {
     showDialog(
@@ -1534,44 +1466,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
               ),
             ),
             const SizedBox(height: 24),
-            ListTile(
-              leading: Icon(note.isEncrypted ? Icons.lock_open : Icons.lock_outline, color: Colors.orange),
-              title: Text(note.isEncrypted ? 'Şifreyi Kaldır' : 'Notu Kilitle'),
-              subtitle: Text(note.isEncrypted ? 'Notu deşifre et' : 'Parola ile koruma altına al'),
-              onTap: () async {
-                Navigator.pop(context);
-                if (note.isEncrypted) {
-                   // Unlock logic (similar to open)
-                   final password = await _showPasswordDialog(isCreate: false);
-                    if (password != null) {
-                       try {
-                          final decrypted = await context.read<LegacyEncryptionServiceAdapter>().decryptWithPassword(
-                            encryptedPackage: note.content,
-                            password: password,
-                          );
-                          final openNote = note.copyWith(content: decrypted, isEncrypted: false);
-                          Provider.of<NoteProvider>(context, listen: false).updateNote(openNote);
-                          if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Notun kilidi açıldı.')));
-                       } catch (_) {
-                          if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Şifre yanlış!'), backgroundColor: Colors.red));
-                       }
-                    }
-                } else {
-                   // Lock logic
-                   final password = await _showPasswordDialog(isCreate: true);
-                   if (password != null && password.isNotEmpty) {
-                      final encrypted = await context.read<LegacyEncryptionServiceAdapter>().encryptWithPassword(
-                        plainText: note.content,
-                        password: password,
-                      );
-                      final lockedNote = note.copyWith(content: encrypted, isEncrypted: true);
-                      Provider.of<NoteProvider>(context, listen: false).updateNote(lockedNote);
-                      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Not kilitlendi.')));
-                   }
-                }
-              },
-            ),
-            const Divider(),
+
             ListTile(
               leading: const Icon(Icons.share_rounded, color: Colors.teal),
               title: const Text('Notu Paylaş'),
@@ -1593,39 +1488,8 @@ class _NoteListScreenState extends State<NoteListScreen> {
                 }
               },
             ),
-            ListTile(
-              leading: const Icon(Icons.picture_as_pdf, color: Colors.red),
-              title: const Text('PDF Olarak Kaydet'),
-              subtitle: const Text('Okunabilir belge formatı'),
-              onTap: () async {
-                Navigator.pop(context);
-                final file = await PdfExportService.exportNoteToPdf(note);
-                if (file != null && mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('PDF kaydedildi: ${file.path.split('/').last}')),
-                  );
-                }
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.functions, color: Colors.blue),
-              title: const Text('LaTeX Kaynak Kodu'),
-              subtitle: const Text('Akademik ve matematiksel formüller için'),
-              onTap: () {
-                Navigator.pop(context);
-                _exportToLatex(note);
-              },
-            ),
           ],
         ),
-      ),
-    );
-  }
-
-  void _exportToLatex(Note note) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => LatexExportScreen(note: note),
       ),
     );
   }

@@ -1,1 +1,0 @@
-class LegacyEncryptionService { Future<String> encrypt(String text, String pw) async { return text; } Future<String> decrypt(String text, String pw) async { return text; } }

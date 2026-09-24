@@ -16,10 +16,6 @@ class SqlNoteRepository implements NoteRepository {
 
   final IDatabaseService _databaseService;
 
-  @override
-  Future<int> insertNote(Note note) async {
-    return _databaseService.insertNote(note.toMap());
-  }
 
   @override
   Future<int> addNote(Note note) async {
@@ -61,25 +57,21 @@ class SqlNoteRepository implements NoteRepository {
     return maps.map(Note.fromMap).toList();
   }
 
-  @override
   Future<List<Note>> getPendingTasks({int limit = 10}) async {
     final maps = await _databaseService.getPendingTasks(limit: limit);
     return maps.map(Note.fromMap).toList();
   }
 
-  @override
   Future<List<Note>> getNotesByFolder(String folderName) async {
     final allNotes = await getAllNotes();
     return allNotes.where((note) => note.folderName == folderName).toList();
   }
 
-  @override
   Future<List<Note>> getNotesByTag(String tag) async {
     final allNotes = await getAllNotes();
     return allNotes.where((note) => note.tags.contains(tag)).toList();
   }
 
-  @override
   Future<List<String>> getAllFolders() async {
     final allNotes = await getAllNotes();
     final folderSet = allNotes
@@ -94,40 +86,33 @@ class SqlNoteRepository implements NoteRepository {
     return folderSet.toList()..sort();
   }
 
-  @override
   Future<Map<String, dynamic>> getDatabaseStats() async {
     return _databaseService.getDatabaseStats();
   }
 
-  @override
   Future<void> insertNotes(List<Note> notes) async {
     await _databaseService.insertNotes(notes.map((note) => note.toMap()).toList());
   }
 
-  @override
   Future<void> deleteNotes(List<int> noteIds) async {
     await _databaseService.deleteNotes(noteIds);
   }
 
-  @override
   Future<List<Map<String, dynamic>>> exportAllNotes() async {
     final notes = await getAllNotes();
     return notes.map((note) => note.toJson()).toList();
   }
 
-  @override
   Future<void> importNotes(List<Map<String, dynamic>> notesData) async {
     final notes = notesData.map(Note.fromJson).toList();
     await insertNotes(notes);
   }
 
-  @override
   Future<List<Backlink>> getBacklinksForNote(int noteId) async {
     final maps = await _databaseService.getBacklinksForNote(noteId);
     return maps.map(Backlink.fromMap).toList();
   }
 
-  @override
   Future<List<Backlink>> getOutgoingLinksForNote(int noteId) async {
     final maps = await _databaseService.getOutgoingLinksForNote(noteId);
     return maps.map(Backlink.fromMap).toList();

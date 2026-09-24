@@ -5,13 +5,11 @@ import 'package:provider/provider.dart';
 import 'package:connected_notebook/core/theme/theme_provider.dart';
 import 'package:connected_notebook/features/notes/models/note_model.dart';
 import 'package:connected_notebook/features/notes/providers/note_provider.dart';
-import 'package:connected_notebook/features/notes/providers/vault_provider.dart';
 import 'package:connected_notebook/features/notes/di/note_dependency_injection.dart';
 import 'package:connected_notebook/features/export/presentation/batch_export_screen.dart';
 import 'package:connected_notebook/features/notes/presentation/tag_management_screen.dart';
 import 'package:connected_notebook/features/search/presentation/advanced_search_screen.dart';
 import 'package:connected_notebook/features/notes/widgets/note_template_manager.dart';
-import 'package:connected_notebook/features/notes/presentation/private_vault_screen.dart';
 import 'package:connected_notebook/core/utils/markdown_cleaner.dart';
 
 /// Item representation in the Raycast/Linear command palette.
@@ -149,13 +147,12 @@ class _CommandPaletteState extends State<CommandPalette> {
 
   List<PaletteItem> _getCurrentItems() {
     final noteProvider = Provider.of<NoteProvider>(context, listen: false);
-    final vaultProvider = Provider.of<VaultProvider>(context, listen: false);
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
 
     final allItems = <PaletteItem>[];
 
     // 1. Actions / Commands
-    allItems.addAll(_getActions(context, vaultProvider, themeProvider));
+    allItems.addAll(_getActions(context, themeProvider));
 
     // 2. Note items
     for (final note in noteProvider.notes) {
@@ -166,7 +163,7 @@ class _CommandPaletteState extends State<CommandPalette> {
           id: 'note_${note.id ?? note.createdAt}',
           title: title,
           subtitle: preview.isNotEmpty ? preview : _formatDate(note.updatedAt),
-          icon: note.isEncrypted ? Icons.lock_rounded : Icons.description_outlined,
+          icon: Icons.description_outlined,
           iconColor: note.color != null ? Color(note.color!) : null,
           category: 'NOTLAR',
           action: () {
@@ -207,10 +204,8 @@ class _CommandPaletteState extends State<CommandPalette> {
 
   List<PaletteItem> _getActions(
     BuildContext context,
-    VaultProvider vaultProvider,
     ThemeProvider themeProvider,
   ) {
-    final isVaultUnlocked = vaultProvider.isUnlocked;
     final isDark = themeProvider.themeMode == ThemeMode.dark;
 
     return [
@@ -232,33 +227,20 @@ class _CommandPaletteState extends State<CommandPalette> {
 
 
 
-      // Vault Lock / Unlock (Kasayı Kilitle / Kilidi Aç)
+      // Batch Export (Toplu Dışa Aktar)
       PaletteItem(
-        id: 'toggle_vault',
-        title: isVaultUnlocked ? 'Kasayı Kilitle' : 'Kasa Kilidini Aç',
-        subtitle: isVaultUnlocked
-            ? 'Şifreli notları anında koruma altına al'
-            : 'Gizli kasadaki şifreli notlara eriş',
-        icon: isVaultUnlocked ? Icons.lock_outline_rounded : Icons.lock_open_rounded,
-        iconColor: Colors.orange,
-        category: 'GÜVENLİK',
-        action: () async {
-          if (isVaultUnlocked) {
-            await vaultProvider.lockVault();
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Gizli kasa kilitlendi.')),
-              );
-            }
-          } else {
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (ctx) => const PrivateVaultScreen()),
-            );
-          }
+        id: 'export_batch',
+        title: 'Toplu Dışa Aktar (TXT, PDF, LaTeX)',
+        subtitle: 'Notları çoklu formatlarda dışa aktar',
+        icon: Icons.archive_outlined,
+        iconColor: Colors.redAccent,
+        category: 'DIŞA AKTARMA',
+        action: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (ctx) => const BatchExportScreen()),
+          );
         },
       ),
-
-
 
       // Daily Journal Note (Günün Notu)
       PaletteItem(
@@ -353,23 +335,6 @@ class _CommandPaletteState extends State<CommandPalette> {
         },
       ),
 
-      // Database Optimize
-      PaletteItem(
-        id: 'optimize_db',
-        title: 'Veritabanını Optimize Et',
-        subtitle: 'İndeksleri temizle ve depolama performansını artır',
-        icon: Icons.speed_rounded,
-        iconColor: Colors.tealAccent,
-        category: 'SİSTEM',
-        action: () async {
-          await context.optimizeNoteDatabase();
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Veritabanı başarıyla optimize edildi.')),
-            );
-          }
-        },
-      ),
 
       // Settings
       PaletteItem(

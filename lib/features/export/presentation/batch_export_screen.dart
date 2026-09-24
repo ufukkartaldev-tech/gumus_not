@@ -4,6 +4,8 @@ import 'package:file_picker/file_picker.dart';
 import 'dart:io';
 import 'package:connected_notebook/features/notes/models/note_model.dart';
 import 'package:connected_notebook/features/notes/providers/note_provider.dart';
+import 'package:connected_notebook/features/export/services/pdf_export_service.dart';
+import 'package:connected_notebook/features/export/services/latex_export_service.dart';
 
 class BatchExportScreen extends StatefulWidget {
   const BatchExportScreen({Key? key}) : super(key: key);
@@ -52,8 +54,13 @@ class _BatchExportScreenState extends State<BatchExportScreen> {
     });
 
     try {
-      // Simple text export for now
-      await _exportToText(directory);
+      if (_exportFormat == 'txt') {
+        await _exportToText(directory);
+      } else if (_exportFormat == 'pdf') {
+        await _exportToPdf(directory);
+      } else if (_exportFormat == 'latex') {
+        await _exportToLatex(directory);
+      }
       _showSuccess(context, 'Notlar başarıyla dışa aktarıldı!', directoryPath: directory);
     } catch (e) {
       _showError(context, 'Dışa aktarma hatası: $e');
@@ -66,26 +73,63 @@ class _BatchExportScreenState extends State<BatchExportScreen> {
 
   Future<void> _exportToText(String directoryPath) async {
     final directory = Directory(directoryPath);
-    final timestamp = DateTime.now().millisecondsSinceEpoch;
-    final file = File('${directory.path}/notes_export_$timestamp.txt');
-    
-    final content = StringBuffer();
     for (int i = 0; i < _selectedNotes.length; i++) {
       final note = _selectedNotes[i];
+      final fileName = '${note.title.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_')}.txt';
+      final file = File('${directory.path}/$fileName');
+      
+      final content = StringBuffer();
       content.writeln('=== ${note.title} ===');
       content.writeln('Created: ${DateTime.fromMillisecondsSinceEpoch(note.createdAt)}');
       content.writeln('Tags: ${note.tags.join(', ')}');
       content.writeln('');
       content.writeln(note.content);
-      content.writeln('');
-      content.writeln('');
+      
+      await file.writeAsString(content.toString());
       
       setState(() {
         _progress = ((i + 1) / _selectedNotes.length * 100).round();
       });
     }
-    
-    await file.writeAsString(content.toString());
+  }
+
+  Future<void> _exportToPdf(String directoryPath) async {
+    final directory = Directory(directoryPath);
+    for (int i = 0; i < _selectedNotes.length; i++) {
+      final note = _selectedNotes[i];
+      try {
+        final fileName = '${note.title.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_')}.pdf';
+        final file = File('${directory.path}/$fileName');
+        
+        final bytes = await PdfExportService.generatePdfDocument(note);
+        await file.writeAsBytes(bytes);
+      } catch (e) {
+        print('PDF Export Error for ${note.title}: $e');
+      }
+      setState(() {
+        _progress = ((i + 1) / _selectedNotes.length * 100).round();
+      });
+    }
+  }
+
+  Future<void> _exportToLatex(String directoryPath) async {
+    final directory = Directory(directoryPath);
+    for (int i = 0; i < _selectedNotes.length; i++) {
+      final note = _selectedNotes[i];
+      final fileName = '${note.title.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_')}.tex';
+      final file = File('${directory.path}/$fileName');
+      
+      final latexContent = LatexExportService.generateLatexDocument(
+        title: note.title,
+        content: note.content,
+      );
+      
+      await file.writeAsString(latexContent);
+      
+      setState(() {
+        _progress = ((i + 1) / _selectedNotes.length * 100).round();
+      });
+    }
   }
 
   void _showError(BuildContext context, String message) {
@@ -197,6 +241,18 @@ class _BatchExportScreenState extends State<BatchExportScreen> {
                 child: RadioListTile<String>(
                   title: const Text('PDF'),
                   value: 'pdf',
+                  groupValue: _exportFormat,
+                  onChanged: (value) {
+                    setState(() {
+                      _exportFormat = value!;
+                    });
+                  },
+                ),
+              ),
+              Expanded(
+                child: RadioListTile<String>(
+                  title: const Text('LaTeX'),
+                  value: 'latex',
                   groupValue: _exportFormat,
                   onChanged: (value) {
                     setState(() {

@@ -8,7 +8,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:printing/printing.dart';
 
 class PdfExportService {
-  static Future<File?> exportNoteToPdf(Note note) async {
+  static Future<Uint8List> generatePdfDocument(Note note) async {
     final pdf = pw.Document();
     
     // PREMIUM: Google Fonts kullanarak Türkçe karakter desteği getiriyoruz
@@ -146,23 +146,17 @@ class PdfExportService {
       ),
     );
 
-    // Kaydetme Diyaloğu
-    try {
-      String? outputFile = await FilePicker.platform.saveFile(
-        dialogTitle: 'Profesyonel PDF Olarak Kaydet',
-        fileName: '${note.title.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_')}.pdf',
-        type: FileType.custom,
-        allowedExtensions: ['pdf'],
-      );
+    return await pdf.save();
+  }
 
-      if (outputFile != null) {
-        final file = File(outputFile);
-        await file.writeAsBytes(await pdf.save());
-        return file;
-      }
+  static Future<void> exportNoteToPdf(Note note) async {
+    final bytes = await generatePdfDocument(note);
+    final fileName = '${note.title.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_')}.pdf';
+    
+    try {
+      await Printing.sharePdf(bytes: bytes, filename: fileName);
     } catch (e) {
       print('PDF Export Error: $e');
     }
-    return null;
   }
 }

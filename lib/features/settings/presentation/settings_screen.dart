@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:connected_notebook/features/notes/providers/note_provider.dart';
-import 'package:connected_notebook/features/notes/providers/vault_provider.dart';
 import 'package:connected_notebook/core/theme/theme_provider.dart';
 import 'package:connected_notebook/core/theme/app_theme.dart';
 import 'package:connected_notebook/features/settings/presentation/about_screen.dart';
 import 'package:connected_notebook/features/backup/presentation/backup_screen.dart';
 import 'package:connected_notebook/features/home_widget/presentation/widget_screen.dart';
 import 'package:connected_notebook/core/utils/shortcut_manager.dart';
+import 'package:connected_notebook/features/backup/services/backup_share_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({Key? key}) : super(key: key);
@@ -17,93 +17,9 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _confirmPasswordController = TextEditingController();
-  bool _isEncryptionEnabled = false;
-  bool _showPassword = false;
-  bool _showConfirmPassword = false;
-
   @override
   void initState() {
     super.initState();
-    _checkEncryptionStatus();
-  }
-
-  @override
-  void dispose() {
-    _passwordController.dispose();
-    _confirmPasswordController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _checkEncryptionStatus() async {
-    final isEnabled = context.read<VaultProvider>().isUnlocked;
-    setState(() {
-      _isEncryptionEnabled = isEnabled;
-    });
-  }
-
-  Future<void> _enableEncryption() async {
-    if (_passwordController.text.isEmpty) {
-      _showError('Şifre boş olamaz');
-      return;
-    }
-
-    if (_passwordController.text != _confirmPasswordController.text) {
-      _showError('Şifreler eşleşmiyor');
-      return;
-    }
-
-    if (_passwordController.text.length < 8) {
-      _showError('Şifre en az 8 karakter olmalıdır');
-      return;
-    }
-
-    try {
-      await context.read<VaultProvider>().initializeVault(
-            password: _passwordController.text,
-          );
-      setState(() {
-        _isEncryptionEnabled = true;
-      });
-
-      _passwordController.clear();
-      _confirmPasswordController.clear();
-
-      _showSuccess('Şifreleme başarıyla etkinleştirildi');
-    } catch (e) {
-      _showError('Şifreleme etkinleştirilemedi: $e');
-    }
-  }
-
-  void _disableEncryption() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Şifrelemeyi Devre Dışı Bırak'),
-        content: const Text(
-          'Şifrelemeyi devre dışı bırakmak, tüm şifreli notların şifresini kaldıracaktır. '
-          'Bu işlem geri alınamaz. Devam etmek istediğinizden emin misiniz?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('İptal'),
-          ),
-          TextButton(
-            onPressed: () {
-              context.read<VaultProvider>().lockVault();
-              setState(() {
-                _isEncryptionEnabled = false;
-              });
-              Navigator.of(context).pop();
-              _showSuccess('Kasa kilitlendi');
-            },
-            child: const Text('Devre Dışı Bırak', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
   }
 
   void _showError(String message) {
@@ -124,54 +40,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Future<void> _exportNotes() async {
-    try {
-      final noteProvider = Provider.of<NoteProvider>(context, listen: false);
-      await noteProvider.loadNotes();
-
-      _showSuccess('Notlar başarıyla dışa aktarıldı');
-    } catch (e) {
-      _showError('Dışa aktarma başarısız: $e');
-    }
-  }
-
-  Future<void> _clearAllData() async {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Tüm Verileri Temizle'),
-        content: const Text(
-          'Bu işlem tüm notlarınızı ve bağlantılarınızı kalıcı olarak silecektir. '
-          'Bu işlem geri alınamaz. Devam etmek istediğinizden emin misiniz?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('İptal'),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.of(context).pop();
-
-              try {
-                final noteProvider = Provider.of<NoteProvider>(context, listen: false);
-                for (final note in noteProvider.notes) {
-                  if (note.id != null) {
-                    await noteProvider.deleteNote(note.id!);
-                  }
-                }
-                _showSuccess('Tüm veriler temizlendi');
-              } catch (e) {
-                _showError('Veriler temizlenemedi: $e');
-              }
-            },
-            child: const Text('Temizle', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -184,12 +52,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _buildDeveloperSection(),
           const SizedBox(height: 24),
           _buildThemeSection(),
-          const SizedBox(height: 24),
-          _buildEncryptionSection(),
-          const SizedBox(height: 24),
-          _buildDataManagementSection(),
-          const SizedBox(height: 24),
-          _buildBackupSection(),
           const SizedBox(height: 24),
           _buildWidgetSection(),
           const SizedBox(height: 24),
@@ -376,103 +238,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildEncryptionSection() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.lock, size: 24),
-                const SizedBox(width: 8),
-                const Text(
-                  'Şifreleme',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const Spacer(),
-                Switch(
-                  value: _isEncryptionEnabled,
-                  onChanged: (value) {
-                    if (value) {
-                      _showEncryptionDialog();
-                    } else {
-                      _disableEncryption();
-                    }
-                  },
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _isEncryptionEnabled
-                  ? 'Şifreleme etkin. Notlarınız AES-256 ile korunuyor.'
-                  : 'Şifreleme devre dışı. Notlarınız şifrelenmiyor.',
-              style: TextStyle(
-                color: _isEncryptionEnabled ? Colors.green : Colors.orange,
-                fontSize: 14,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDataManagementSection() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Row(
-              children: [
-                Icon(Icons.storage, size: 24),
-                SizedBox(width: 8),
-                Text(
-                  'Veri Yönetimi',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            ListTile(
-              leading: const Icon(Icons.download),
-              title: const Text('Notları Dışa Aktar'),
-              subtitle: const Text('Tüm notları JSON formatında dışa aktar'),
-              onTap: _exportNotes,
-            ),
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.delete_forever, color: Colors.red),
-              title: const Text('Tüm Verileri Temizle'),
-              subtitle: const Text('Tüm notları ve bağlantıları kalıcı olarak sil'),
-              onTap: _clearAllData,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBackupSection() {
-    return Card(
-      child: ListTile(
-        leading: const Icon(Icons.cloud_sync),
-        title: const Text('Yedekleme & Senkronizasyon'),
-        subtitle: const Text('Google Drive ile yedekleme ve senkronizasyon'),
-        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const BackupScreen()),
-          );
-        },
-      ),
-    );
-  }
 
   Widget _buildWidgetSection() {
     return Card(
@@ -508,69 +273,4 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  void _showEncryptionDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Şifrelemeyi Etkinleştir'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'Notlarınızı şifrelemek için bir anahtar şifre oluşturun. '
-              'Bu şifreyi unutursanız verilerinize erişemezsiniz!',
-              style: TextStyle(fontSize: 14),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _passwordController,
-              obscureText: !_showPassword,
-              decoration: InputDecoration(
-                labelText: 'Şifre',
-                border: const OutlineInputBorder(),
-                suffixIcon: IconButton(
-                  icon: Icon(_showPassword ? Icons.visibility : Icons.visibility_off),
-                  onPressed: () {
-                    setState(() {
-                      _showPassword = !_showPassword;
-                    });
-                  },
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _confirmPasswordController,
-              obscureText: !_showConfirmPassword,
-              decoration: InputDecoration(
-                labelText: 'Şifre Tekrarı',
-                border: const OutlineInputBorder(),
-                suffixIcon: IconButton(
-                  icon: Icon(_showConfirmPassword ? Icons.visibility : Icons.visibility_off),
-                  onPressed: () {
-                    setState(() {
-                      _showConfirmPassword = !_showConfirmPassword;
-                    });
-                  },
-                ),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('İptal'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              _enableEncryption();
-            },
-            child: const Text('Etkinleştir'),
-          ),
-        ],
-      ),
-    );
-  }
 }

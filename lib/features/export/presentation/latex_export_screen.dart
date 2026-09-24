@@ -1,4 +1,7 @@
 import 'dart:io';
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
+import 'package:cross_file/cross_file.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:connected_notebook/features/notes/models/note_model.dart';
@@ -233,24 +236,35 @@ class _LatexExportScreenState extends State<LatexExportScreen> {
 
       final fileName = '${widget.note.title.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_')}.tex';
       
-      final String? outputFile = await FilePicker.platform.saveFile(
-        dialogTitle: 'LaTeX Dosyası Olarak Kaydet',
-        fileName: fileName,
-        type: FileType.custom,
-        allowedExtensions: ['tex'],
-      );
-
-      if (outputFile != null) {
-        final file = File(outputFile);
-        await file.writeAsString(latexContent);
-        
+      if (kIsWeb) {
+        final bytes = utf8.encode(latexContent);
+        final xFile = XFile.fromData(Uint8List.fromList(bytes), name: fileName, mimeType: 'text/plain');
+        await xFile.saveTo(fileName);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('LaTeX dosyası başarıyla oluşturuldu: ${outputFile.split('\\').last}'),
-              backgroundColor: Colors.green,
-            ),
+            const SnackBar(content: Text('LaTeX dosyası indiriliyor...'), backgroundColor: Colors.green),
           );
+        }
+      } else {
+        final String? outputFile = await FilePicker.platform.saveFile(
+          dialogTitle: 'LaTeX Dosyası Olarak Kaydet',
+          fileName: fileName,
+          type: FileType.custom,
+          allowedExtensions: ['tex'],
+        );
+
+        if (outputFile != null) {
+          final file = File(outputFile);
+          await file.writeAsString(latexContent);
+          
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('LaTeX dosyası başarıyla oluşturuldu: ${outputFile.split('\\').last}'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
         }
       }
     } catch (e) {

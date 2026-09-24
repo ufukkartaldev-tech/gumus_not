@@ -1,25 +1,15 @@
 import '../models/note_model.dart';
 import '../repositories/note_repository.dart';
 import 'backlink_service.dart';
-import '../../../core/security/legacy_encryption_service_adapter.dart';
 
-/// Main orchestration service for note operations.
-///
-/// Responsibilities:
-/// - decide whether note content should be encrypted,
-/// - keep backlink extraction in plaintext phase,
-/// - delegate persistence to the repository layer,
-/// - preserve the existing UI-facing API so screens do not break.
 class NoteService {
   NoteService(
     this._repository,
-    this._backlinkService, {
-    LegacyEncryptionServiceAdapter? encryptionAdapter,
-  }) : _encryptionAdapter = encryptionAdapter;
+    this._backlinkService,
+  );
 
   final NoteRepository _repository;
   final BacklinkService _backlinkService;
-  final LegacyEncryptionServiceAdapter? _encryptionAdapter;
 
   /// Create a new note with optional vault encryption.
   ///
@@ -250,40 +240,14 @@ class NoteService {
     return suggestions.toList();
   }
 
-  /// Resolve the readable content for a note when the vault is unlocked.
-  ///
-  /// This helper is intended for note detail screens and other explicit read
-  /// flows. List loading intentionally stays ciphertext-safe.
   Future<String> resolveReadableContent(Note note) async {
-    if (!note.isEncrypted) {
-      return note.content;
-    }
-
-    final adapter = _encryptionAdapter;
-    if (adapter == null || !adapter.isUnlocked()) {
-      throw StateError('Vault is locked. Encrypted note content cannot be resolved.');
-    }
-
-    return adapter.decrypt(note.content);
+    return note.content;
   }
 
   Future<String> _prepareContentForPersistence({
     required String content,
     required bool isEncrypted,
   }) async {
-    if (!isEncrypted) {
-      return content;
-    }
-
-    final adapter = _encryptionAdapter;
-    if (adapter == null) {
-      throw StateError('Encryption adapter is not configured.');
-    }
-
-    if (!adapter.isUnlocked()) {
-      throw StateError('Vault must be unlocked before saving encrypted notes.');
-    }
-
-    return adapter.encrypt(content);
+    return content;
   }
 }

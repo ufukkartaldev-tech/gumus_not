@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:connected_notebook/features/notes/providers/note_provider.dart';
 import 'package:connected_notebook/features/backup/services/backup_share_service.dart';
 import 'package:connected_notebook/core/database/sqlite_database_service.dart';
 
@@ -22,9 +24,10 @@ class _BackupScreenState extends State<BackupScreen> {
 
   Future<void> _loadNoteCount() async {
     try {
-      final notes = await SqliteDatabaseService().getAllNotes();
+      final noteProvider = Provider.of<NoteProvider>(context, listen: false);
+      await noteProvider.loadNotes();
       setState(() {
-        _totalNotes = notes.length;
+        _totalNotes = noteProvider.notes.length;
       });
     } catch (e) {
       print("Not sayısı yüklenemedi: $e");

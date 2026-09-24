@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../core/theme/app_theme.dart';
-import '../../core/theme/theme_provider.dart';
-
+import 'package:provider/provider.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/theme_provider.dart';
 /// Theme selection screen with preset themes and custom options
 class ThemeSelectionScreen extends StatefulWidget {
   const ThemeSelectionScreen({Key? key}) : super(key: key);

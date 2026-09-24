@@ -9,7 +9,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:connected_notebook/features/notes/models/note_model.dart';
 import 'package:connected_notebook/features/notes/providers/note_provider.dart';
 import 'package:connected_notebook/features/notes/providers/note_editor_provider.dart';
-import 'package:connected_notebook/features/notes/providers/vault_provider.dart';
 import 'package:connected_notebook/features/media/services/image_service.dart';
 import 'package:connected_notebook/features/notes/widgets/custom_widgets.dart';
 import 'package:connected_notebook/features/notes/widgets/math_markdown_renderer.dart';
@@ -21,6 +20,7 @@ import 'package:connected_notebook/features/tools/widgets/pomodoro_timer.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:connected_notebook/features/export/services/pdf_service.dart';
 import 'package:connected_notebook/core/utils/shortcut_manager.dart';
+import 'package:connected_notebook/features/export/presentation/latex_export_screen.dart';
 
 class MarkdownEditor extends StatefulWidget {
   final Note? note;
@@ -258,7 +258,6 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
     }
     setState(() => _isLoading = true);
     try {
-      final vaultProvider = context.read<VaultProvider>();
       final plaintextContent = _contentController.text;
 
       final note = Note(
@@ -267,31 +266,15 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
         content: plaintextContent,
         createdAt: widget.note?.createdAt ?? DateTime.now().millisecondsSinceEpoch,
         updatedAt: DateTime.now().millisecondsSinceEpoch,
-        isEncrypted: _isEncrypted,
+        isEncrypted: false,
         tags: _tags,
         color: _selectedColor,
       );
-      if (note.isEncrypted) {
-        if (widget.note == null) {
-          await vaultProvider.createPrivateNote(
-            title: note.title,
-            content: plaintextContent,
-            tags: note.tags,
-            color: note.color,
-            folderName: note.folderName,
-          );
-        } else {
-          await vaultProvider.updatePrivateNote(
-            note: note,
-            plainTextContent: plaintextContent,
-          );
-        }
+
+      if (widget.note == null) {
+        await Provider.of<NoteProvider>(context, listen: false).addNote(note);
       } else {
-        if (widget.note == null) {
-          await Provider.of<NoteProvider>(context, listen: false).addNote(note);
-        } else {
-          await Provider.of<NoteProvider>(context, listen: false).updateNote(note);
-        }
+        await Provider.of<NoteProvider>(context, listen: false).updateNote(note);
       }
       widget.onSave(note);
     } catch (e) {
@@ -308,23 +291,6 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
   }
 
-  Future<void> _unlockEncryptedNote() async {
-    final note = widget.note;
-    if (note == null || !note.isEncrypted) return;
-
-    try {
-      await context.read<NoteEditorProvider>().unlockNote(note);
-      final content = context.read<NoteEditorProvider>().resolvedContent;
-      if (content != null) {
-        setState(() {
-          _contentController.text = content;
-          _isEncrypted = true;
-        });
-      }
-    } catch (e) {
-      _showError('Not açılamadı: $e');
-    }
-  }
 
   void _showColorPicker() {
     showDialog(
@@ -589,26 +555,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
               ),
             ),
 
-            // Encrypted lock banner
-            if ((widget.note?.isEncrypted ?? false) && _contentController.text.startsWith('🔒'))
-              Positioned(
-                bottom: 80,
-                left: 20,
-                right: 20,
-                child: Center(
-                  child: ElevatedButton.icon(
-                    onPressed: _unlockEncryptedNote,
-                    icon: const Icon(Icons.lock_open_rounded),
-                    label: const Text('Şifreyi Çöz ve Notu Aç'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orange,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                    ),
-                  ),
-                ),
-              ),
+
 
             // Mobile Floating Accessory Bar (Docked right above keyboard)
             if (!_isFocusMode && !_isPreviewMode && (!isDesktop || keyboardHeight > 0))
@@ -751,20 +698,6 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
               case 'color':
                 _showColorPicker();
                 break;
-              case 'lock':
-                final vaultProvider = context.read<VaultProvider>();
-                if (!vaultProvider.isUnlocked && !_isEncrypted) {
-                  _showError('Kasa kilitli. Şifreli not oluşturmak için önce kasayı açın.');
-                  return;
-                }
-                setState(() => _isEncrypted = !_isEncrypted);
-                context.read<NoteEditorProvider>().setEncrypted(_isEncrypted);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(_isEncrypted ? 'Not şifreli olarak kaydedilecek' : 'Not düz olarak kaydedilecek'),
-                  ),
-                );
-                break;
               case 'tags':
                 _showTagAndMoodSheet();
                 break;
@@ -776,6 +709,11 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
                 break;
               case 'pdf':
                 _exportToPdf();
+                break;
+              case 'latex':
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (ctx) => LatexExportScreen(note: widget.note!)),
+                );
                 break;
               case 'share':
                 final textToShare = '${_titleController.text.trim()}\n\n${_contentController.text}';
@@ -813,17 +751,6 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
                   Icon(Icons.palette_outlined, size: 20, color: _selectedColor != null ? Color(_selectedColor!) : null),
                   const SizedBox(width: 12),
                   const Text('Kağıt Rengi'),
-                ],
-              ),
-            ),
-            PopupMenuItem(
-              value: 'lock',
-              child: Row(
-                children: [
-                  Icon(_isEncrypted ? Icons.lock_rounded : Icons.lock_open_rounded,
-                      size: 20, color: _isEncrypted ? Colors.orange : null),
-                  const SizedBox(width: 12),
-                  Text(_isEncrypted ? 'Şifrelemeyi Kaldır' : 'Notu Şifrele'),
                 ],
               ),
             ),
@@ -878,6 +805,16 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
                 ],
               ),
             ),
+            PopupMenuItem(
+              value: 'latex',
+              child: const Row(
+                children: [
+                  Icon(Icons.text_format_rounded, size: 20),
+                  const SizedBox(width: 12),
+                  Text('LaTeX Olarak Dışa Aktar'),
+                ],
+              ),
+            ),
           ],
         ),
       ],
@@ -887,46 +824,6 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
   /// The Content-First Zen Mode Editor
   Widget _buildZenEditor(BuildContext context) {
     final theme = Theme.of(context);
-
-    // If encrypted and not yet unlocked
-    if (_isEncrypted && _contentController.text.contains('🔒 Bu not şifreli')) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.lock_rounded, size: 80, color: Colors.orange.withOpacity(0.6)),
-            const SizedBox(height: 24),
-            Text(
-              'Bu Not Şifreli',
-              style: theme.textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: Colors.orange,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'İçeriği görmek ve düzenlemek için şifre giriniz.',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.disabledColor,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 32),
-            ElevatedButton.icon(
-              onPressed: _unlockEncryptedNote,
-              icon: const Icon(Icons.lock_open_rounded),
-              label: const Text('Şifre ile Aç'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.orange,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
 
     final mood = _findCurrentMood();
     final nonMoodTags = _tags.where((t) => !t.startsWith('mood:')).toList();
