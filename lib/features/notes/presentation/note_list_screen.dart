@@ -304,6 +304,12 @@ class _NoteListScreenState extends State<NoteListScreen> {
           iconColor: Colors.indigoAccent,
           onTap: () => Navigator.of(context).pushNamed('/graph'),
         ),
+        _buildSidebarItem(
+          icon: Icons.calendar_month_outlined,
+          title: 'Takvim & Günlük',
+          iconColor: Colors.orangeAccent,
+          onTap: () => Navigator.of(context).pushNamed('/calendar'),
+        ),
 
         const SizedBox(height: 16),
         // Folders Section

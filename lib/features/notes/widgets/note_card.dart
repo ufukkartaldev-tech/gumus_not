@@ -200,9 +200,10 @@ class _NoteCardState extends State<NoteCard>
 
                                         Expanded(
                                           child: Text(
-                                            widget.note.title.isEmpty
+                                            (widget.note.emojiIcon != null ? '${widget.note.emojiIcon} ' : '') + 
+                                            (widget.note.title.isEmpty
                                                 ? 'Başlıksız Not'
-                                                : MarkdownCleaner.clean(widget.note.title),
+                                                : MarkdownCleaner.clean(widget.note.title)),
                                             style: theme.textTheme.titleMedium
                                                 ?.copyWith(
                                                   fontWeight: FontWeight.w800,

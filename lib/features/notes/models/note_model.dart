@@ -88,6 +88,7 @@ class Note {
   List<String> tags;
   int? color; // New field for storing color value (0xFF... int)
   String folderName; // Folder/category name for organization
+  String? emojiIcon; // New field for Notion-like icon
 
   Note({
     this.id,
@@ -99,6 +100,7 @@ class Note {
     this.tags = const [],
     this.color,
     this.folderName = 'Genel', // Default folder
+    this.emojiIcon,
   });
 
   Map<String, dynamic> toMap() {
@@ -112,6 +114,7 @@ class Note {
       'tags': tags.join(','),
       'color': color,
       'folder_name': folderName,
+      'emoji_icon': emojiIcon,
     };
   }
 
@@ -126,6 +129,7 @@ class Note {
       tags: (map['tags'] as String? ?? '').split(',').where((tag) => tag.isNotEmpty).toList(),
       color: map['color'],
       folderName: map['folder_name'] ?? 'Genel',
+      emojiIcon: map['emoji_icon'],
     );
   }
 
@@ -139,6 +143,7 @@ class Note {
     List<String>? tags,
     int? color,
     String? folderName,
+    String? emojiIcon,
   }) {
     return Note(
       id: id ?? this.id,
@@ -150,6 +155,7 @@ class Note {
       tags: tags ?? this.tags,
       color: color ?? this.color,
       folderName: folderName ?? this.folderName,
+      emojiIcon: emojiIcon ?? this.emojiIcon,
     );
   }
 

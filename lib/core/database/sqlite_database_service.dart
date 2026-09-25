@@ -7,7 +7,7 @@ import 'idatabase_service.dart';
 class SqliteDatabaseService implements IDatabaseService {
   static Database? _database;
   static const String _dbName = 'connected_notebook.db';
-  static const int _dbVersion = 4;
+  static const int _dbVersion = 5;
 
   @override
   Future<Database> get database async {
@@ -38,7 +38,8 @@ class SqliteDatabaseService implements IDatabaseService {
         is_encrypted INTEGER DEFAULT 0,
         tags TEXT,
         color INTEGER,
-        folder_name TEXT DEFAULT 'Genel'
+        folder_name TEXT DEFAULT 'Genel',
+        emoji_icon TEXT
       )
     ''');
 
@@ -102,6 +103,9 @@ class SqliteDatabaseService implements IDatabaseService {
         INSERT INTO notes_fts(id, title, content)
         SELECT id, title, content FROM notes;
       ''');
+    }
+    if (oldVersion < 5) {
+      await db.execute("ALTER TABLE notes ADD COLUMN emoji_icon TEXT");
     }
   }
 

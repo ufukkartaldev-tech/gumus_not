@@ -21,6 +21,7 @@ import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:connected_notebook/features/export/services/pdf_service.dart';
 import 'package:connected_notebook/core/utils/shortcut_manager.dart';
 import 'package:connected_notebook/features/export/presentation/latex_export_screen.dart';
+import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 
 class MarkdownEditor extends StatefulWidget {
   final Note? note;
@@ -47,6 +48,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
   bool _isLoading = false;
   bool _isEncrypted = false;
   int? _selectedColor;
+  String? _emojiIcon;
   bool _isPomodoroVisible = false;
   bool _isCrossReferenceVisible = false;
   List<String> _tags = [];
@@ -92,6 +94,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
 
     _contentController = MarkdownLivePreviewController(text: content);
     _selectedColor = widget.note?.color;
+    _emojiIcon = widget.note?.emojiIcon;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -269,6 +272,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
         isEncrypted: false,
         tags: _tags,
         color: _selectedColor,
+        emojiIcon: _emojiIcon,
       );
 
       if (widget.note == null) {
@@ -366,39 +370,38 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
                     height: 4,
                     decoration: BoxDecoration(
                       color: theme.dividerColor,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
+                      borderRadius: BorderRadius.circular(2),
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      const Icon(Icons.functions_rounded, color: Colors.purple, size: 22),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Matematik & Diyagram Ekle',
-                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: mathItems.map((item) {
-                      return ActionChip(
-                        label: Text(item['label']!, style: const TextStyle(fontWeight: FontWeight.w600)),
-                        backgroundColor: theme.colorScheme.surface,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _insertTextAtCursor(item['syntax']!);
-                        },
-                      );
-                    }).toList(),
-                  ),
-                ],
-              ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    const Icon(Icons.functions_rounded, color: Colors.purple, size: 22),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Matematik & Diyagram Ekle',
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: mathItems.map((item) {
+                    return ActionChip(
+                      label: Text(item['label']!, style: const TextStyle(fontWeight: FontWeight.w600)),
+                      backgroundColor: theme.colorScheme.surface,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _insertTextAtCursor(item['syntax']!);
+                      },
+                    );
+                  }).toList(),
+                ),
+              ],
             ),
           ),
         );
@@ -426,35 +429,34 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                      Center(
-                        child: Container(
-                          width: 40,
-                          height: 4,
-                          decoration: BoxDecoration(
-                            color: Colors.grey.withOpacity(0.3),
-                            borderRadius: BorderRadius.circular(2),
-                          ),
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(2),
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Not Bilgileri & Etiketler',
-                        style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Not Bilgileri & Etiketler',
+                      style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildMoodSelector(),
+                    const SizedBox(height: 16),
+                    Expanded(
+                      child: TagManagerWidget(
+                        initialTags: _tags,
+                        onTagsChanged: (newTags) {
+                          setState(() => _tags = newTags);
+                          setSheetState(() {});
+                        },
                       ),
-                      const SizedBox(height: 16),
-                      _buildMoodSelector(),
-                      const SizedBox(height: 16),
-                      Expanded(
-                        child: TagManagerWidget(
-                          initialTags: _tags,
-                          onTagsChanged: (newTags) {
-                            setState(() => _tags = newTags);
-                            setSheetState(() {});
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             );
@@ -828,8 +830,46 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // Title Field - Large H1 Notion-like header
+        // Notion-like header: emoji icon + color picker
         Padding(
-          padding: const EdgeInsets.fromLTRB(28, 20, 28, 4),
+          padding: const EdgeInsets.fromLTRB(28, 12, 28, 0),
+          child: Row(
+            children: [
+              if (_emojiIcon != null)
+                GestureDetector(
+                  onTap: _showEmojiPicker,
+                  child: Text(_emojiIcon!, style: const TextStyle(fontSize: 56)),
+                ),
+              if (_emojiIcon == null)
+                TextButton.icon(
+                  onPressed: _showEmojiPicker,
+                  icon: const Icon(Icons.add_reaction_outlined, size: 18),
+                  label: const Text('İkon Ekle'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: theme.disabledColor,
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
+              const SizedBox(width: 12),
+              TextButton.icon(
+                onPressed: _showColorPicker,
+                icon: const Icon(Icons.color_lens_outlined, size: 18),
+                label: const Text('Renk'),
+                style: TextButton.styleFrom(
+                  foregroundColor: theme.disabledColor,
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        Padding(
+          padding: const EdgeInsets.fromLTRB(28, 8, 28, 4),
           child: TextField(
             controller: _titleController,
             focusNode: _titleFocusNode,
@@ -1063,6 +1103,10 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 24),
+            if (_emojiIcon != null) ...[
+              Text(_emojiIcon!, style: const TextStyle(fontSize: 64)),
+              const SizedBox(height: 8),
+            ],
             Text(
               _titleController.text.isEmpty ? 'Başlıksız Not' : _titleController.text,
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
@@ -1078,6 +1122,23 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
             ),
             const SizedBox(height: 100),
           ],
+        ),
+      ),
+    );
+  }
+
+  void _showEmojiPicker() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => SizedBox(
+        height: 300,
+        child: EmojiPicker(
+          onEmojiSelected: (category, emoji) {
+            setState(() => _emojiIcon = emoji.emoji);
+            Navigator.pop(ctx);
+          },
+          config: const Config(),
         ),
       ),
     );

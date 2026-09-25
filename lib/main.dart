@@ -16,6 +16,7 @@ import 'package:connected_notebook/features/notes/presentation/main_screen.dart'
 import 'package:connected_notebook/features/home_widget/presentation/widget_screen.dart';
 import 'package:connected_notebook/features/notes/widgets/markdown_editor.dart';
 import 'package:connected_notebook/features/notes/models/note_model.dart';
+import 'package:connected_notebook/features/calendar/presentation/calendar_screen.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -183,6 +184,7 @@ class ConnectedNotebookApp extends StatelessWidget {
                   '/graph': (context) => const GraphViewScreen(),
                   '/settings': (context) => const SettingsScreen(),
                   '/widgets': (context) => const WidgetScreen(),
+                  '/calendar': (context) => const CalendarScreen(),
                 },
                 onGenerateRoute: (settings) {
                   if (settings.name == '/note-editor') {
