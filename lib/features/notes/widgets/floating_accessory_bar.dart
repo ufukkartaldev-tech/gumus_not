@@ -95,22 +95,22 @@ class FloatingAccessoryBar extends StatelessWidget {
           color: isDark ? const Color(0xFF1E1F24) : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isDark ? Colors.white12 : Colors.black.withOpacity(0.08),
-              width: 0.8,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(isDark ? 0.4 : 0.12),
-                blurRadius: 18,
-                offset: const Offset(0, 6),
-              ),
-            ],
+            color: isDark ? Colors.white12 : Colors.black.withValues(alpha: 0.08),
+            width: 0.8,
           ),
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-            children: [
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.12),
+              blurRadius: 18,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: ListView(
+          scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+          children: [
               // [ B ] Bold
               _AccessoryButton(
                 label: 'B',
@@ -260,8 +260,7 @@ class FloatingAccessoryBar extends StatelessWidget {
                 tooltip: 'Klavyeyi Gizle',
                 onPressed: () => focusNode.unfocus(),
               ),
-            ],
-          ),
+          ],
         ),
       ),
     );
@@ -290,20 +289,20 @@ class DesktopSelectionBubbleMenu extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF2D2E33) : Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: isDark ? Colors.white24 : Colors.black12,
-              width: 0.8,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.18),
-                blurRadius: 14,
-                offset: const Offset(0, 4),
-              ),
-            ],
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isDark ? Colors.white24 : Colors.black12,
+            width: 0.8,
           ),
-          child: Row(
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.18),
+              blurRadius: 14,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               _AccessoryButton(
@@ -396,8 +395,7 @@ class DesktopSelectionBubbleMenu extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
+      );
   }
 }
 

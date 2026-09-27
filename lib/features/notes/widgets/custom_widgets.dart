@@ -244,44 +244,43 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
         padding: const EdgeInsets.only(top: 8, bottom: 8),
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surface,
-            border: Border(
-              bottom: BorderSide(
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.05),
-                width: 1,
-              ),
+          border: Border(
+            bottom: BorderSide(
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
+              width: 1,
             ),
           ),
-          child: SafeArea(
-            bottom: false,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: [
-                  if (showBackButton)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8.0),
-                      child: IconButton(
-                        onPressed: onBackPressed ?? () => Navigator.of(context).pop(),
-                        icon: const Icon(Icons.arrow_back_rounded),
-                        splashRadius: 24,
-                      ),
-                    ),
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: -0.5,
-                      ),
+        ),
+        child: SafeArea(
+          bottom: false,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                if (showBackButton)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: IconButton(
+                      onPressed: onBackPressed ?? () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.arrow_back_rounded),
+                      splashRadius: 24,
                     ),
                   ),
-                  if (actions != null)
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(children: actions!),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: -0.5,
                     ),
-                ],
-              ),
+                  ),
+                ),
+                if (actions != null)
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(children: actions!),
+                  ),
+              ],
             ),
           ),
         ),
