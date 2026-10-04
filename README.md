@@ -17,10 +17,8 @@ GümüşNot, Zettelkasten metodolojisinden ilham alan, **local-first** (önce ye
 *   **Gelişmiş Filtreleme**: Başlık, içerik, etiket ve tarih aralığına göre çok kriterli profesyonel arama motoru.
 *   **SQL Konsolu**: Gelişmiş kullanıcılar için doğrudan veritabanı sorgulama imkanı.
 
-### 3. Askeri Seviye Güvenlik (Private Vault)
-*   **AES-256 Şifreleme**: Hassas notlarınız veritabanında şifreli olarak saklanır.
-*   **Biyometrik Koruma**: Parmak izi ve yüz tanıma (FaceID/TouchID) desteği ile kasanıza güvenli erişim.
-*   **Deterministik Kurtarma**: Güvenli ve matematiksel olarak doğrulanabilir şifre kurtarma mekanizması.
+### 3. Uygulama Güvenliği
+*   **Biyometrik Koruma**: Parmak izi ve yüz tanıma (FaceID/TouchID) desteği ile uygulamanıza güvenli erişim.
 
 ### 4. Profesyonel Editör ve Medya
 *   **Görselleştirme ve Diyagramlar (Mermaid.js / PlantUML)**: Yazılımcılar sistem tasarlarken diyagram çizmeyi sever. Markdown içine yazılan mermaid kodunu anında görsel bir akış şemasına veya mimari çizime dönüştüren gelişmiş bir eklenti.
@@ -56,7 +54,7 @@ GümüşNot, ekran boyutuna göre çalışma alanını optimize eder:
 *   **UI Framework**: [Flutter](https://flutter.dev/) (Multi-platform)
 *   **Veritabanı**: SQLite (`sqflite` & `sqflite_common_ffi`)
 *   **Durum Yönetimi**: `Provider`
-*   **Güvenlik**: `encrypt` (AES-256), `local_auth` (Biyometrik), `flutter_secure_storage`
+*   **Güvenlik**: `local_auth` (Biyometrik), `flutter_secure_storage`
 *   **Render**: `flutter_markdown`, `flutter_math_fork`
 *   **Grafik ve Görselleştirme**: `fl_chart`
 *   **Dosya Yönetimi**: `pdf`, `printing`, `path_provider`, `archive`, `file_picker`
@@ -101,7 +99,7 @@ GümüşNot, ekran boyutuna göre çalışma alanını optimize eder:
 *   **Temel Not Yönetimi**: Oluşturma, düzenleme, silme, arama
 *   **Zettelkasten Bağlantıları**: Çift yönlü bağlantılar ve grafik görünümü
 *   **Görev Merkezi**: Notlardaki görevleri otomatik tarama ve yönetme
-*   **Şifreleme ve Güvenlik**: AES-256 ile not şifreleme, biyometrik koruma ve geliştirilmiş şifre hataları ile güvenli çalışma
+*   **Güvenlik**: Biyometrik koruma ile uygulamanıza güvenli giriş imkanı
 *   **Markdown ve LaTeX**: Zengin metin ve matematiksel formül desteği
 *   **Çizim Özelliği**: El yazısı notlar ve şemalar
 *   **Resim Desteği**: Kamera ve galeriden görsel ekleme
@@ -138,7 +136,7 @@ Proje hakkında detaylı bilgi için aşağıdaki belgelere göz atabilirsiniz:
 
 *   **[Özellik Yol Haritası](OZELLIK_YOLHARITASI.md)** - Geliştirme planı ve özellik detayları
 *   **[Algoritma Dokümanı](ALGORITMA_DOKUMAN.md)** - Temel algoritmalar ve veri yapıları
-*   **[Biyometrik Güvenlik](BIYOMETRIK_GUVENLIK.md)** - Şifreleme ve kimlik doğrulama sistemi
+*   **[Biyometrik Güvenlik](BIYOMETRIK_GUVENLIK.md)** - Kimlik doğrulama sistemi
 *   **[Çizim Özelliği](CIZIM_OZELLIGI.md)** - El yazısı ve çizim desteği
 *   **[PDF Export](PDF_EXPORT.md)** - Dışa aktarma özellikleri
 *   **[Resim Desteği](RESIM_DESTEGI.md)** - Görsel yönetimi ve optimizasyonu

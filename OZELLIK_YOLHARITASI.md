@@ -104,9 +104,9 @@ graph TD
 
 ### 4. ☁️ Bulut Senkronizasyonu
 
-#### a) End-to-End Şifreli Senkronizasyon
+#### a) Bulut Senkronizasyonu
 ```dart
-// Veriler bulutta bile şifreli
+// Notlarınızı bulutta yedekleyin
 - Google Drive entegrasyonu
 - Dropbox desteği
 - iCloud (iOS)
@@ -183,7 +183,6 @@ graph TD
 - Tarih aralığı + etiket + kelime sayısı
 - Bağlantı sayısına göre
 - Son düzenleme zamanına göre
-- Şifreli/şifresiz
 ```
 
 #### c) Kaydedilmiş Aramalar
@@ -311,8 +310,8 @@ graph TD
 
 #### c) Güvenli Paylaşım
 ```dart
-// Şifreli link paylaşımı
-- Şifre korumalı linkler
+// Özel link paylaşımı
+- Sadece davetlilere özel linkler
 - Süreli linkler (24 saat sonra geçersiz)
 - Tek kullanımlık linkler
 ```
