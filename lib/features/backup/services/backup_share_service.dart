@@ -39,8 +39,9 @@ class BackupShareService {
       if (zipData == null) return false;
 
       final tempDir = await getTemporaryDirectory();
-      final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
-      final fileName = 'gumusnot_backup_$timestamp.zip';
+      final now = DateTime.now();
+      final timestamp = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}-${now.minute.toString().padLeft(2, '0')}';
+      final fileName = 'gumusnot_yedek_$timestamp.zip';
       final backupFile = File('${tempDir.path}/$fileName');
       
       await backupFile.writeAsBytes(zipData);
