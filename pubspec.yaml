@@ -65,7 +65,7 @@ dependencies:
   # Cloud sync (will be implemented later)
   image_picker: ^1.2.1
   cached_network_image: ^3.4.1
-  permission_handler: ^12.0.1
+  permission_handler: ^13.0.2
   printing: ^5.14.2
   fl_chart: ^1.1.1
   intl: ^0.20.3
@@ -81,6 +81,7 @@ dependencies:
   emoji_picker_flutter: ^4.4.0
   table_calendar: ^3.2.1
   local_auth: ^3.0.2
+  speech_to_text: ^7.4.0
 
 dev_dependencies:
   flutter_test:

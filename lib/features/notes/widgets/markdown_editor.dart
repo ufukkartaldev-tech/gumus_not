@@ -22,6 +22,7 @@ import 'package:connected_notebook/features/export/services/pdf_service.dart';
 import 'package:connected_notebook/core/utils/shortcut_manager.dart';
 import 'package:connected_notebook/features/export/presentation/latex_export_screen.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
+import 'package:connected_notebook/features/notes/services/voice_note_service.dart';
 
 class MarkdownEditor extends StatefulWidget {
   final Note? note;
@@ -53,6 +54,9 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
   bool _isCrossReferenceVisible = false;
   List<String> _tags = [];
   bool _isVimInsertMode = false; // Start in Normal mode if Vim is enabled
+
+  final VoiceNoteService _voiceNoteService = VoiceNoteService();
+  bool _isRecording = false;
 
   final FocusNode _titleFocusNode = FocusNode();
   final FocusNode _contentFocusNode = FocusNode();
@@ -252,6 +256,29 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
       );
     }
     _contentFocusNode.requestFocus();
+  }
+
+  Future<void> _toggleVoiceRecording() async {
+    if (_isRecording) {
+      await _voiceNoteService.stopListening();
+      setState(() => _isRecording = false);
+    } else {
+      final success = await _voiceNoteService.initialize();
+      if (success) {
+        setState(() => _isRecording = true);
+        final initialText = _contentController.text;
+        
+        await _voiceNoteService.startListening((text) {
+           final separator = initialText.isEmpty || initialText.endsWith(' ') || initialText.endsWith('\n') ? '' : ' ';
+           setState(() {
+              _contentController.text = initialText + separator + text;
+              _contentController.selection = TextSelection.collapsed(offset: _contentController.text.length);
+           });
+        });
+      } else {
+        _showError('Mikrofon izni alınamadı veya sistem desteklemiyor.');
+      }
+    }
   }
 
   Future<void> _saveNote() async {
@@ -666,6 +693,16 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
           ),
           onPressed: () => setState(() => _isPreviewMode = !_isPreviewMode),
           tooltip: _isPreviewMode ? 'Düzenleme Modu' : 'Tam Önizleme',
+        ),
+
+        // Voice Note Toggle
+        IconButton(
+          icon: Icon(
+            _isRecording ? Icons.mic : Icons.mic_none,
+            color: _isRecording ? Colors.red : null,
+          ),
+          onPressed: _toggleVoiceRecording,
+          tooltip: 'Sesli Not',
         ),
 
         // Save Button (Clean and prominent)
