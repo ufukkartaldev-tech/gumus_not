@@ -17,6 +17,7 @@ import 'package:connected_notebook/features/home_widget/presentation/widget_scre
 import 'package:connected_notebook/features/notes/widgets/markdown_editor.dart';
 import 'package:connected_notebook/features/notes/models/note_model.dart';
 import 'package:connected_notebook/features/calendar/presentation/calendar_screen.dart';
+import 'package:connected_notebook/features/security/presentation/lock_screen.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -177,8 +178,9 @@ class ConnectedNotebookApp extends StatelessWidget {
                 routes: {
                   '/splash': (context) => SplashScreen(
                     onInitialized: () =>
-                        Navigator.of(context).pushReplacementNamed('/'),
+                        Navigator.of(context).pushReplacementNamed('/lock'),
                   ),
+                  '/lock': (context) => const LockScreen(),
                   '/': (context) => const MainScreen(),
                   '/notes': (context) => const NoteListScreen(),
                   '/graph': (context) => const GraphViewScreen(),

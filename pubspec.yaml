@@ -80,6 +80,7 @@ dependencies:
   args: ^2.7.0
   emoji_picker_flutter: ^4.4.0
   table_calendar: ^3.2.1
+  local_auth: ^3.0.2
 
 dev_dependencies:
   flutter_test:
