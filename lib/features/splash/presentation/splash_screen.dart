@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 class SplashScreen extends StatefulWidget {
   final VoidCallback onInitialized;
 
-  const SplashScreen({Key? key, required this.onInitialized}) : super(key: key);
+  const SplashScreen({super.key, required this.onInitialized});
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
@@ -67,12 +67,12 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                       width: 120,
                       height: 120,
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.05),
+                        color: Colors.white.withValues(alpha: 0.05),
                         borderRadius: BorderRadius.circular(30),
-                        border: Border.all(color: Colors.white.withOpacity(0.1)),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
                         boxShadow: [
                            BoxShadow(
-                             color: Colors.blue.withOpacity(0.2),
+                             color: Colors.blue.withValues(alpha: 0.2),
                              blurRadius: 30,
                              spreadRadius: 5,
                            )

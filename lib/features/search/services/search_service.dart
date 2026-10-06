@@ -1,6 +1,5 @@
 import 'dart:math';
 import 'package:connected_notebook/features/notes/models/note_model.dart';
-import 'package:connected_notebook/core/database/database_service.dart';
 
 class SearchService {
   // Ağırlık Puanları

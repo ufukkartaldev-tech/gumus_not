@@ -148,7 +148,7 @@ class BacklinkService {
 
       // In a real implementation, this would update the backlinks table
       // For now, we'll just log the operation
-      print('Backlink: ${noteId} -> ${targetNote.id} ($linkText)');
+      print('Backlink: $noteId -> ${targetNote.id} ($linkText)');
     }
   }
 

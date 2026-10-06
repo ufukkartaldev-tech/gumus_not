@@ -89,22 +89,22 @@ class _NoteCardState extends State<NoteCard>
               borderRadius: const BorderRadius.all(Radius.circular(20)),
               boxShadow: [
                 BoxShadow(
-                  color: accentColor.withOpacity(_isHovered ? 0.2 : 0.05),
+                  color: accentColor.withValues(alpha: _isHovered ? 0.2 : 0.05),
                   blurRadius: _isHovered ? 16 : 6,
                   offset: Offset(0, _isHovered ? 8 : 4),
                   spreadRadius: _isHovered ? 1 : 0,
                 ),
                 if (!_isHovered)
                   BoxShadow(
-                    color: Colors.black.withOpacity(isDark ? 0.3 : 0.04),
+                    color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.04),
                     blurRadius: 2,
                     offset: const Offset(0, 1),
                   ),
               ],
               border: Border.all(
                 color: _isHovered
-                    ? accentColor.withOpacity(0.5)
-                    : theme.dividerColor.withOpacity(isDark ? 0.2 : 0.6),
+                    ? accentColor.withValues(alpha: 0.5)
+                    : theme.dividerColor.withValues(alpha: isDark ? 0.2 : 0.6),
                 width: _isHovered ? 1.5 : 1,
               ),
             ),
@@ -114,7 +114,7 @@ class _NoteCardState extends State<NoteCard>
               child: InkWell(
                 onTap: widget.onTap,
                 borderRadius: BorderRadius.circular(20),
-                splashColor: accentColor.withOpacity(0.1),
+                splashColor: accentColor.withValues(alpha: 0.1),
                 hoverColor: Colors.transparent,
                 child: Stack(
                   children: [
@@ -126,8 +126,8 @@ class _NoteCardState extends State<NoteCard>
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                               colors: [
-                                noteColor.withOpacity(isDark ? 0.15 : 0.1),
-                                noteColor.withOpacity(isDark ? 0.05 : 0.02),
+                                noteColor.withValues(alpha: isDark ? 0.15 : 0.1),
+                                noteColor.withValues(alpha: isDark ? 0.05 : 0.02),
                                 Colors.transparent,
                               ],
                               stops: const [0.0, 0.6, 1.0],
@@ -274,8 +274,8 @@ class _NoteCardState extends State<NoteCard>
                                 borderRadius: BorderRadius.circular(4),
                                 gradient: LinearGradient(
                                   colors: [
-                                    theme.disabledColor.withOpacity(0.1),
-                                    theme.disabledColor.withOpacity(0.05),
+                                    theme.disabledColor.withValues(alpha: 0.1),
+                                    theme.disabledColor.withValues(alpha: 0.05),
                                   ],
                                 ),
                               ),
@@ -284,7 +284,7 @@ class _NoteCardState extends State<NoteCard>
                                   '•••••••••••••••••',
                                   style: TextStyle(
                                     letterSpacing: 4,
-                                    color: theme.disabledColor.withOpacity(0.5),
+                                    color: theme.disabledColor.withValues(alpha: 0.5),
                                   ),
                                 ),
                               ),
@@ -296,7 +296,7 @@ class _NoteCardState extends State<NoteCard>
                                 height: 1.6,
                                 fontSize: 14,
                                 color: theme.textTheme.bodyMedium?.color
-                                    ?.withOpacity(0.85),
+                                    ?.withValues(alpha: 0.85),
                               ),
                               maxLines: 4,
                               overflow: TextOverflow.ellipsis,
@@ -332,11 +332,11 @@ class _NoteCardState extends State<NoteCard>
                                   ),
                                   decoration: BoxDecoration(
                                     color: theme.colorScheme.primary
-                                        .withOpacity(0.1),
+                                        .withValues(alpha: 0.1),
                                     borderRadius: BorderRadius.circular(8),
                                     border: Border.all(
                                       color: theme.colorScheme.primary
-                                          .withOpacity(0.2),
+                                          .withValues(alpha: 0.2),
                                     ),
                                   ),
                                   child: Row(
@@ -492,10 +492,10 @@ class _NoteCardState extends State<NoteCard>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
-              color: theme.dividerColor.withOpacity(isDark ? 0.15 : 0.08),
+              color: theme.dividerColor.withValues(alpha: isDark ? 0.15 : 0.08),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: theme.dividerColor.withOpacity(isDark ? 0.3 : 0.2),
+                color: theme.dividerColor.withValues(alpha: isDark ? 0.3 : 0.2),
                 width: 1,
               ),
             ),
@@ -526,10 +526,10 @@ class _NoteCardState extends State<NoteCard>
           return Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
-              color: accentColor.withOpacity(isDark ? 0.12 : 0.08),
+              color: accentColor.withValues(alpha: isDark ? 0.12 : 0.08),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: accentColor.withOpacity(isDark ? 0.28 : 0.18),
+                color: accentColor.withValues(alpha: isDark ? 0.28 : 0.18),
                 width: 1,
               ),
             ),
@@ -543,7 +543,7 @@ class _NoteCardState extends State<NoteCard>
                   Text(
                     '#',
                     style: TextStyle(
-                      color: accentColor.withOpacity(0.7),
+                      color: accentColor.withValues(alpha: 0.7),
                       fontSize: 10,
                       fontWeight: FontWeight.bold,
                     ),
@@ -554,8 +554,8 @@ class _NoteCardState extends State<NoteCard>
                   displayTag,
                   style: TextStyle(
                     color: isDark
-                        ? accentColor.withOpacity(0.95)
-                        : accentColor.withOpacity(0.9),
+                        ? accentColor.withValues(alpha: 0.95)
+                        : accentColor.withValues(alpha: 0.9),
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
                     letterSpacing: -0.2,
@@ -571,10 +571,10 @@ class _NoteCardState extends State<NoteCard>
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
               decoration: BoxDecoration(
-                color: theme.disabledColor.withOpacity(0.08),
+                color: theme.disabledColor.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: theme.disabledColor.withOpacity(0.18),
+                  color: theme.disabledColor.withValues(alpha: 0.18),
                   width: 1,
                 ),
               ),
@@ -641,7 +641,7 @@ class _ActionButton extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
+            color: color.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(icon, size: 18, color: color),

@@ -15,7 +15,7 @@ class ImagePickerWidget extends StatefulWidget {
   final String? placeholderText;
 
   const ImagePickerWidget({
-    Key? key,
+    super.key,
     this.initialImagePath,
     required this.onImageSelected,
     this.width,
@@ -23,7 +23,7 @@ class ImagePickerWidget extends StatefulWidget {
     this.allowCamera = true,
     this.allowGallery = true,
     this.placeholderText,
-  }) : super(key: key);
+  });
 
   @override
   State<ImagePickerWidget> createState() => _ImagePickerWidgetState();
@@ -42,7 +42,7 @@ class _ImagePickerWidgetState extends State<ImagePickerWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return SizedBox(
       width: widget.width,
       height: widget.height,
       child: Column(
@@ -284,14 +284,14 @@ class NoteImageDisplay extends StatelessWidget {
   final VoidCallback? onTap;
 
   const NoteImageDisplay({
-    Key? key,
+    super.key,
     required this.imagePath,
     this.width,
     this.height,
     this.fit = BoxFit.cover,
     this.borderRadius,
     this.onTap,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -304,7 +304,7 @@ class NoteImageDisplay extends StatelessWidget {
           borderRadius: borderRadius ?? BorderRadius.circular(8),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: Colors.black.withValues(alpha: 0.1),
               blurRadius: 4,
               offset: const Offset(0, 2),
             ),
@@ -355,7 +355,7 @@ class NoteImageDisplay extends StatelessWidget {
 class FullScreenImageView extends StatelessWidget {
   final String imagePath;
 
-  const FullScreenImageView({Key? key, required this.imagePath}) : super(key: key);
+  const FullScreenImageView({super.key, required this.imagePath});
 
   @override
   Widget build(BuildContext context) {

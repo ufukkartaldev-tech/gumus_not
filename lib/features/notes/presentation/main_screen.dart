@@ -68,12 +68,12 @@ class _MainScreenState extends State<MainScreen> {
               color: theme.cardTheme.color ?? theme.cardColor,
               borderRadius: BorderRadius.circular(24),
               border: Border.all(
-                color: theme.dividerColor.withOpacity(isDark ? 0.08 : 0.12),
+                color: theme.dividerColor.withValues(alpha: isDark ? 0.08 : 0.12),
                 width: 1,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(isDark ? 0.15 : 0.04),
+                  color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.04),
                   blurRadius: 20,
                   offset: const Offset(0, 4),
                 ),
@@ -115,7 +115,7 @@ class _MainScreenState extends State<MainScreen> {
         onTap: () => setState(() => _selectedIndex = index),
         borderRadius: BorderRadius.circular(20),
         highlightColor: Colors.transparent,
-        splashColor: theme.primaryColor.withOpacity(0.08),
+        splashColor: theme.primaryColor.withValues(alpha: 0.08),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 8),
           child: Column(
@@ -132,7 +132,7 @@ class _MainScreenState extends State<MainScreen> {
                     height: 26,
                     decoration: BoxDecoration(
                       color: isSelected
-                          ? theme.primaryColor.withOpacity(isDark ? 0.16 : 0.08)
+                          ? theme.primaryColor.withValues(alpha: isDark ? 0.16 : 0.08)
                           : Colors.transparent,
                       borderRadius: BorderRadius.circular(13),
                     ),
@@ -141,7 +141,7 @@ class _MainScreenState extends State<MainScreen> {
                     icon,
                     color: isSelected
                         ? theme.primaryColor
-                        : theme.colorScheme.onSurface.withOpacity(0.6),
+                        : theme.colorScheme.onSurface.withValues(alpha: 0.6),
                     size: 20,
                   ),
                 ],
@@ -154,7 +154,7 @@ class _MainScreenState extends State<MainScreen> {
                   fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                   color: isSelected
                       ? theme.primaryColor
-                      : theme.colorScheme.onSurface.withOpacity(0.6),
+                      : theme.colorScheme.onSurface.withValues(alpha: 0.6),
                   letterSpacing: -0.2,
                 ),
               ),

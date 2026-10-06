@@ -4,7 +4,7 @@ import 'package:connected_notebook/features/notes/models/note_model.dart';
 import 'package:connected_notebook/features/notes/providers/note_provider.dart';
 
 class CodeSnippetsScreen extends StatefulWidget {
-  const CodeSnippetsScreen({Key? key}) : super(key: key);
+  const CodeSnippetsScreen({super.key});
 
   @override
   State<CodeSnippetsScreen> createState() => _CodeSnippetsScreenState();
@@ -130,8 +130,8 @@ class _CodeSnippetsScreenState extends State<CodeSnippetsScreen> {
           );
           Navigator.of(context).pushNamed('/note-editor', arguments: newSnippet);
         },
-        child: const Icon(Icons.add),
         tooltip: 'Yeni Kod Parçacığı',
+        child: const Icon(Icons.add),
       ),
     );
   }

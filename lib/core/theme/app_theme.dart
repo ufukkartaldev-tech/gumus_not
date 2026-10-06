@@ -305,7 +305,7 @@ class AppTheme {
         onError: Colors.white,
         surface: surface,
         onSurface: textPrimary,
-        secondaryContainer: surface.withOpacity(0.8),
+        secondaryContainer: surface.withValues(alpha: 0.8),
         outline: border,
       ),
 
@@ -328,7 +328,7 @@ class AppTheme {
       cardTheme: CardThemeData(
         color: surface,
         elevation: 0,
-        shadowColor: Colors.black.withOpacity(0.1),
+        shadowColor: Colors.black.withValues(alpha: 0.1),
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
@@ -341,7 +341,7 @@ class AppTheme {
           backgroundColor: primaryColor,
           foregroundColor: Colors.white,
           elevation: 4,
-          shadowColor: primaryColor.withOpacity(0.4),
+          shadowColor: primaryColor.withValues(alpha: 0.4),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
@@ -370,7 +370,7 @@ class AppTheme {
 
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: surface.withOpacity(0.8),
+        fillColor: surface.withValues(alpha: 0.8),
         isDense: true,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
@@ -389,7 +389,7 @@ class AppTheme {
           borderSide: BorderSide(color: primaryColor, width: 2),
         ),
         labelStyle: TextStyle(color: textSecondary),
-        hintStyle: TextStyle(color: textSecondary.withOpacity(0.5)),
+        hintStyle: TextStyle(color: textSecondary.withValues(alpha: 0.5)),
       ),
 
       textTheme: TextTheme(
@@ -417,7 +417,7 @@ class AppTheme {
         ),
         bodySmall: baseTextStyle.copyWith(
           fontSize: 12,
-          color: textSecondary.withOpacity(0.7),
+          color: textSecondary.withValues(alpha: 0.7),
         ),
       ),
 
@@ -488,7 +488,7 @@ class AppTheme {
       cardTheme: CardThemeData(
         color: surface,
         elevation: isDark ? 0 : 2, // Soft shadow in light, flat in dark
-        shadowColor: Colors.black.withOpacity(0.05),
+        shadowColor: Colors.black.withValues(alpha: 0.05),
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16), // Softer corners
@@ -502,7 +502,7 @@ class AppTheme {
           backgroundColor: primaryColor,
           foregroundColor: Colors.white,
           elevation: 4,
-          shadowColor: primaryColor.withOpacity(0.4), // Colored shadow
+          shadowColor: primaryColor.withValues(alpha: 0.4), // Colored shadow
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
@@ -551,7 +551,7 @@ class AppTheme {
           borderSide: BorderSide(color: primaryColor, width: 2),
         ),
         labelStyle: TextStyle(color: textSecondary),
-        hintStyle: TextStyle(color: textSecondary.withOpacity(0.5)),
+        hintStyle: TextStyle(color: textSecondary.withValues(alpha: 0.5)),
       ),
 
       // Refined Typography
@@ -580,7 +580,7 @@ class AppTheme {
         ),
         bodySmall: baseTextStyle.copyWith(
           fontSize: 12,
-          color: textSecondary.withOpacity(0.7),
+          color: textSecondary.withValues(alpha: 0.7),
         ),
       ),
 

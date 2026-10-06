@@ -97,8 +97,9 @@ class ConnectedNotebookApp extends StatelessWidget {
     LogicalKeyboardKey? mainKey;
 
     for (final part in parts) {
-      if (part == 'meta' || part == 'cmd') isMeta = true;
-      else if (part == 'ctrl') isCtrl = true;
+      if (part == 'meta' || part == 'cmd') {
+        isMeta = true;
+      } else if (part == 'ctrl') isCtrl = true;
       else if (part == 'shift') isShift = true;
       else if (part == 'alt') isAlt = true;
       else {

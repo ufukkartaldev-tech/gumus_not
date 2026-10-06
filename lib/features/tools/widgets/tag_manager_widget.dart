@@ -130,7 +130,7 @@ class _TagManagerWidgetState extends State<TagManagerWidget> {
               label: Text('#$tag'),
               deleteIcon: const Icon(Icons.close, size: 16),
               onDeleted: () => _removeTag(tag),
-              backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
+              backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.1),
               deleteIconColor: Theme.of(context).primaryColor,
               labelStyle: TextStyle(
                 color: Theme.of(context).primaryColor,

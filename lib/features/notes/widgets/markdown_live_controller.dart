@@ -87,7 +87,7 @@ class MarkdownLivePreviewController extends TextEditingController {
           style: defaultStyle.copyWith(
             fontFamily: 'monospace',
             color: isDark ? Colors.tealAccent.shade100 : Colors.teal.shade800,
-            backgroundColor: theme.dividerColor.withOpacity(0.12),
+            backgroundColor: theme.dividerColor.withValues(alpha: 0.12),
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -100,8 +100,8 @@ class MarkdownLivePreviewController extends TextEditingController {
       final prefix = '# ';
       final content = line.substring(2);
       final prefixColor = isCursorOnLine
-          ? theme.colorScheme.primary.withOpacity(0.55)
-          : theme.colorScheme.primary.withOpacity(0.20);
+          ? theme.colorScheme.primary.withValues(alpha: 0.55)
+          : theme.colorScheme.primary.withValues(alpha: 0.20);
       final prefixSize = isCursorOnLine ? 18.0 : 13.0;
 
       final headingStyle = defaultStyle.copyWith(
@@ -131,8 +131,8 @@ class MarkdownLivePreviewController extends TextEditingController {
       final prefix = '## ';
       final content = line.substring(3);
       final prefixColor = isCursorOnLine
-          ? theme.colorScheme.secondary.withOpacity(0.55)
-          : theme.colorScheme.secondary.withOpacity(0.20);
+          ? theme.colorScheme.secondary.withValues(alpha: 0.55)
+          : theme.colorScheme.secondary.withValues(alpha: 0.20);
       final prefixSize = isCursorOnLine ? 16.0 : 12.0;
 
       final headingStyle = defaultStyle.copyWith(
@@ -162,8 +162,8 @@ class MarkdownLivePreviewController extends TextEditingController {
       final prefix = '### ';
       final content = line.substring(4);
       final prefixColor = isCursorOnLine
-          ? theme.disabledColor.withOpacity(0.6)
-          : theme.disabledColor.withOpacity(0.25);
+          ? theme.disabledColor.withValues(alpha: 0.6)
+          : theme.disabledColor.withValues(alpha: 0.25);
 
       final headingStyle = defaultStyle.copyWith(
         fontSize: 18,
@@ -232,13 +232,13 @@ class MarkdownLivePreviewController extends TextEditingController {
       final content = line.substring(2);
       final quoteStyle = defaultStyle.copyWith(
         fontStyle: FontStyle.italic,
-        color: defaultStyle.color?.withOpacity(0.85),
+        color: defaultStyle.color?.withValues(alpha: 0.85),
       );
       spans.add(
         TextSpan(
           text: prefix,
           style: defaultStyle.copyWith(
-            color: theme.colorScheme.primary.withOpacity(0.6),
+            color: theme.colorScheme.primary.withValues(alpha: 0.6),
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -281,7 +281,7 @@ class MarkdownLivePreviewController extends TextEditingController {
     int lastEnd = 0;
 
     final syntaxMuted = baseStyle.copyWith(
-      color: (baseStyle.color ?? theme.colorScheme.onSurface).withOpacity(0.35),
+      color: (baseStyle.color ?? theme.colorScheme.onSurface).withValues(alpha: 0.35),
       fontSize: (baseStyle.fontSize ?? 16) * 0.85,
     );
 
@@ -328,7 +328,7 @@ class MarkdownLivePreviewController extends TextEditingController {
             style: baseStyle.copyWith(
               fontFamily: 'monospace',
               color: isDark ? Colors.amber.shade200 : Colors.deepOrange.shade800,
-              backgroundColor: theme.dividerColor.withOpacity(0.12),
+              backgroundColor: theme.dividerColor.withValues(alpha: 0.12),
             ),
           ),
         );
@@ -337,7 +337,7 @@ class MarkdownLivePreviewController extends TextEditingController {
       // WikiLink: [[page]]
       else if (matchedText.startsWith('[[') && matchedText.endsWith(']]') && matchedText.length >= 4) {
         final inner = matchedText.substring(2, matchedText.length - 2);
-        spans.add(TextSpan(text: '[[', style: syntaxMuted.copyWith(color: theme.colorScheme.primary.withOpacity(0.4))));
+        spans.add(TextSpan(text: '[[', style: syntaxMuted.copyWith(color: theme.colorScheme.primary.withValues(alpha: 0.4))));
         spans.add(
           TextSpan(
             text: inner,
@@ -345,17 +345,17 @@ class MarkdownLivePreviewController extends TextEditingController {
               color: theme.colorScheme.primary,
               fontWeight: FontWeight.w600,
               decoration: TextDecoration.underline,
-              decorationColor: theme.colorScheme.primary.withOpacity(0.5),
+              decorationColor: theme.colorScheme.primary.withValues(alpha: 0.5),
             ),
           ),
         );
-        spans.add(TextSpan(text: ']]', style: syntaxMuted.copyWith(color: theme.colorScheme.primary.withOpacity(0.4))));
+        spans.add(TextSpan(text: ']]', style: syntaxMuted.copyWith(color: theme.colorScheme.primary.withValues(alpha: 0.4))));
       }
       // Math: $formula$
       else if (matchedText.startsWith(r'$') && matchedText.endsWith(r'$') && matchedText.length >= 2) {
         final inner = matchedText.substring(1, matchedText.length - 1);
         final mathColor = isDark ? Colors.purpleAccent.shade100 : Colors.deepPurple.shade700;
-        spans.add(TextSpan(text: r'$', style: syntaxMuted.copyWith(color: mathColor.withOpacity(0.5))));
+        spans.add(TextSpan(text: r'$', style: syntaxMuted.copyWith(color: mathColor.withValues(alpha: 0.5))));
         spans.add(
           TextSpan(
             text: inner,
@@ -366,7 +366,7 @@ class MarkdownLivePreviewController extends TextEditingController {
             ),
           ),
         );
-        spans.add(TextSpan(text: r'$', style: syntaxMuted.copyWith(color: mathColor.withOpacity(0.5))));
+        spans.add(TextSpan(text: r'$', style: syntaxMuted.copyWith(color: mathColor.withValues(alpha: 0.5))));
       }
       // Link or image: [title](url) or ![alt](url)
       else if (matchedText.startsWith('![') || matchedText.startsWith('[')) {

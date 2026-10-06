@@ -48,7 +48,7 @@ class GraphCustomPainter extends CustomPainter {
   void _paintNode(Canvas canvas, GraphNode node, TextPainter textPainter) {
     final radius = GraphConstants.calculateNodeRadius(node.connectionCount);
     final nodeColor = node.isGhost
-        ? GraphConstants.ghostNodeColor.withOpacity(GraphConstants.ghostOpacity)
+        ? GraphConstants.ghostNodeColor.withValues(alpha: GraphConstants.ghostOpacity)
         : theme.primaryColor;
 
     // Paint glow for real nodes

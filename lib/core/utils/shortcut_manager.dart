@@ -1,13 +1,12 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AppShortcutManager extends ChangeNotifier {
   bool _isVimModeEnabled = false;
   
   // Action Name -> Shortcut String representation
-  Map<String, String> _customShortcuts = {
+  final Map<String, String> _customShortcuts = {
     'command_palette': 'meta+k', // Command+K or Ctrl+K
     'new_note': 'meta+n',
     'search_notes': 'meta+f',

@@ -4,7 +4,7 @@ import 'package:connected_notebook/features/notes/providers/note_provider.dart';
 import 'package:connected_notebook/features/notes/models/note_model.dart';
 
 class AdvancedSearchScreen extends StatefulWidget {
-  const AdvancedSearchScreen({Key? key}) : super(key: key);
+  const AdvancedSearchScreen({super.key});
 
   @override
   State<AdvancedSearchScreen> createState() => _AdvancedSearchScreenState();
@@ -305,7 +305,7 @@ class _AdvancedSearchScreenState extends State<AdvancedSearchScreen> {
         });
       },
       backgroundColor: Theme.of(context).colorScheme.surface,
-      selectedColor: Theme.of(context).primaryColor.withOpacity(0.2),
+      selectedColor: Theme.of(context).primaryColor.withValues(alpha: 0.2),
       checkmarkColor: Theme.of(context).primaryColor,
     );
   }
@@ -359,7 +359,7 @@ class _AdvancedSearchScreenState extends State<AdvancedSearchScreen> {
                         padding: const EdgeInsets.only(right: 4),
                         child: Chip(
                           label: Text('#$tag'),
-                          backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
+                          backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.1),
                           labelStyle: TextStyle(
                             color: Theme.of(context).primaryColor,
                             fontSize: 10,

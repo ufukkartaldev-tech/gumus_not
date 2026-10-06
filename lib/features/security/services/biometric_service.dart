@@ -11,7 +11,6 @@ class BiometricService {
       final isSupported = await _auth.isDeviceSupported();
       return canCheck || isSupported;
     } on PlatformException catch (e) {
-      print('Biyometri kontrol hatası: $e');
       return false;
     }
   }
@@ -28,14 +27,11 @@ class BiometricService {
       // biometricOnly: false -> Yüz/Parmak izi yoksa Windows Hello veya telefon PIN'ini sorar.
       return await _auth.authenticate(
         localizedReason: 'GümüşNot\'a erişmek için kimliğinizi doğrulayın',
-        options: const AuthenticationOptions(
-          stickyAuth: true,
-          biometricOnly: false, 
-          useErrorDialogs: true,
-        ),
+        stickyAuth: true,
+        biometricOnly: false,
+        useErrorDialogs: true,
       );
     } on PlatformException catch (e) {
-      print('Kimlik doğrulama hatası: $e');
       return false;
     }
   }

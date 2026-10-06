@@ -23,11 +23,9 @@ import 'package:connected_notebook/features/search/presentation/advanced_search_
 import 'package:connected_notebook/features/export/presentation/import_export_screen.dart';
 import 'package:connected_notebook/features/notes/widgets/note_template_manager.dart';
 import 'package:connected_notebook/features/tools/widgets/dashboard_stats.dart';
-import 'package:connected_notebook/features/export/services/pdf_export_service.dart';
-import 'package:connected_notebook/features/graph/presentation/graph_view_screen.dart';
 
 class NoteListScreen extends StatefulWidget {
-  const NoteListScreen({Key? key}) : super(key: key);
+  const NoteListScreen({super.key});
 
   @override
   State<NoteListScreen> createState() => _NoteListScreenState();
@@ -107,7 +105,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
 
   Widget _buildMobileLayout() {
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.background,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: _buildAppBar(isSplitView: false),
       drawer: _buildDrawer(),
       body: Column(
@@ -136,7 +134,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
   Widget _buildDesktopWorkbench() {
     final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: theme.colorScheme.background,
+      backgroundColor: theme.colorScheme.surface,
       body: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -174,7 +172,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
         color: isDark ? const Color(0xFF1E1F24) : const Color(0xFFF7F8FA),
         border: Border(
           right: BorderSide(
-            color: theme.dividerColor.withOpacity(isDark ? 0.08 : 0.12),
+            color: theme.dividerColor.withValues(alpha: isDark ? 0.08 : 0.12),
           ),
         ),
       ),
@@ -195,7 +193,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
                       Container(
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: theme.primaryColor.withOpacity(0.12),
+                          color: theme.primaryColor.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Icon(Icons.sticky_note_2, color: theme.primaryColor, size: 20),
@@ -399,7 +397,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
           IconButton(
             icon: Icon(
               Icons.article_outlined,
-              color: isAllSelected ? theme.primaryColor : theme.colorScheme.onSurface.withOpacity(0.7),
+              color: isAllSelected ? theme.primaryColor : theme.colorScheme.onSurface.withValues(alpha: 0.7),
             ),
             tooltip: 'Tüm Notlar',
             onPressed: () {
@@ -413,7 +411,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
           IconButton(
             icon: Icon(
               Icons.push_pin_outlined,
-              color: _showFavoritesOnly ? Colors.amber : theme.colorScheme.onSurface.withOpacity(0.7),
+              color: _showFavoritesOnly ? Colors.amber : theme.colorScheme.onSurface.withValues(alpha: 0.7),
             ),
             tooltip: 'Favoriler & Sabitler ($pinnedCount)',
             onPressed: () {
@@ -480,7 +478,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
 
     final effectiveColor = isSelected
         ? theme.primaryColor
-        : (iconColor ?? theme.colorScheme.onSurface.withOpacity(0.75));
+        : (iconColor ?? theme.colorScheme.onSurface.withValues(alpha: 0.75));
 
     return InkWell(
       onTap: onTap,
@@ -490,12 +488,12 @@ class _NoteListScreenState extends State<NoteListScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
         decoration: BoxDecoration(
           color: isSelected
-              ? theme.primaryColor.withOpacity(isDark ? 0.16 : 0.08)
+              ? theme.primaryColor.withValues(alpha: isDark ? 0.16 : 0.08)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
           border: isSelected
               ? Border.all(
-                  color: theme.primaryColor.withOpacity(isDark ? 0.3 : 0.2),
+                  color: theme.primaryColor.withValues(alpha: isDark ? 0.3 : 0.2),
                   width: 1,
                 )
               : null,
@@ -517,7 +515,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
                   fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                   color: isSelected
                       ? theme.primaryColor
-                      : theme.colorScheme.onSurface.withOpacity(0.85),
+                      : theme.colorScheme.onSurface.withValues(alpha: 0.85),
                 ),
               ),
             ),
@@ -527,8 +525,8 @@ class _NoteListScreenState extends State<NoteListScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
                   color: isSelected
-                      ? theme.primaryColor.withOpacity(0.18)
-                      : theme.dividerColor.withOpacity(0.1),
+                      ? theme.primaryColor.withValues(alpha: 0.18)
+                      : theme.dividerColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
@@ -538,7 +536,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
                     fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                     color: isSelected
                         ? theme.primaryColor
-                        : theme.colorScheme.onSurface.withOpacity(0.6),
+                        : theme.colorScheme.onSurface.withValues(alpha: 0.6),
                   ),
                 ),
               ),
@@ -558,7 +556,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
           fontSize: 11,
           fontWeight: FontWeight.w700,
           letterSpacing: 0.8,
-          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.45),
+          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.45),
         ),
       ),
     );
@@ -588,7 +586,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
         color: theme.scaffoldBackgroundColor,
         border: Border(
           right: BorderSide(
-            color: theme.dividerColor.withOpacity(isDark ? 0.08 : 0.12),
+            color: theme.dividerColor.withValues(alpha: isDark ? 0.08 : 0.12),
           ),
         ),
       ),
@@ -630,7 +628,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
                               child: Container(
                                 padding: const EdgeInsets.all(2),
                                 decoration: BoxDecoration(
-                                  color: theme.dividerColor.withOpacity(0.15),
+                                  color: theme.dividerColor.withValues(alpha: 0.15),
                                   shape: BoxShape.circle,
                                 ),
                                 child: const Icon(Icons.close, size: 14),
@@ -687,7 +685,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
                       style: IconButton.styleFrom(
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
-                          side: BorderSide(color: theme.dividerColor.withOpacity(0.2)),
+                          side: BorderSide(color: theme.dividerColor.withValues(alpha: 0.2)),
                         ),
                       ),
                       onPressed: _openDailyNote,
@@ -805,9 +803,9 @@ class _NoteListScreenState extends State<NoteListScreen> {
              Container(
                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                decoration: BoxDecoration(
-                 color: Theme.of(context).dividerColor.withOpacity(0.1),
+                 color: Theme.of(context).dividerColor.withValues(alpha: 0.1),
                  borderRadius: BorderRadius.circular(4),
-                 border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.2)),
+                 border: Border.all(color: Theme.of(context).dividerColor.withValues(alpha: 0.2)),
                ),
                child: Row(
                  mainAxisSize: MainAxisSize.min,
@@ -944,9 +942,9 @@ class _NoteListScreenState extends State<NoteListScreen> {
               margin: const EdgeInsets.symmetric(horizontal: 32),
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
               decoration: BoxDecoration(
-                color: Theme.of(context).primaryColor.withOpacity(0.05),
+                color: Theme.of(context).primaryColor.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Theme.of(context).primaryColor.withOpacity(0.1)),
+                border: Border.all(color: Theme.of(context).primaryColor.withValues(alpha: 0.1)),
               ),
               child: Column(
                 children: [
@@ -957,7 +955,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       fontStyle: FontStyle.italic,
-                      color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.8),
+                      color: Theme.of(context).textTheme.bodyMedium?.color?.withValues(alpha: 0.8),
                     ),
                   ),
                 ],
@@ -1102,7 +1100,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
                            final isSelected = _selectedNote?.id == note.id;
                            return Container(
                              decoration: isSelected && isSidebar ? BoxDecoration(
-                               color: Theme.of(context).primaryColor.withOpacity(0.08),
+                               color: Theme.of(context).primaryColor.withValues(alpha: 0.08),
                                borderRadius: BorderRadius.circular(14),
                                border: Border.all(color: Theme.of(context).primaryColor, width: 2),
                              ) : null,
@@ -1133,7 +1131,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
                           return Container(
                             margin: const EdgeInsets.only(bottom: 8),
                             decoration: isSelected && isSidebar ? BoxDecoration(
-                              color: Theme.of(context).primaryColor.withOpacity(0.08),
+                              color: Theme.of(context).primaryColor.withValues(alpha: 0.08),
                               borderRadius: BorderRadius.circular(14),
                               border: Border.all(color: Theme.of(context).primaryColor, width: 2),
                             ) : null,
@@ -1208,7 +1206,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
           });
         },
         backgroundColor: Theme.of(context).colorScheme.surface,
-        selectedColor: Theme.of(context).primaryColor.withOpacity(0.2),
+        selectedColor: Theme.of(context).primaryColor.withValues(alpha: 0.2),
         checkmarkColor: Theme.of(context).primaryColor,
         labelStyle: TextStyle(
           color: isSelected ? Theme.of(context).primaryColor : Theme.of(context).textTheme.bodyMedium?.color,
@@ -1575,7 +1573,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
                 image: const AssetImage('assets/header_bg.png'), // Varsa
                 fit: BoxFit.cover,
                 colorFilter: ColorFilter.mode(
-                  Colors.black.withOpacity(0.3),
+                  Colors.black.withValues(alpha: 0.3),
                   BlendMode.darken
                 ),
                 onError: (_, __) {}, // Hata olursa sadece renk kalsın
@@ -1587,7 +1585,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
             ),
             accountEmail: Text(
               '${Provider.of<NoteProvider>(context).notes.length} not • ${_countWords(Provider.of<NoteProvider>(context).notes)} kelime',
-              style: TextStyle(color: Colors.white.withOpacity(0.9)),
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.9)),
             ),
             currentAccountPicture: CircleAvatar(
               backgroundColor: Colors.white,
@@ -1816,7 +1814,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
                                Expanded(
                                   child: Container(
                                      width: 2,
-                                     color: Theme.of(context).dividerColor.withOpacity(0.5),
+                                     color: Theme.of(context).dividerColor.withValues(alpha: 0.5),
                                   )
                                )
                             ],

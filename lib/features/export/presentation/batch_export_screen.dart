@@ -8,7 +8,7 @@ import 'package:connected_notebook/features/export/services/pdf_export_service.d
 import 'package:connected_notebook/features/export/services/latex_export_service.dart';
 
 class BatchExportScreen extends StatefulWidget {
-  const BatchExportScreen({Key? key}) : super(key: key);
+  const BatchExportScreen({super.key});
 
   @override
   State<BatchExportScreen> createState() => _BatchExportScreenState();
@@ -18,7 +18,7 @@ class _BatchExportScreenState extends State<BatchExportScreen> {
   List<Note> _selectedNotes = [];
   bool _isExporting = false;
   String _exportFormat = 'txt';
-  bool _includeEncrypted = false;
+  final bool _includeEncrypted = false;
   String? _exportPath;
   int _progress = 0;
   String? _errorMessage;
@@ -336,7 +336,7 @@ class _BatchExportScreenState extends State<BatchExportScreen> {
   }
 
   Widget _buildExportButton() {
-    return Container(
+    return SizedBox(
       width: double.infinity,
       child: ElevatedButton(
         onPressed: _isExporting ? null : _startExport,

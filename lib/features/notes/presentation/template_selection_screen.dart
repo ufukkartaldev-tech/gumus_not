@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:connected_notebook/features/notes/models/note_template.dart';
 
 class TemplateSelectionScreen extends StatelessWidget {
-  const TemplateSelectionScreen({Key? key}) : super(key: key);
+  const TemplateSelectionScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -61,7 +61,7 @@ class TemplateSelectionScreen extends StatelessWidget {
         decoration: BoxDecoration(
           color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withOpacity(0.3), width: 1.5),
+          border: Border.all(color: color.withValues(alpha: 0.3), width: 1.5),
         ),
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -70,7 +70,7 @@ class TemplateSelectionScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
+                color: color.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(icon, size: 32, color: color),

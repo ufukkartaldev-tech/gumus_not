@@ -1,11 +1,9 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:connected_notebook/core/theme/theme_provider.dart';
 import 'package:connected_notebook/features/notes/models/note_model.dart';
 import 'package:connected_notebook/features/notes/providers/note_provider.dart';
-import 'package:connected_notebook/features/notes/di/note_dependency_injection.dart';
 import 'package:connected_notebook/features/export/presentation/batch_export_screen.dart';
 import 'package:connected_notebook/features/notes/presentation/tag_management_screen.dart';
 import 'package:connected_notebook/features/search/presentation/advanced_search_screen.dart';
@@ -40,14 +38,14 @@ class PaletteItem {
 class CommandPalette extends StatefulWidget {
   final Function(Note?)? onNoteSelected;
 
-  const CommandPalette({Key? key, this.onNoteSelected}) : super(key: key);
+  const CommandPalette({super.key, this.onNoteSelected});
 
   static void show(BuildContext context, {Function(Note?)? onNoteSelected}) {
     showGeneralDialog(
       context: context,
       barrierDismissible: true,
       barrierLabel: 'CommandPalette',
-      barrierColor: Colors.black.withOpacity(0.55),
+      barrierColor: Colors.black.withValues(alpha: 0.55),
       transitionDuration: const Duration(milliseconds: 200),
       pageBuilder: (context, animation, secondaryAnimation) {
         return CommandPalette(onNoteSelected: onNoteSelected);
@@ -514,13 +512,13 @@ class _CommandPaletteState extends State<CommandPalette> {
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: isDark
-                  ? theme.colorScheme.primary.withOpacity(0.25)
-                  : theme.dividerColor.withOpacity(0.5),
+                  ? theme.colorScheme.primary.withValues(alpha: 0.25)
+                  : theme.dividerColor.withValues(alpha: 0.5),
               width: 1,
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(isDark ? 0.6 : 0.2),
+                color: Colors.black.withValues(alpha: isDark ? 0.6 : 0.2),
                 blurRadius: 36,
                 offset: const Offset(0, 16),
                 spreadRadius: 2,
@@ -614,11 +612,11 @@ class _CommandPaletteState extends State<CommandPalette> {
             padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
             decoration: BoxDecoration(
               color: isDark
-                  ? Colors.white.withOpacity(0.08)
-                  : Colors.black.withOpacity(0.06),
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : Colors.black.withValues(alpha: 0.06),
               borderRadius: BorderRadius.circular(5),
               border: Border.all(
-                color: theme.dividerColor.withOpacity(0.3),
+                color: theme.dividerColor.withValues(alpha: 0.3),
               ),
             ),
             child: Text(
@@ -658,13 +656,13 @@ class _CommandPaletteState extends State<CommandPalette> {
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: isSelected
-                      ? theme.colorScheme.primary.withOpacity(isDark ? 0.25 : 0.12)
+                      ? theme.colorScheme.primary.withValues(alpha: isDark ? 0.25 : 0.12)
                       : Colors.transparent,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
                     color: isSelected
-                        ? theme.colorScheme.primary.withOpacity(0.4)
-                        : theme.dividerColor.withOpacity(0.2),
+                        ? theme.colorScheme.primary.withValues(alpha: 0.4)
+                        : theme.dividerColor.withValues(alpha: 0.2),
                   ),
                 ),
                 child: Text(
@@ -734,12 +732,12 @@ class _CommandPaletteState extends State<CommandPalette> {
       margin: const EdgeInsets.symmetric(vertical: 2),
       decoration: BoxDecoration(
         color: isSelected
-            ? theme.colorScheme.primary.withOpacity(isDark ? 0.16 : 0.08)
+            ? theme.colorScheme.primary.withValues(alpha: isDark ? 0.16 : 0.08)
             : Colors.transparent,
         borderRadius: BorderRadius.circular(10),
         border: isSelected
             ? Border.all(
-                color: theme.colorScheme.primary.withOpacity(isDark ? 0.35 : 0.25),
+                color: theme.colorScheme.primary.withValues(alpha: isDark ? 0.35 : 0.25),
                 width: 1,
               )
             : null,
@@ -755,7 +753,7 @@ class _CommandPaletteState extends State<CommandPalette> {
         leading: Container(
           padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
-            color: accent.withOpacity(isDark ? 0.18 : 0.1),
+            color: accent.withValues(alpha: isDark ? 0.18 : 0.1),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(item.icon, size: 18, color: accent),
@@ -784,7 +782,7 @@ class _CommandPaletteState extends State<CommandPalette> {
             ? Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.primary.withOpacity(0.15),
+                  color: theme.colorScheme.primary.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Row(
@@ -824,7 +822,7 @@ class _CommandPaletteState extends State<CommandPalette> {
             Icon(
               Icons.search_off_rounded,
               size: 40,
-              color: theme.disabledColor.withOpacity(0.5),
+              color: theme.disabledColor.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 12),
             Text(
@@ -840,7 +838,7 @@ class _CommandPaletteState extends State<CommandPalette> {
               '"$_query" için eşleşen bir komut veya not yok',
               style: TextStyle(
                 fontSize: 12,
-                color: theme.disabledColor.withOpacity(0.7),
+                color: theme.disabledColor.withValues(alpha: 0.7),
               ),
               textAlign: TextAlign.center,
             ),
@@ -889,10 +887,10 @@ class _CommandPaletteState extends State<CommandPalette> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
           decoration: BoxDecoration(
-            color: isDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.06),
+            color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.06),
             borderRadius: BorderRadius.circular(4),
             border: Border.all(
-              color: theme.dividerColor.withOpacity(0.2),
+              color: theme.dividerColor.withValues(alpha: 0.2),
             ),
           ),
           child: Text(

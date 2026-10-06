@@ -10,7 +10,7 @@ import 'package:connected_notebook/features/graph/interaction/graph_interaction_
 import 'package:connected_notebook/features/graph/constants/graph_constants.dart';
 
 class GraphViewScreen extends StatefulWidget {
-  const GraphViewScreen({Key? key}) : super(key: key);
+  const GraphViewScreen({super.key});
 
   @override
   State<GraphViewScreen> createState() => _GraphViewScreenState();
@@ -34,9 +34,9 @@ class _GraphViewScreenState extends State<GraphViewScreen> {
   bool _isInitialized = false;
 
   // Performance monitoring
-  Stopwatch _frameStopwatch = Stopwatch();
+  final Stopwatch _frameStopwatch = Stopwatch();
   double _averageFrameTime = 0.0;
-  bool _didSetupDependencies = false;
+  final bool _didSetupDependencies = false;
 
   @override
   void initState() {
@@ -310,15 +310,15 @@ class _GraphViewScreenState extends State<GraphViewScreen> {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
               side: BorderSide(
-                color: theme.dividerColor.withOpacity(isDark ? 0.15 : 0.4),
+                color: theme.dividerColor.withValues(alpha: isDark ? 0.15 : 0.4),
               ),
             ),
             elevation: 4,
+            onPressed: () => _togglePhysics(!_isPhysicsActive),
+            heroTag: 'physics_toggle',
             child: Icon(
               _isPhysicsActive ? Icons.pause_rounded : Icons.play_arrow_rounded,
             ),
-            onPressed: () => _togglePhysics(!_isPhysicsActive),
-            heroTag: 'physics_toggle',
           ),
           const SizedBox(height: 8),
           FloatingActionButton(
@@ -328,13 +328,13 @@ class _GraphViewScreenState extends State<GraphViewScreen> {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
               side: BorderSide(
-                color: theme.dividerColor.withOpacity(isDark ? 0.15 : 0.4),
+                color: theme.dividerColor.withValues(alpha: isDark ? 0.15 : 0.4),
               ),
             ),
             elevation: 4,
-            child: const Icon(Icons.center_focus_strong_rounded),
             onPressed: _resetView,
             heroTag: 'reset_view',
+            child: const Icon(Icons.center_focus_strong_rounded),
           ),
           const SizedBox(height: 8),
           FloatingActionButton(
@@ -344,13 +344,13 @@ class _GraphViewScreenState extends State<GraphViewScreen> {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
               side: BorderSide(
-                color: theme.dividerColor.withOpacity(isDark ? 0.15 : 0.4),
+                color: theme.dividerColor.withValues(alpha: isDark ? 0.15 : 0.4),
               ),
             ),
             elevation: 4,
-            child: const Icon(Icons.zoom_out_map_rounded),
             onPressed: _zoomToFit,
             heroTag: 'zoom_fit',
+            child: const Icon(Icons.zoom_out_map_rounded),
           ),
         ],
       ),

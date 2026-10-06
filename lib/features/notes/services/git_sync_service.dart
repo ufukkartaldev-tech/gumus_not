@@ -74,7 +74,7 @@ class GitSyncService {
       // Get the diff for this file in the specific commit
       final result = await Process.run(
         'git',
-        ['show', '$commitHash', '--', fileName],
+        ['show', commitHash, '--', fileName],
         workingDirectory: path,
       );
 

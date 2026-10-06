@@ -4,7 +4,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
 /// Theme selection screen with preset themes and custom options
 class ThemeSelectionScreen extends StatefulWidget {
-  const ThemeSelectionScreen({Key? key}) : super(key: key);
+  const ThemeSelectionScreen({super.key});
 
   @override
   State<ThemeSelectionScreen> createState() => _ThemeSelectionScreenState();
@@ -71,7 +71,7 @@ class _ThemeSelectionScreenState extends State<ThemeSelectionScreen> {
                 Text(
                   themeProvider.currentThemeDescription,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -222,8 +222,8 @@ class _ThemeSelectionScreenState extends State<ThemeSelectionScreen> {
                     preset.description,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: isSelected 
-                          ? Theme.of(context).colorScheme.onPrimaryContainer.withOpacity(0.8)
-                          : Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                          ? Theme.of(context).colorScheme.onPrimaryContainer.withValues(alpha: 0.8)
+                          : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -245,7 +245,7 @@ class _ThemeSelectionScreenState extends State<ThemeSelectionScreen> {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(6),
         border: Border.all(
-          color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
+          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
         ),
       ),
       child: Row(

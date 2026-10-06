@@ -50,7 +50,7 @@ void main(List<String> arguments) async {
       // Piped input
       content = await stdin.transform(const SystemEncoding().decoder).join();
       if (command.rest.isNotEmpty) {
-        content += '\n' + command.rest.join(' ');
+        content += '\n${command.rest.join(' ')}';
       }
     }
     

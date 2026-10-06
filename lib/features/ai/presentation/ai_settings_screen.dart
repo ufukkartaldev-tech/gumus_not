@@ -5,7 +5,7 @@ import '../models/ai_provider_type.dart';
 import '../models/ai_config.dart';
 
 class AiSettingsScreen extends StatefulWidget {
-  const AiSettingsScreen({Key? key}) : super(key: key);
+  const AiSettingsScreen({super.key});
 
   @override
   State<AiSettingsScreen> createState() => _AiSettingsScreenState();
@@ -60,7 +60,7 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
             const Text('GümüşNot yapay zeka entegrasyonu tamamen "Kendi Anahtarını Getir" (BYOK) mantığıyla çalışır. İstediğiniz API anahtarını girerek modeli seçebilirsiniz.'),
             const SizedBox(height: 24),
             DropdownButtonFormField<AiProviderType>(
-              value: _selectedType,
+              initialValue: _selectedType,
               decoration: const InputDecoration(labelText: 'AI Sağlayıcısı (Provider)', border: OutlineInputBorder()),
               items: const [
                 DropdownMenuItem(value: AiProviderType.none, child: Text('Kapalı')),

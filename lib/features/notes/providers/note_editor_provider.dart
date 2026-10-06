@@ -4,7 +4,7 @@ import '../models/note_model.dart';
 class NoteEditorProvider with ChangeNotifier {
   NoteEditorProvider();
 
-  bool _isBusy = false;
+  final bool _isBusy = false;
   bool _isEncrypted = false;
   bool _isDecrypted = false;
   String? _resolvedContent;

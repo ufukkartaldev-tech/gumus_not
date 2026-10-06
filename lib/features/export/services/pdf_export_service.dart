@@ -2,9 +2,7 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:path_provider/path_provider.dart';
 import 'package:connected_notebook/features/notes/models/note_model.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:printing/printing.dart';
 
 class PdfExportService {
@@ -140,7 +138,7 @@ class PdfExportService {
                   textAlign: pw.TextAlign.justify,
                 );
               }
-            }).toList(),
+            }),
           ];
         },
       ),

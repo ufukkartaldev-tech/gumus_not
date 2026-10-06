@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:connected_notebook/features/notes/providers/note_provider.dart';
 
 class TagCloudWidget extends StatelessWidget {
-  const TagCloudWidget({Key? key}) : super(key: key);
+  const TagCloudWidget({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -101,10 +101,10 @@ class TagCloudWidget extends StatelessWidget {
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).primaryColor.withOpacity(0.1),
+                        color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color: Theme.of(context).primaryColor.withOpacity(opacity * 0.3),
+                          color: Theme.of(context).primaryColor.withValues(alpha: opacity * 0.3),
                         ),
                       ),
                       child: Row(
@@ -115,7 +115,7 @@ class TagCloudWidget extends StatelessWidget {
                             style: TextStyle(
                               fontSize: fontSize,
                               fontWeight: FontWeight.w500,
-                              color: Theme.of(context).primaryColor.withOpacity(opacity),
+                              color: Theme.of(context).primaryColor.withValues(alpha: opacity),
                             ),
                           ),
                           const SizedBox(width: 4),
@@ -125,7 +125,7 @@ class TagCloudWidget extends StatelessWidget {
                               vertical: 2,
                             ),
                             decoration: BoxDecoration(
-                              color: Theme.of(context).primaryColor.withOpacity(opacity * 0.2),
+                              color: Theme.of(context).primaryColor.withValues(alpha: opacity * 0.2),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
@@ -133,7 +133,7 @@ class TagCloudWidget extends StatelessWidget {
                               style: TextStyle(
                                 fontSize: fontSize * 0.7,
                                 fontWeight: FontWeight.bold,
-                                color: Theme.of(context).primaryColor.withOpacity(opacity),
+                                color: Theme.of(context).primaryColor.withValues(alpha: opacity),
                               ),
                             ),
                           ),
@@ -154,7 +154,7 @@ class TagCloudWidget extends StatelessWidget {
 class TagFilteredScreen extends StatefulWidget {
   final String tag;
 
-  const TagFilteredScreen({Key? key, required this.tag}) : super(key: key);
+  const TagFilteredScreen({super.key, required this.tag});
 
   @override
   State<TagFilteredScreen> createState() => _TagFilteredScreenState();

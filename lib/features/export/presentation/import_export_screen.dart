@@ -8,7 +8,7 @@ import 'package:connected_notebook/features/notes/models/note_model.dart';
 import 'package:connected_notebook/features/notes/providers/note_provider.dart';
 
 class ImportExportScreen extends StatefulWidget {
-  const ImportExportScreen({Key? key}) : super(key: key);
+  const ImportExportScreen({super.key});
 
   @override
   State<ImportExportScreen> createState() => _ImportExportScreenState();
@@ -103,10 +103,10 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).primaryColor.withOpacity(0.1),
+                  color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: Theme.of(context).primaryColor.withOpacity(0.3),
+                    color: Theme.of(context).primaryColor.withValues(alpha: 0.3),
                   ),
                 ),
                 child: Row(
@@ -173,7 +173,7 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
     return Card(
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
+          backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.1),
           child: Icon(
             icon,
             color: Theme.of(context).primaryColor,
@@ -202,7 +202,7 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
     return Card(
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
+          backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.1),
           child: Icon(
             icon,
             color: Theme.of(context).primaryColor,

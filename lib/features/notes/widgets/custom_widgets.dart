@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:ui';
 
 class CustomSearchBar extends StatefulWidget {
   final String hintText;
@@ -8,12 +7,12 @@ class CustomSearchBar extends StatefulWidget {
   final TextEditingController? controller;
 
   const CustomSearchBar({
-    Key? key,
+    super.key,
     required this.hintText,
     required this.onChanged,
     this.onClear,
     this.controller,
-  }) : super(key: key);
+  });
 
   @override
   State<CustomSearchBar> createState() => _CustomSearchBarState();
@@ -57,17 +56,17 @@ class _CustomSearchBarState extends State<CustomSearchBar> {
       duration: const Duration(milliseconds: 200),
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface.withOpacity(0.8),
+        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.8),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: _isFocused 
               ? Theme.of(context).primaryColor 
-              : Colors.grey.withOpacity(0.2),
+              : Colors.grey.withValues(alpha: 0.2),
           width: _isFocused ? 2 : 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(_isFocused ? 0.08 : 0.03),
+            color: Colors.black.withValues(alpha: _isFocused ? 0.08 : 0.03),
             blurRadius: 15,
             offset: const Offset(0, 4),
           ),
@@ -122,14 +121,14 @@ class CustomFloatingActionButton extends StatefulWidget {
   final Widget? icon;
 
   const CustomFloatingActionButton({
-    Key? key,
+    super.key,
     required this.onPressed,
     this.onLongPress,
     this.child,
     this.tooltip,
     this.label,
     this.icon,
-  }) : super(key: key);
+  });
 
   @override
   State<CustomFloatingActionButton> createState() => _CustomFloatingActionButtonState();
@@ -226,12 +225,12 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback? onBackPressed;
 
   const CustomAppBar({
-    Key? key,
+    super.key,
     required this.title,
     this.actions,
     this.showBackButton = false,
     this.onBackPressed,
-  }) : super(key: key);
+  });
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight + 10);

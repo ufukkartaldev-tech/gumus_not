@@ -106,7 +106,7 @@ class _ParticleState extends State<_Particle> with SingleTickerProviderStateMixi
                 width: 8,
                 height: 8,
                 decoration: BoxDecoration(
-                  color: widget.color.withOpacity(0.8),
+                  color: widget.color.withValues(alpha: 0.8),
                   shape: BoxShape.circle,
                 ),
               ),

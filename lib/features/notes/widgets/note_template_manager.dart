@@ -5,7 +5,7 @@ import 'package:connected_notebook/features/notes/providers/note_provider.dart';
 import 'package:connected_notebook/features/notes/widgets/markdown_editor.dart';
 
 class NoteTemplateManager extends StatefulWidget {
-  const NoteTemplateManager({Key? key}) : super(key: key);
+  const NoteTemplateManager({super.key});
 
   @override
   State<NoteTemplateManager> createState() => _NoteTemplateManagerState();
@@ -322,7 +322,7 @@ ${'Kitabın ana mesajı'}
                 });
               },
               backgroundColor: Theme.of(context).colorScheme.surface,
-              selectedColor: Theme.of(context).primaryColor.withOpacity(0.2),
+              selectedColor: Theme.of(context).primaryColor.withValues(alpha: 0.2),
             ),
           );
         },
@@ -340,7 +340,7 @@ ${'Kitabın ana mesajı'}
           margin: const EdgeInsets.only(bottom: 12),
           child: ExpansionTile(
             leading: CircleAvatar(
-              backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
+              backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.1),
               child: Icon(
                 _getCategoryIcon(template.category),
                 color: Theme.of(context).primaryColor,

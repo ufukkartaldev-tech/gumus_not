@@ -6,11 +6,11 @@ class ActivityHeatmap extends StatelessWidget {
   final DateTime? endDate;
 
   const ActivityHeatmap({
-    Key? key,
+    super.key,
     required this.datasets,
     this.startDate,
     this.endDate,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -70,7 +70,7 @@ class ActivityHeatmap extends StatelessWidget {
                       final count = normalizedDatasets[normalizedCurrent] ?? 0;
                       
                       return Tooltip(
-                        message: '${count} katkı\n${_formatDate(currentDate)}',
+                        message: '$count katkı\n${_formatDate(currentDate)}',
                         child: Container(
                           width: 12,
                           height: 12,
@@ -122,13 +122,13 @@ class ActivityHeatmap extends StatelessWidget {
   Color _getColorForCount(int count, ThemeData theme) {
     final baseColor = theme.colorScheme.primary;
     final isDark = theme.brightness == Brightness.dark;
-    final emptyColor = isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.05);
+    final emptyColor = isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.05);
 
     if (count == 0) return emptyColor;
-    if (count <= 2) return baseColor.withOpacity(0.2);
-    if (count <= 4) return baseColor.withOpacity(0.4);
-    if (count <= 6) return baseColor.withOpacity(0.6);
-    if (count <= 8) return baseColor.withOpacity(0.8);
+    if (count <= 2) return baseColor.withValues(alpha: 0.2);
+    if (count <= 4) return baseColor.withValues(alpha: 0.4);
+    if (count <= 6) return baseColor.withValues(alpha: 0.6);
+    if (count <= 8) return baseColor.withValues(alpha: 0.8);
     return baseColor;
   }
 

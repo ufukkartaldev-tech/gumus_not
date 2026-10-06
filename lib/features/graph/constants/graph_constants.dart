@@ -92,7 +92,7 @@ class GraphConstants {
   /// Get edge paint with configured constants
   static Paint getEdgePaint() {
     return Paint()
-      ..color = edgeColor.withOpacity(edgeOpacity)
+      ..color = edgeColor.withValues(alpha: edgeOpacity)
       ..strokeWidth = edgeStrokeWidth;
   }
 
@@ -110,7 +110,7 @@ class GraphConstants {
         : nodeGlowRadiusSmall;
 
     return Paint()
-      ..color = color.withOpacity(nodeGlowOpacity)
+      ..color = color.withValues(alpha: nodeGlowOpacity)
       ..maskFilter = MaskFilter.blur(BlurStyle.normal, glowRadius);
   }
 
@@ -124,7 +124,7 @@ class GraphConstants {
     final dynamicLabelColor = isDark ? Colors.white : const Color(0xFF1E293B);
     final dynamicLabelShadow = isDark
         ? const Shadow(blurRadius: 2, color: Colors.black87)
-        : Shadow(blurRadius: 4, color: Colors.white.withOpacity(0.9));
+        : Shadow(blurRadius: 4, color: Colors.white.withValues(alpha: 0.9));
 
     return TextStyle(
       color: dynamicLabelColor.withOpacity(

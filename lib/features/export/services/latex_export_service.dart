@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 
 class LatexExportService {
   static String convertToLatex(String markdownContent) {

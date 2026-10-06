@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -441,7 +440,7 @@ class _AccessoryButton extends StatelessWidget {
                   : Icon(
                       icon,
                       size: 19,
-                      color: theme.colorScheme.onSurface.withOpacity(0.85),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.85),
                     ),
             ),
           ),
@@ -460,7 +459,7 @@ class _AccessoryDivider extends StatelessWidget {
       width: 1,
       height: 18,
       margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
-      color: Theme.of(context).dividerColor.withOpacity(0.18),
+      color: Theme.of(context).dividerColor.withValues(alpha: 0.18),
     );
   }
 }

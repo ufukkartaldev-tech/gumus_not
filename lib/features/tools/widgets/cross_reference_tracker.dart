@@ -9,9 +9,9 @@ class CrossReferenceTracker extends StatefulWidget {
   final Note currentNote;
 
   const CrossReferenceTracker({
-    Key? key,
+    super.key,
     required this.currentNote,
-  }) : super(key: key);
+  });
 
   @override
   State<CrossReferenceTracker> createState() => _CrossReferenceTrackerState();
@@ -24,7 +24,7 @@ class _CrossReferenceTrackerState extends State<CrossReferenceTracker> {
   List<String> _suggestedTags = [];
   bool _isLoading = true;
   bool _isCalculatingSimilarity = false;
-  final Set<String> _stopwords = {
+  final Set<String> _stopwords = <String>[
     'bu', 've', 'veya', 'ama', 'ancak', 'ile', 'için', 'gibi', 'olarak', 'daha',
     'çok', 'az', 'bir', 'iki', 'üç', 'dört', 'beş', 'altı', 'yedi', 'sekiz',
     'dokuz', 'on', 'yüz', 'bin', 'milyon', 'milyar', 'yok', 'var', 'değil',
@@ -44,7 +44,7 @@ class _CrossReferenceTrackerState extends State<CrossReferenceTracker> {
     'now', 'then', 'here', 'there', 'up', 'down', 'out', 'off', 'over', 'under',
     'again', 'further', 'then', 'once', 'more', 'most', 'some', 'such', 'no',
     'nor', 'not', 'only', 'own', 'same', 'so', 'than', 'too', 'very', 'you'
-  };
+  ].toSet();
 
   @override
   void initState() {
@@ -201,7 +201,7 @@ class _CrossReferenceTrackerState extends State<CrossReferenceTracker> {
 
   static List<String> _extractConceptsStatic(String text) {
     final concepts = <String>{};
-    final stopwords = {
+    final stopwords = <String>[
       'bu', 've', 'veya', 'ama', 'ancak', 'ile', 'için', 'gibi', 'olarak', 'daha',
       'çok', 'az', 'bir', 'iki', 'üç', 'dört', 'beş', 'altı', 'yedi', 'sekiz',
       'dokuz', 'on', 'yüz', 'bin', 'milyon', 'milyar', 'yok', 'var', 'değil',
@@ -221,7 +221,7 @@ class _CrossReferenceTrackerState extends State<CrossReferenceTracker> {
       'now', 'then', 'here', 'there', 'up', 'down', 'out', 'off', 'over', 'under',
       'again', 'further', 'then', 'once', 'more', 'most', 'some', 'such', 'no',
       'nor', 'not', 'only', 'own', 'same', 'so', 'than', 'too', 'very', 'you'
-    };
+    ].toSet();
     
     // Extract [[wiki-style links]]
     final wikiLinks = RegExp(r'\[\[([^\]]+)\]\]').allMatches(text);
@@ -441,7 +441,7 @@ class _CrossReferenceTrackerState extends State<CrossReferenceTracker> {
                   tag,
                   style: const TextStyle(fontSize: 10),
                 ),
-                backgroundColor: _getConceptColor(weight).withOpacity(0.1),
+                backgroundColor: _getConceptColor(weight).withValues(alpha: 0.1),
                 side: BorderSide(color: _getConceptColor(weight)),
                 onPressed: () => _addTag(tag),
                 avatar: Icon(
@@ -530,11 +530,11 @@ class _CrossReferenceTrackerState extends State<CrossReferenceTracker> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).primaryColor.withOpacity(0.1),
+                        color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        '${relatedNote.relevanceScore.toStringAsFixed(1)}',
+                        relatedNote.relevanceScore.toStringAsFixed(1),
                         style: TextStyle(
                           fontSize: 10,
                           color: Theme.of(context).primaryColor,

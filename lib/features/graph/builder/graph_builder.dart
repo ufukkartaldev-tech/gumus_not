@@ -152,7 +152,7 @@ class GraphBuilder {
     );
     
     if (existingEdge == null) {
-      edges.add(GraphEdge(sourceNode, ghostNode!, label: targetTitle));
+      edges.add(GraphEdge(sourceNode, ghostNode, label: targetTitle));
     }
   }
   

@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:home_widget/home_widget.dart';
 import 'package:connected_notebook/features/home_widget/services/widget_service.dart';
 
 import 'package:connected_notebook/features/notes/models/note_model.dart';
 
 class WidgetScreen extends StatefulWidget {
-  const WidgetScreen({Key? key}) : super(key: key);
+  const WidgetScreen({super.key});
 
   @override
   State<WidgetScreen> createState() => _WidgetScreenState();
@@ -229,7 +228,7 @@ class _WidgetScreenState extends State<WidgetScreen> {
                     overflow: TextOverflow.ellipsis,
                   ),
                 );
-              }).toList(),
+              }),
           ],
         ),
       ),
@@ -267,7 +266,7 @@ class _WidgetScreenState extends State<WidgetScreen> {
                     overflow: TextOverflow.ellipsis,
                   ),
                 );
-              }).toList(),
+              }),
           ],
         ),
       ),
@@ -371,9 +370,9 @@ class _StatCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Column(
         children: [

@@ -296,7 +296,7 @@ class DatabaseMigrationService {
     try {
       final oldPath = await getOldDatabasePath();
       final newPath = await getNewDatabasePath();
-      final backupPath = '${oldPath}.backup';
+      final backupPath = '$oldPath.backup';
 
       final factory = databaseFactory;
 
@@ -334,7 +334,7 @@ class DatabaseMigrationService {
   static Future<bool> createBackup() async {
     try {
       final oldPath = await getOldDatabasePath();
-      final backupPath = '${oldPath}.backup';
+      final backupPath = '$oldPath.backup';
 
       final factory = databaseFactory;
       final oldDbExists = await factory.databaseExists(oldPath);

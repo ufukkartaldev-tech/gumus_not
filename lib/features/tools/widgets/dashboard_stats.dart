@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:connected_notebook/features/notes/models/note_model.dart';
-import 'dart:ui';
 
 class DashboardStats extends StatelessWidget {
   final List<Note> notes;
 
-  const DashboardStats({Key? key, required this.notes}) : super(key: key);
+  const DashboardStats({super.key, required this.notes});
 
   @override
   Widget build(BuildContext context) {
@@ -55,23 +54,23 @@ class DashboardStats extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(0.08),
+            color: color.withValues(alpha: 0.08),
             blurRadius: 15,
             offset: const Offset(0, 5),
           ),
           BoxShadow(
-            color: Theme.of(context).shadowColor.withOpacity(0.05),
+            color: Theme.of(context).shadowColor.withValues(alpha: 0.05),
             blurRadius: 5,
             offset: const Offset(0, 2),
           ),
         ],
-        border: Border.all(color: color.withOpacity(0.15), width: 1.5),
+        border: Border.all(color: color.withValues(alpha: 0.15), width: 1.5),
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
             Theme.of(context).cardColor,
-            Theme.of(context).cardColor.withOpacity(0.9),
+            Theme.of(context).cardColor.withValues(alpha: 0.9),
           ],
         ),
       ),
@@ -84,7 +83,7 @@ class DashboardStats extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
+                  color: color.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(icon, size: 20, color: color),
@@ -108,7 +107,7 @@ class DashboardStats extends StatelessWidget {
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w500,
-              color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.8),
+              color: Theme.of(context).textTheme.bodySmall?.color?.withValues(alpha: 0.8),
             ),
           ),
         ],

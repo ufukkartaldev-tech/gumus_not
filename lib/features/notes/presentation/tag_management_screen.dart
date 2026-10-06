@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:connected_notebook/features/notes/providers/note_provider.dart';
-import 'package:connected_notebook/features/notes/presentation/note_list_screen.dart';
 import 'package:connected_notebook/features/notes/widgets/tag_cloud_widget.dart';
 
 class TagManagementScreen extends StatefulWidget {
-  const TagManagementScreen({Key? key}) : super(key: key);
+  const TagManagementScreen({super.key});
 
   @override
   State<TagManagementScreen> createState() => _TagManagementScreenState();
@@ -67,10 +66,10 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                 margin: const EdgeInsets.symmetric(horizontal: 16),
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).primaryColor.withOpacity(0.1),
+                  color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: Theme.of(context).primaryColor.withOpacity(0.2),
+                    color: Theme.of(context).primaryColor.withValues(alpha: 0.2),
                   ),
                 ),
                 child: Row(
@@ -157,7 +156,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                             margin: const EdgeInsets.only(bottom: 8),
                             child: ListTile(
                               leading: CircleAvatar(
-                                backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
+                                backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.1),
                                 child: Text(
                                   '#$tag'[0].toUpperCase(),
                                   style: TextStyle(

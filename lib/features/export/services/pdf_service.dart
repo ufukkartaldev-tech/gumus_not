@@ -2,9 +2,7 @@ import 'dart:io';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
-import 'package:flutter/services.dart';
 import 'package:connected_notebook/features/notes/models/note_model.dart';
-import 'package:connected_notebook/shared/utils/image_service.dart';
 
 class PdfService {
   /// Bir notu PDF'e dönüştür ve paylaş/yazdır
@@ -37,7 +35,7 @@ class PdfService {
           ...contentParts.map((part) {
             if (part is pw.Widget) return part;
             return pw.Text(part.toString(), style: pw.TextStyle(font: font));
-          }).toList(),
+          }),
         ],
       ),
     );

@@ -1,8 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
-import 'dart:io';
-import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
@@ -600,7 +598,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                 margin: const EdgeInsets.only(right: 8),
                 decoration: BoxDecoration(
-                  color: isSelected ? Theme.of(context).primaryColor.withOpacity(0.18) : Colors.transparent,
+                  color: isSelected ? Theme.of(context).primaryColor.withValues(alpha: 0.18) : Colors.transparent,
                   borderRadius: BorderRadius.circular(12),
                   border: isSelected ? Border.all(color: Theme.of(context).primaryColor, width: 1.5) : null,
                 ),
@@ -637,7 +635,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bgColor = _selectedColor != null
         ? Color(_selectedColor!)
-        : Theme.of(context).colorScheme.background;
+        : Theme.of(context).colorScheme.surface;
 
     final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
     final width = MediaQuery.of(context).size.width;
@@ -702,7 +700,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
                 top: 16,
                 right: 16,
                 child: Material(
-                  color: Colors.black.withOpacity(0.4),
+                  color: Colors.black.withValues(alpha: 0.4),
                   borderRadius: BorderRadius.circular(20),
                   child: IconButton(
                     icon: const Icon(Icons.fullscreen_exit_rounded, color: Colors.white),
@@ -884,7 +882,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
               child: const Row(
                 children: [
                   Icon(Icons.fullscreen_rounded, size: 20),
-                  const SizedBox(width: 12),
+                  SizedBox(width: 12),
                   Text('Zen Odak Modu'),
                 ],
               ),
@@ -905,7 +903,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
                 child: const Row(
                   children: [
                     Icon(Icons.hub_outlined, size: 20),
-                    const SizedBox(width: 12),
+                    SizedBox(width: 12),
                     Text('Çapraz Bağlantılar'),
                   ],
                 ),
@@ -915,7 +913,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
               child: const Row(
                 children: [
                   Icon(Icons.share_rounded, size: 20),
-                  const SizedBox(width: 12),
+                  SizedBox(width: 12),
                   Text('Notu Paylaş'),
                 ],
               ),
@@ -925,7 +923,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
               child: const Row(
                 children: [
                   Icon(Icons.picture_as_pdf_outlined, size: 20),
-                  const SizedBox(width: 12),
+                  SizedBox(width: 12),
                   Text('PDF Olarak Kaydet'),
                 ],
               ),
@@ -935,7 +933,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
               child: const Row(
                 children: [
                   Icon(Icons.text_format_rounded, size: 20),
-                  const SizedBox(width: 12),
+                  SizedBox(width: 12),
                   Text('LaTeX Olarak Dışa Aktar'),
                 ],
               ),
@@ -1011,7 +1009,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
             decoration: InputDecoration(
               hintText: 'Başlıksız Not',
               hintStyle: TextStyle(
-                color: theme.disabledColor.withOpacity(0.28),
+                color: theme.disabledColor.withValues(alpha: 0.28),
                 fontWeight: FontWeight.w800,
               ),
               border: InputBorder.none,
@@ -1034,7 +1032,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.surfaceVariant.withOpacity(0.35),
+                      color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
@@ -1057,7 +1055,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
                       margin: const EdgeInsets.only(right: 6),
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: theme.colorScheme.primary.withOpacity(0.09),
+                        color: theme.colorScheme.primary.withValues(alpha: 0.09),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
@@ -1077,9 +1075,9 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.surfaceVariant.withOpacity(0.2),
+                      color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: theme.dividerColor.withOpacity(0.2), width: 0.8),
+                      border: Border.all(color: theme.dividerColor.withValues(alpha: 0.2), width: 0.8),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -1121,7 +1119,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
               decoration: InputDecoration(
                 hintText: 'Düşüncelerinizi buraya dökün...',
                 hintStyle: TextStyle(
-                  color: theme.disabledColor.withOpacity(0.3),
+                  color: theme.disabledColor.withValues(alpha: 0.3),
                   fontStyle: FontStyle.italic,
                   fontSize: 16,
                 ),
@@ -1151,7 +1149,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
     // Find notes that link to this one
     final backlinks = noteProvider.notes.where((n) {
       if (n.id == widget.note?.id) return false;
-      return n.content.toLowerCase().contains('\[\[$currentTitle\]\]');
+      return n.content.toLowerCase().contains('[[$currentTitle]]');
     }).toList();
 
     if (backlinks.isEmpty) return const SizedBox.shrink();
@@ -1160,9 +1158,9 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
       margin: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.dividerColor.withOpacity(0.1)),
+        border: Border.all(color: theme.dividerColor.withValues(alpha: 0.1)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1195,7 +1193,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
                     decoration: BoxDecoration(
                       color: theme.colorScheme.surface,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: theme.dividerColor.withOpacity(0.2)),
+                      border: Border.all(color: theme.dividerColor.withValues(alpha: 0.2)),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,

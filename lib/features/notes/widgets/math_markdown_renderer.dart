@@ -7,7 +7,6 @@ import 'package:markdown/markdown.dart' as md;
 import 'package:flutter_highlighter/flutter_highlighter.dart';
 import 'package:flutter_highlighter/themes/github.dart';
 import 'package:flutter_highlighter/themes/darcula.dart';
-import 'package:connected_notebook/features/media/widgets/image_picker_widget.dart';
 import 'package:provider/provider.dart';
 import 'package:connected_notebook/features/notes/providers/note_provider.dart';
 
@@ -17,7 +16,7 @@ class WikilinkSyntax extends md.InlineSyntax {
   @override
   bool onMatch(md.InlineParser parser, Match match) {
     final title = match.group(1)!;
-    final element = md.Element('a', [md.Text('[[${title}]]')]);
+    final element = md.Element('a', [md.Text('[[$title]]')]);
     element.attributes['href'] = 'zettel://$title';
     parser.addNode(element);
     return true;
@@ -162,7 +161,7 @@ class MathMarkdownRenderer extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: Colors.black.withValues(alpha: 0.1),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -236,10 +235,10 @@ class MathMarkdownRenderer extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.5)),
+        border: Border.all(color: Theme.of(context).dividerColor.withValues(alpha: 0.5)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -250,7 +249,7 @@ class MathMarkdownRenderer extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: Theme.of(context).primaryColor.withOpacity(0.1),
+              color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
               borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
             ),
             child: Row(
@@ -405,7 +404,7 @@ class _EnhancedMarkdownEditorState extends State<EnhancedMarkdownEditor> {
               decoration: BoxDecoration(
                 border: Border.all(color: Colors.grey.shade300),
                 borderRadius: BorderRadius.circular(4),
-                color: Theme.of(context).primaryColor.withOpacity(0.1),
+                color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
               ),
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
@@ -571,7 +570,7 @@ class CodeElementBuilder extends MarkdownElementBuilder {
             ? const Color(0xff2b2b2b) 
             : const Color(0xfff8f8f8),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey.withOpacity(0.3)),
+        border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
       ),
       child: Stack(
         children: [

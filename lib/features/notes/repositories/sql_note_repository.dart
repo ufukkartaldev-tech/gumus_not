@@ -57,6 +57,7 @@ class SqlNoteRepository implements NoteRepository {
     return maps.map(Note.fromMap).toList();
   }
 
+  @override
   Future<List<Note>> getPendingTasks({int limit = 10}) async {
     final maps = await _databaseService.getPendingTasks(limit: limit);
     return maps.map(Note.fromMap).toList();
@@ -67,6 +68,7 @@ class SqlNoteRepository implements NoteRepository {
     return allNotes.where((note) => note.folderName == folderName).toList();
   }
 
+  @override
   Future<List<Note>> getNotesByTag(String tag) async {
     final allNotes = await getAllNotes();
     return allNotes.where((note) => note.tags.contains(tag)).toList();
@@ -86,6 +88,7 @@ class SqlNoteRepository implements NoteRepository {
     return folderSet.toList()..sort();
   }
 
+  @override
   Future<Map<String, dynamic>> getDatabaseStats() async {
     return _databaseService.getDatabaseStats();
   }
@@ -108,11 +111,13 @@ class SqlNoteRepository implements NoteRepository {
     await insertNotes(notes);
   }
 
+  @override
   Future<List<Backlink>> getBacklinksForNote(int noteId) async {
     final maps = await _databaseService.getBacklinksForNote(noteId);
     return maps.map(Backlink.fromMap).toList();
   }
 
+  @override
   Future<List<Backlink>> getOutgoingLinksForNote(int noteId) async {
     final maps = await _databaseService.getOutgoingLinksForNote(noteId);
     return maps.map(Backlink.fromMap).toList();

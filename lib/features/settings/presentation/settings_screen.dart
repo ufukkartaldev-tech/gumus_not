@@ -1,18 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:connected_notebook/features/notes/providers/note_provider.dart';
 import 'package:connected_notebook/core/theme/theme_provider.dart';
 import 'package:connected_notebook/core/theme/app_theme.dart';
 import 'package:connected_notebook/features/settings/presentation/about_screen.dart';
-import 'package:connected_notebook/features/backup/presentation/backup_screen.dart';
 import 'package:connected_notebook/features/home_widget/presentation/widget_screen.dart';
 import 'package:connected_notebook/core/utils/shortcut_manager.dart';
-import 'package:connected_notebook/features/backup/services/backup_share_service.dart';
 
 import 'package:connected_notebook/features/ai/presentation/ai_settings_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({Key? key}) : super(key: key);
+  const SettingsScreen({super.key});
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -238,7 +235,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               : null,
                           boxShadow: [
                             BoxShadow(
-                              color: color.color.withOpacity(0.4),
+                              color: color.color.withValues(alpha: 0.4),
                               blurRadius: 8,
                               offset: const Offset(0, 2),
                             ),

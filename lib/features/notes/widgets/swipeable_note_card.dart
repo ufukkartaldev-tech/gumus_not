@@ -14,14 +14,14 @@ class SwipeableNoteCard extends StatelessWidget {
   final bool isPinned;
 
   const SwipeableNoteCard({
-    Key? key,
+    super.key,
     required this.note,
     required this.child,
     required this.onTogglePin,
     required this.onDelete,
     required this.onArchive,
     this.isPinned = false,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -141,7 +141,7 @@ class SwipeableNoteCard extends StatelessWidget {
                   height: 4,
                   margin: const EdgeInsets.only(bottom: 16),
                   decoration: BoxDecoration(
-                    color: Theme.of(ctx).dividerColor.withOpacity(0.4),
+                    color: Theme.of(ctx).dividerColor.withValues(alpha: 0.4),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -163,7 +163,7 @@ class SwipeableNoteCard extends StatelessWidget {
                 leading: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.indigo.withOpacity(0.12),
+                    color: Colors.indigo.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: const Icon(Icons.archive_outlined, color: Colors.indigo, size: 22),
@@ -178,7 +178,7 @@ class SwipeableNoteCard extends StatelessWidget {
                 leading: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.12),
+                    color: Colors.red.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 22),

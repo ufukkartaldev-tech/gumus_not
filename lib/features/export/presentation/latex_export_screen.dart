@@ -11,9 +11,9 @@ class LatexExportScreen extends StatefulWidget {
   final Note note;
 
   const LatexExportScreen({
-    Key? key,
+    super.key,
     required this.note,
-  }) : super(key: key);
+  });
 
   @override
   State<LatexExportScreen> createState() => _LatexExportScreenState();
@@ -27,7 +27,7 @@ class _LatexExportScreenState extends State<LatexExportScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.background,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
         title: const Text('LaTeX Dışa Aktar'),
         backgroundColor: Colors.transparent,
