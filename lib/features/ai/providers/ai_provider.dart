@@ -50,33 +50,33 @@ class AiProvider extends ChangeNotifier {
     }
   }
 
-  // --- Caching Proxy Methods ---
+  // --- Caching Proxy Methods (Fuzzy %5 Tolerance) ---
 
-  Future<String> getSummary(String text) async {
+  Future<String> getSummary(String text, {required String noteId}) async {
     if (_activeService == null) throw Exception("AI kapalı veya yapılandırılmamış.");
     
-    final cached = await _cacheService.getCached('summary', text);
+    final cached = await _cacheService.getCached('summary', noteId, text);
     if (cached != null) {
-      debugPrint("AI Cache Hit: Özet önbellekten getirildi.");
+      debugPrint("AI Cache Hit (Fuzzy %5): Özet önbellekten getirildi.");
       return cached;
     }
 
     final result = await _activeService!.generateSummary(text);
-    await _cacheService.setCached('summary', text, result);
+    await _cacheService.setCached('summary', noteId, text, result);
     return result;
   }
 
-  Future<List<String>> getTags(String text) async {
+  Future<List<String>> getTags(String text, {required String noteId}) async {
     if (_activeService == null) throw Exception("AI kapalı veya yapılandırılmamış.");
     
-    final cached = await _cacheService.getCached('tags', text);
+    final cached = await _cacheService.getCached('tags', noteId, text);
     if (cached != null) {
-      debugPrint("AI Cache Hit: Etiketler önbellekten getirildi.");
+      debugPrint("AI Cache Hit (Fuzzy %5): Etiketler önbellekten getirildi.");
       return cached.split(',');
     }
 
     final result = await _activeService!.suggestTags(text);
-    await _cacheService.setCached('tags', text, result.join(','));
+    await _cacheService.setCached('tags', noteId, text, result.join(','));
     return result;
   }
 }
