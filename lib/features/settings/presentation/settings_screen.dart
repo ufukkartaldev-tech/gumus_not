@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:connected_notebook/core/theme/theme_provider.dart';
 import 'package:connected_notebook/core/theme/app_theme.dart';
@@ -7,6 +7,7 @@ import 'package:connected_notebook/features/home_widget/presentation/widget_scre
 import 'package:connected_notebook/core/utils/shortcut_manager.dart';
 
 import 'package:connected_notebook/features/ai/presentation/ai_settings_screen.dart';
+import 'package:connected_notebook/features/settings/screens/theme_selection_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -181,81 +182,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
 
   Widget _buildThemeSection() {
-    return Consumer<ThemeProvider>(
-      builder: (context, themeProvider, child) {
-        return Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Row(
-                  children: [
-                    Icon(Icons.palette, size: 24),
-                    SizedBox(width: 8),
-                    Text(
-                      'Görünüm',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                const Text('Tema Modu', style: TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 8),
-                SegmentedButton<ThemeMode>(
-                  segments: const [
-                    ButtonSegment(value: ThemeMode.light, icon: Icon(Icons.light_mode), label: Text('Açık')),
-                    ButtonSegment(value: ThemeMode.dark, icon: Icon(Icons.dark_mode), label: Text('Koyu')),
-                    ButtonSegment(value: ThemeMode.system, icon: Icon(Icons.brightness_auto), label: Text('Sistem')),
-                  ],
-                  selected: {themeProvider.themeMode},
-                  onSelectionChanged: (Set<ThemeMode> newSelection) {
-                    themeProvider.setThemeMode(newSelection.first);
-                  },
-                ),
-                const SizedBox(height: 16),
-                const Text('Tema Rengi', style: TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: AppThemeColor.values.map((color) {
-                    final isSelected = themeProvider.selectedColor == color;
-                    return InkWell(
-                      onTap: () => themeProvider.setThemeColor(color),
-                      borderRadius: BorderRadius.circular(20),
-                      child: Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: color.color,
-                          shape: BoxShape.circle,
-                          border: isSelected
-                              ? Border.all(color: Theme.of(context).colorScheme.onSurface, width: 3)
-                              : null,
-                          boxShadow: [
-                            BoxShadow(
-                              color: color.color.withValues(alpha: 0.4),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: isSelected
-                            ? const Icon(Icons.check, color: Colors.white, size: 20)
-                            : null,
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+    return Card(
+      child: ListTile(
+        leading: const Icon(Icons.color_lens_outlined, color: Colors.blue),
+        title: const Text('Temalar ve Görünüm', style: TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: const Text('Dracula, Nord, karanlık/aydınlık mod'),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const ThemeSelectionScreen()),
+          );
+        },
+      ),
     );
   }
-
 
   Widget _buildWidgetSection() {
     return Card(
@@ -292,3 +233,4 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
 }
+
