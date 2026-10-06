@@ -9,6 +9,7 @@ class GeminiAiService implements IAiService {
       : _model = GenerativeModel(
           model: config.modelName?.isNotEmpty == true ? config.modelName! : 'gemini-1.5-flash',
           apiKey: config.apiKey ?? '',
+          generationConfig: GenerationConfig(maxOutputTokens: 150), // Maliyet tasarrufu
         );
 
   @override

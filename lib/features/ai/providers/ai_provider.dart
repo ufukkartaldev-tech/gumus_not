@@ -6,8 +6,11 @@ import '../services/gemini_ai_service.dart';
 import '../services/openai_compatible_service.dart';
 import '../services/secure_key_storage.dart';
 
+import '../services/ai_cache_service.dart';
+
 class AiProvider extends ChangeNotifier {
   final SecureKeyStorage _storage = SecureKeyStorage();
+  final AiCacheService _cacheService = AiCacheService();
   
   AiConfig _config = AiConfig(providerType: AiProviderType.none);
   IAiService? _activeService;
@@ -45,5 +48,35 @@ class AiProvider extends ChangeNotifier {
       debugPrint("AI Servisi başlatılamadı: $e");
       _activeService = null;
     }
+  }
+
+  // --- Caching Proxy Methods ---
+
+  Future<String> getSummary(String text) async {
+    if (_activeService == null) throw Exception("AI kapalı veya yapılandırılmamış.");
+    
+    final cached = await _cacheService.getCached('summary', text);
+    if (cached != null) {
+      debugPrint("AI Cache Hit: Özet önbellekten getirildi.");
+      return cached;
+    }
+
+    final result = await _activeService!.generateSummary(text);
+    await _cacheService.setCached('summary', text, result);
+    return result;
+  }
+
+  Future<List<String>> getTags(String text) async {
+    if (_activeService == null) throw Exception("AI kapalı veya yapılandırılmamış.");
+    
+    final cached = await _cacheService.getCached('tags', text);
+    if (cached != null) {
+      debugPrint("AI Cache Hit: Etiketler önbellekten getirildi.");
+      return cached.split(',');
+    }
+
+    final result = await _activeService!.suggestTags(text);
+    await _cacheService.setCached('tags', text, result.join(','));
+    return result;
   }
 }

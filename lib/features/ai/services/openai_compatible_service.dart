@@ -27,6 +27,7 @@ class OpenAiCompatibleService implements IAiService {
         'messages': [
           {'role': 'user', 'content': prompt}
         ],
+        'max_tokens': 150, // Maliyet tasarrufu: Gevezeliği önler
       }),
     );
 

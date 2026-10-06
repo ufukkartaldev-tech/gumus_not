@@ -381,12 +381,12 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
 
     try {
       if (action == 'summary') {
-        final summary = await aiProvider.activeService!.generateSummary(text);
+        final summary = await aiProvider.getSummary(text);
         final formattedSummary = '\n\n> **✨ AI Özeti:**\n> ${summary.replaceAll('\n', '\n> ')}\n\n';
         _insertTextAtCursor(formattedSummary);
-        _showSuccess('Özet eklendi!');
+        _showSuccess('Özet eklendi (Gerekirse önbellekten)!');
       } else if (action == 'tags') {
-        final suggestedTags = await aiProvider.activeService!.suggestTags(text);
+        final suggestedTags = await aiProvider.getTags(text);
         setState(() {
           for (var tag in suggestedTags) {
             if (!_tags.contains(tag)) _tags.add(tag);
