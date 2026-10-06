@@ -9,6 +9,8 @@ import 'package:connected_notebook/features/home_widget/presentation/widget_scre
 import 'package:connected_notebook/core/utils/shortcut_manager.dart';
 import 'package:connected_notebook/features/backup/services/backup_share_service.dart';
 
+import 'package:connected_notebook/features/ai/presentation/ai_settings_screen.dart';
+
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({Key? key}) : super(key: key);
 
@@ -49,6 +51,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16.0),
         children: [
+          _buildAiSection(),
+          const SizedBox(height: 24),
           _buildDeveloperSection(),
           const SizedBox(height: 24),
           _buildThemeSection(),
@@ -57,6 +61,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 24),
           _buildAboutSection(),
         ],
+      ),
+    );
+  }
+
+  Widget _buildAiSection() {
+    return Card(
+      child: ListTile(
+        leading: const Icon(Icons.auto_awesome, color: Colors.deepPurple),
+        title: const Text('Yapay Zeka (AI) Asistanı', style: TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: const Text('Gemini, DeepSeek, OpenAI yapılandırması'),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const AiSettingsScreen()),
+          );
+        },
       ),
     );
   }

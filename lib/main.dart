@@ -18,6 +18,7 @@ import 'package:connected_notebook/features/notes/widgets/markdown_editor.dart';
 import 'package:connected_notebook/features/notes/models/note_model.dart';
 import 'package:connected_notebook/features/calendar/presentation/calendar_screen.dart';
 import 'package:connected_notebook/features/security/presentation/lock_screen.dart';
+import 'package:connected_notebook/features/ai/providers/ai_provider.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -134,6 +135,7 @@ class ConnectedNotebookApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider.value(value: themeProvider),
         ChangeNotifierProvider.value(value: shortcutManager),
+        ChangeNotifierProvider(create: (_) => AiProvider()..loadConfig()),
         ...NoteDependencyInjection.getProviders(),
       ],
       child: Consumer2<ThemeProvider, AppShortcutManager>(

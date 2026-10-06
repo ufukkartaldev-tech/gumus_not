@@ -23,6 +23,7 @@ import 'package:connected_notebook/core/utils/shortcut_manager.dart';
 import 'package:connected_notebook/features/export/presentation/latex_export_screen.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'package:connected_notebook/features/notes/services/voice_note_service.dart';
+import 'package:connected_notebook/features/ai/providers/ai_provider.dart';
 
 class MarkdownEditor extends StatefulWidget {
   final Note? note;
@@ -57,6 +58,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
 
   final VoiceNoteService _voiceNoteService = VoiceNoteService();
   bool _isRecording = false;
+  bool _isAiLoading = false;
 
   final FocusNode _titleFocusNode = FocusNode();
   final FocusNode _contentFocusNode = FocusNode();
@@ -320,6 +322,83 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
   void _showError(String msg) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
+  }
+
+  void _showSuccess(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.green));
+  }
+
+  Future<void> _showAiMenu() async {
+    final aiProvider = context.read<AiProvider>();
+    if (!aiProvider.isAiEnabled) {
+      _showError('Lütfen önce Ayarlar\'dan AI sağlayıcınızı yapılandırın.');
+      return;
+    }
+
+    final String text = _contentController.text.trim();
+    if (text.isEmpty) {
+      _showError('Lütfen önce biraz not yazın.');
+      return;
+    }
+
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        final theme = Theme.of(context);
+        final isDark = theme.brightness == Brightness.dark;
+        return Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E1F24) : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('✨ Yapay Zeka Asistanı', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: const Icon(Icons.summarize_rounded, color: Colors.blue),
+                title: const Text('Notu Özetle'),
+                onTap: () => Navigator.pop(context, 'summary'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.local_offer_rounded, color: Colors.orange),
+                title: const Text('Etiket Öner'),
+                onTap: () => Navigator.pop(context, 'tags'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (action == null) return;
+
+    setState(() => _isAiLoading = true);
+
+    try {
+      if (action == 'summary') {
+        final summary = await aiProvider.activeService!.generateSummary(text);
+        final formattedSummary = '\n\n> **✨ AI Özeti:**\n> ${summary.replaceAll('\n', '\n> ')}\n\n';
+        _insertTextAtCursor(formattedSummary);
+        _showSuccess('Özet eklendi!');
+      } else if (action == 'tags') {
+        final suggestedTags = await aiProvider.activeService!.suggestTags(text);
+        setState(() {
+          for (var tag in suggestedTags) {
+            if (!_tags.contains(tag)) _tags.add(tag);
+          }
+        });
+        _showSuccess('${suggestedTags.length} etiket eklendi!');
+      }
+    } catch (e) {
+      _showError('AI Hatası: $e');
+    } finally {
+      if (mounted) setState(() => _isAiLoading = false);
+    }
   }
 
 
@@ -703,6 +782,15 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
           ),
           onPressed: _toggleVoiceRecording,
           tooltip: 'Sesli Not',
+        ),
+
+        // AI Assistant Toggle
+        IconButton(
+          icon: _isAiLoading
+              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Icon(Icons.auto_awesome, color: Colors.deepPurple),
+          onPressed: _isAiLoading ? null : _showAiMenu,
+          tooltip: 'Yapay Zeka Asistanı',
         ),
 
         // Save Button (Clean and prominent)
