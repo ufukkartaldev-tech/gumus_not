@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+﻿import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
@@ -1042,12 +1042,15 @@ class _NoteListScreenState extends State<NoteListScreen> {
                      margin: const EdgeInsets.all(16),
                      child: TagCloudWidget(),
                    ),
-                Icon(Icons.note_add_outlined, size: 48, color: Theme.of(context).dividerColor),
-                const SizedBox(height: 16),
-                Text(
-                  'Not bulunamadı',
-                  style: TextStyle(color: Theme.of(context).disabledColor),
-                ),
+                                  EmptyStateWidget(
+                    icon: _searchController.text.isNotEmpty ? Icons.search_off_rounded : Icons.edit_document,
+                    title: _searchController.text.isNotEmpty ? 'Sonuç Bulunamadı' : 'Buralar Çok Issız',
+                    message: _searchController.text.isNotEmpty 
+                        ? 'Aramanızla eşleşen hiçbir not bulamadık.'
+                        : 'İkinci beyninizi inşa etmeye başlamak için ilk notunuzu oluşturun.',
+                    buttonText: _searchController.text.isEmpty ? 'Yeni Not Oluştur' : null,
+                    onButtonPressed: _searchController.text.isEmpty ? () => _createNewNote() : null,
+                  ),
               ],
             ),
           );
@@ -1863,3 +1866,5 @@ class _NoteListScreenState extends State<NoteListScreen> {
      return '${date.day} ${months[date.month - 1]} ${date.year}';
   }
 }
+
+
