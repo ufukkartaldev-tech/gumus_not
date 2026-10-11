@@ -5,11 +5,6 @@ import 'note_repository.dart';
 
 /// Concrete implementation of [NoteRepository] using an injected database
 /// service.
-///
-/// The repository intentionally depends on the legacy [IDatabaseService]
-/// contract so existing callers remain stable. In the new architecture this
-/// contract is fulfilled by [LegacyDatabaseServiceAdapter], which internally
-/// routes all persistence to the secure transaction-based database layer.
 class SqlNoteRepository implements NoteRepository {
   SqlNoteRepository([IDatabaseService? databaseService])
       : _databaseService = databaseService ?? SqliteDatabaseService();

@@ -1,4 +1,4 @@
-﻿import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
@@ -23,6 +23,7 @@ import 'package:connected_notebook/features/search/presentation/advanced_search_
 import 'package:connected_notebook/features/export/presentation/import_export_screen.dart';
 import 'package:connected_notebook/features/notes/widgets/note_template_manager.dart';
 import 'package:connected_notebook/features/tools/widgets/dashboard_stats.dart';
+import 'package:connected_notebook/shared/widgets/empty_state_widget.dart';
 
 class NoteListScreen extends StatefulWidget {
   const NoteListScreen({super.key});
@@ -1049,7 +1050,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
                         ? 'Aramanızla eşleşen hiçbir not bulamadık.'
                         : 'İkinci beyninizi inşa etmeye başlamak için ilk notunuzu oluşturun.',
                     buttonText: _searchController.text.isEmpty ? 'Yeni Not Oluştur' : null,
-                    onButtonPressed: _searchController.text.isEmpty ? () => _createNewNote() : null,
+                    onButtonPressed: _searchController.text.isEmpty ? () => _createNote() : null,
                   ),
               ],
             ),
