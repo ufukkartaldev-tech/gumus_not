@@ -1,16 +1,200 @@
+import 'dart:math';
 import '../models/note_model.dart';
 import '../repositories/note_repository.dart';
 import 'backlink_service.dart';
 
-/// Service for advanced note search operations
-/// Follows Single Responsibility Principle: Only handles search and filtering logic
+/// Gelişmiş, Türkçe karakter duyarsız ve hata toleranslı (fuzzy) not arama servisi.
+/// Tek Sorumluluk Prensibi (SRP): Yalnızca arama, filtreleme ve alaka düzeyi skorlamasını yönetir.
 class NoteSearchService {
   final NoteRepository _repository;
-  final BacklinkService _backlinkService;
+  final BacklinkService? _backlinkService;
 
-  NoteSearchService(this._repository, this._backlinkService);
+  NoteSearchService(this._repository, [this._backlinkService]);
 
-  /// Advanced search with multiple criteria
+  /// Stop words (Gereksiz bağlaçlar/boş kelimeler)
+  static const Set<String> _stopWords = {
+    've', 'ile', 'veya', 'bir', 'bu', 'su', 'o', 'mi', 'da', 'de', 'ki', 'ama', 'fakat', 'icin', 'gibi', 'kadar'
+  };
+
+  /// Türkçe karakter ve büyük/küçük harf normalizasyonu
+  /// 'ı' -> 'i', 'ğ' -> 'g', 'ü' -> 'u', 'ş' -> 's', 'ö' -> 'o', 'ç' -> 'c'
+  static String normalize(String text) {
+    if (text.isEmpty) return '';
+    return text
+        .toLowerCase()
+        .replaceAll('ı', 'i')
+        .replaceAll('İ', 'i')
+        .replaceAll('ğ', 'g')
+        .replaceAll('Ğ', 'g')
+        .replaceAll('ü', 'u')
+        .replaceAll('Ü', 'u')
+        .replaceAll('ş', 's')
+        .replaceAll('Ş', 's')
+        .replaceAll('ö', 'o')
+        .replaceAll('Ö', 'o')
+        .replaceAll('ç', 'c')
+        .replaceAll('Ç', 'c')
+        .trim();
+  }
+
+  /// Levenshtein Edit Distance (Yazım hatası mesafesi)
+  static int levenshteinDistance(String s1, String s2) {
+    if (s1 == s2) return 0;
+    if (s1.isEmpty) return s2.length;
+    if (s2.isEmpty) return s1.length;
+
+    List<int> v0 = List<int>.generate(s2.length + 1, (i) => i);
+    List<int> v1 = List<int>.filled(s2.length + 1, 0);
+
+    for (int i = 0; i < s1.length; i++) {
+      v1[0] = i + 1;
+      for (int j = 0; j < s2.length; j++) {
+        final cost = (s1.codeUnitAt(i) == s2.codeUnitAt(j)) ? 0 : 1;
+        v1[j + 1] = min(v1[j] + 1, min(v0[j + 1] + 1, v0[j] + cost));
+      }
+      for (int j = 0; j <= s2.length; j++) {
+        v0[j] = v1[j];
+      }
+    }
+    return v1[s2.length];
+  }
+
+  /// Kelimeler arası toleranslı eşleşme kontrolü
+  static bool isFuzzyMatch(String word, String query) {
+    if (query.length < 3) return word == query;
+    if ((word.length - query.length).abs() > 2) return false;
+    final maxDist = query.length <= 4 ? 1 : 2;
+    return levenshteinDistance(word, query) <= maxDist;
+  }
+
+  /// Doğrudan arama metodu (Geriye dönük uyumluluk ve UI kısayolu için)
+  Future<List<Note>> search(String query, [List<Note>? notes]) async {
+    final noteList = notes ?? await _repository.getAllNotes();
+    return fuzzySearch(query, noteList);
+  }
+
+  /// Ağırlıklı alaka düzeyi (Relevance Scoring) ve Fuzzy tabanlı arama
+  Future<List<Note>> fuzzySearch(String query, List<Note> notes) async {
+    final rawQuery = query.trim();
+    if (rawQuery.isEmpty) return List<Note>.from(notes);
+
+    final normalizedQuery = normalize(rawQuery);
+    final queryWords = normalizedQuery
+        .split(RegExp(r'\s+'))
+        .where((w) => w.isNotEmpty && !_stopWords.contains(w))
+        .toList();
+
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final oneDayMs = 24 * 60 * 60 * 1000;
+    final oneWeekMs = 7 * oneDayMs;
+    final oneMonthMs = 30 * oneDayMs;
+
+    final scoredList = <MapEntry<Note, double>>[];
+
+    for (final note in notes) {
+      double score = 0.0;
+      final normTitle = normalize(note.title);
+      final normTags = note.tags.map(normalize).toList();
+      final normContent = note.isEncrypted ? '' : normalize(note.content);
+
+      // --- 1. BAŞLIK EŞLEŞMELERİ (En Yüksek Ağırlık) ---
+      if (normTitle == normalizedQuery) {
+        score += 100.0; // Tam başlık eşleşmesi (10x)
+      } else if (normTitle.startsWith(normalizedQuery)) {
+        score += 60.0; // Başlık başlangıcı eşleşmesi
+      } else if (normTitle.contains(normalizedQuery)) {
+        score += 35.0; // Başlık alt metin eşleşmesi
+      }
+
+      final titleWords = normTitle.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+      for (final qWord in queryWords) {
+        for (final tWord in titleWords) {
+          if (tWord == qWord) {
+            score += 25.0;
+          } else if (isFuzzyMatch(tWord, qWord)) {
+            score += 15.0; // Başlıkta yazım hatası toleransı
+          }
+        }
+      }
+
+      // --- 2. ETİKET EŞLEŞMELERİ (Yüksek Ağırlık) ---
+      for (final tag in normTags) {
+        final cleanTag = tag.replaceAll('#', '');
+        final cleanQuery = normalizedQuery.replaceAll('#', '');
+        if (cleanTag == cleanQuery) {
+          score += 50.0; // Tam etiket eşleşmesi (5x)
+        } else if (cleanTag.contains(cleanQuery)) {
+          score += 30.0;
+        } else if (isFuzzyMatch(cleanTag, cleanQuery)) {
+          score += 15.0; // Etikette fuzzy tolerans
+        }
+      }
+
+      // --- 3. İÇERİK VE KOD BLOKLARI EŞLEŞMELERİ (Standart Ağırlık) ---
+      if (!note.isEncrypted && normContent.isNotEmpty) {
+        // Kod bloklarında arama: ```...```
+        final codeBlocks = RegExp(r'```[\s\S]*?```').allMatches(note.content);
+        for (final match in codeBlocks) {
+          final blockText = normalize(match.group(0) ?? '');
+          if (blockText.contains(normalizedQuery)) {
+            score += 20.0; // Kod bloğu içinde tam eşleşme
+          }
+        }
+
+        // İçerik genelinde tam sorgu eşleşmesi
+        if (normContent.contains(normalizedQuery)) {
+          score += 15.0;
+        }
+
+        // Kelime bazlı içerik eşleşmesi
+        final contentWords = normContent.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+        int contentWordMatches = 0;
+        for (final qWord in queryWords) {
+          for (final cWord in contentWords) {
+            if (cWord == qWord) {
+              contentWordMatches++;
+              if (contentWordMatches >= 5) break; // Çok fazla puan yığılmasını önle
+            } else if (isFuzzyMatch(cWord, qWord)) {
+              score += 4.0;
+            }
+          }
+        }
+        score += (contentWordMatches * 3.0);
+      }
+
+      // --- 4. GÜNCELLİK PUANI (Recency Boost) ---
+      final ageMs = now - note.updatedAt;
+      if (ageMs <= oneDayMs) {
+        score += 5.0; // Son 24 saatte güncellenen not
+      } else if (ageMs <= oneWeekMs) {
+        score += 3.0; // Son 1 haftada güncellenen not
+      } else if (ageMs <= oneMonthMs) {
+        score += 1.0; // Son 1 ayda güncellenen not
+      }
+
+      // --- 5. BAĞLANTI (Backlink) DESTEĞİ ---
+      if (_backlinkService != null) {
+        final links = note.extractLinks();
+        if (links.isNotEmpty) {
+          score += 2.0; // İlişkisel zenginlik katkısı
+        }
+      }
+
+      // Yalnızca eşleşen (puanı > 5 olan) notları listeye ekle
+      // (Salt güncellik puanı tek başına eşleşme yaratamaz)
+      final pureMatchScore = score - (ageMs <= oneDayMs ? 5.0 : ageMs <= oneWeekMs ? 3.0 : ageMs <= oneMonthMs ? 1.0 : 0.0);
+      if (pureMatchScore > 0) {
+        scoredList.add(MapEntry(note, score));
+      }
+    }
+
+    // Skora göre azalan sırada sırala (En alakalı en üstte)
+    scoredList.sort((a, b) => b.value.compareTo(a.value));
+
+    return scoredList.map((entry) => entry.key).toList();
+  }
+
+  /// Çok kriterli gelişmiş arama
   Future<List<Note>> advancedSearch({
     String query = '',
     List<String>? tags,
@@ -26,24 +210,25 @@ class NoteSearchService {
     final allNotes = await _repository.getAllNotes();
     var results = List<Note>.from(allNotes);
 
-    // Text search
-    if (query.isNotEmpty) {
+    // 1. Akıllı metin araması (Puanlamaya göre sıralı)
+    if (query.trim().isNotEmpty) {
       results = await fuzzySearch(query, results);
     }
 
-    // Tag filter
+    // 2. Etiket filtreleme
     if (tags != null && tags.isNotEmpty) {
+      final normalizedFilterTags = tags.map(normalize).toSet();
       results = results.where((note) {
-        return tags.any((tag) => note.tags.contains(tag));
+        return note.tags.any((tag) => normalizedFilterTags.contains(normalize(tag)));
       }).toList();
     }
 
-    // Folder filter
-    if (folder != null && folder.isNotEmpty) {
+    // 3. Klasör filtreleme
+    if (folder != null && folder.isNotEmpty && folder != 'Tümü') {
       results = results.where((note) => note.folderName == folder).toList();
     }
 
-    // Date range filter
+    // 4. Tarih filtreleme
     if (startDate != null) {
       results = results.where((note) => note.createdAt >= startDate.millisecondsSinceEpoch).toList();
     }
@@ -51,12 +236,12 @@ class NoteSearchService {
       results = results.where((note) => note.createdAt <= endDate.millisecondsSinceEpoch).toList();
     }
 
-    // Encryption filter
+    // 5. Şifrelilik filtresi
     if (isEncrypted != null) {
       results = results.where((note) => note.isEncrypted == isEncrypted).toList();
     }
 
-    // Word count filter
+    // 6. Kelime sayısı filtresi
     if (minWordCount != null) {
       results = results.where((note) => note.wordCount >= minWordCount).toList();
     }
@@ -64,72 +249,20 @@ class NoteSearchService {
       results = results.where((note) => note.wordCount <= maxWordCount).toList();
     }
 
-    // Has links filter
+    // 7. Bağlantı (Link) filtresi
     if (hasLinks) {
       results = results.where((note) => note.extractLinks().isNotEmpty).toList();
     }
 
-    // Has tasks filter
+    // 8. Görev (Task) filtresi
     if (hasTasks) {
-      results = results.where((note) => note.content.contains('- [ ')).toList();
+      results = results.where((note) => note.content.contains('- [ ]') || note.content.contains('- [x]')).toList();
     }
 
     return results;
   }
 
-  /// Fuzzy search implementation
-  Future<List<Note>> fuzzySearch(String query, List<Note> notes) async {
-    if (query.isEmpty) return notes;
-
-    final lowerQuery = query.toLowerCase();
-    final results = <Note>[];
-
-    for (final note in notes) {
-      double score = 0;
-
-      // Title matches (higher weight)
-      if (note.title.toLowerCase().contains(lowerQuery)) {
-        score += 2.0;
-      }
-
-      // Content matches
-      if (note.content.toLowerCase().contains(lowerQuery)) {
-        score += 1.0;
-      }
-
-      // Tag matches
-      for (final tag in note.tags) {
-        if (tag.toLowerCase().contains(lowerQuery)) {
-          score += 1.5;
-        }
-      }
-
-      // Exact word matches
-      final queryWords = lowerQuery.split(' ');
-      final contentWords = note.content.toLowerCase().split(' ');
-      
-      for (final queryWord in queryWords) {
-        if (contentWords.contains(queryWord)) {
-          score += 0.5;
-        }
-      }
-
-      if (score > 0) {
-        results.add(note);
-      }
-    }
-
-    // Sort by score (descending)
-    results.sort((a, b) {
-      final scoreA = _calculateSearchScore(a, lowerQuery);
-      final scoreB = _calculateSearchScore(b, lowerQuery);
-      return scoreB.compareTo(scoreA);
-    });
-
-    return results;
-  }
-
-  /// Search by content similarity
+  /// İçerik benzerliğine göre not arama (Jaccard Similarity)
   Future<List<Note>> searchBySimilarity(int noteId, {int limit = 10}) async {
     final sourceNote = await _repository.getNoteById(noteId);
     if (sourceNote == null) return [];
@@ -141,7 +274,7 @@ class NoteSearchService {
       if (note.id == noteId) continue;
 
       final similarity = _calculateContentSimilarity(sourceNote.content, note.content);
-      if (similarity > 0.1) { // Minimum similarity threshold
+      if (similarity > 0.1) {
         similarities.add({
           'note': note,
           'similarity': similarity,
@@ -149,8 +282,7 @@ class NoteSearchService {
       }
     }
 
-    // Sort by similarity (descending)
-    similarities.sort((a, b) => b['similarity'].compareTo(a['similarity']));
+    similarities.sort((a, b) => (b['similarity'] as double).compareTo(a['similarity'] as double));
 
     return similarities
         .take(limit)
@@ -158,117 +290,73 @@ class NoteSearchService {
         .toList();
   }
 
-  /// Get search suggestions based on partial input
+  /// Arama kutusu için otomatik tamamlama önerileri
   Future<List<String>> getSearchSuggestions(String partialQuery) async {
-    if (partialQuery.length < 2) return [];
+    final normQuery = normalize(partialQuery);
+    if (normQuery.length < 2) return [];
 
     final allNotes = await _repository.getAllNotes();
     final suggestions = <String>{};
 
-    // Extract words from titles and content
     for (final note in allNotes) {
-      // Title words
-      final titleWords = note.title.toLowerCase().split(' ');
-      suggestions.addAll(titleWords.where((word) => 
-        word.contains(partialQuery.toLowerCase()) && word.length > 2
-      ));
+      // Başlık kelimeleri
+      final titleWords = normalize(note.title).split(RegExp(r'\s+'));
+      for (final word in titleWords) {
+        if (word.startsWith(normQuery) && word.length > 2) {
+          suggestions.add(word);
+        }
+      }
 
-      // Tag suggestions
-      suggestions.addAll(note.tags.where((tag) => 
-        tag.toLowerCase().contains(partialQuery.toLowerCase())
-      ));
+      // Etiket önerileri
+      for (final tag in note.tags) {
+        final cleanTag = normalize(tag).replaceAll('#', '');
+        if (cleanTag.startsWith(normQuery)) {
+          suggestions.add('#$cleanTag');
+        }
+      }
 
-      // Content words (limited to avoid too many suggestions)
-      final contentWords = note.content.toLowerCase().split(' ');
-      suggestions.addAll(contentWords.where((word) => 
-        word.contains(partialQuery.toLowerCase()) && 
-        word.length > 3 && 
-        word.length < 20 // Avoid very long words
-      ).take(5));
+      if (suggestions.length >= 10) break;
     }
 
-    return suggestions.toList()..take(10);
+    return suggestions.toList();
   }
 
-  /// Get popular search terms
+  /// Popüler arama terimleri
   Future<List<String>> getPopularSearchTerms({int limit = 20}) async {
     final allNotes = await _repository.getAllNotes();
     final termFrequency = <String, int>{};
 
-    // Extract and count terms
     for (final note in allNotes) {
-      // Title terms (higher weight)
-      final titleWords = note.title.toLowerCase().split(' ');
+      // Başlık kelimeleri (+3 ağırlık)
+      final titleWords = normalize(note.title).split(RegExp(r'\s+'));
       for (final word in titleWords) {
-        if (word.length > 2) {
-          termFrequency[word] = (termFrequency[word] ?? 0) + 2;
+        if (word.length > 2 && !_stopWords.contains(word)) {
+          termFrequency[word] = (termFrequency[word] ?? 0) + 3;
         }
       }
 
-      // Tag terms
+      // Etiketler (+5 ağırlık)
       for (final tag in note.tags) {
-        termFrequency[tag.toLowerCase()] = (termFrequency[tag.toLowerCase()] ?? 0) + 3;
-      }
-
-      // Content terms
-      final contentWords = note.content.toLowerCase().split(' ');
-      for (final word in contentWords) {
-        if (word.length > 3 && word.length < 15) {
-          termFrequency[word] = (termFrequency[word] ?? 0) + 1;
+        final cleanTag = normalize(tag).replaceAll('#', '');
+        if (cleanTag.isNotEmpty) {
+          termFrequency['#$cleanTag'] = (termFrequency['#$cleanTag'] ?? 0) + 5;
         }
       }
     }
 
-    // Sort by frequency and return top terms
-    final sortedTerms = termFrequency.entries.toList()
+    final sorted = termFrequency.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
 
-    return sortedTerms
-        .take(limit)
-        .map((entry) => entry.key)
-        .toList();
+    return sorted.take(limit).map((e) => e.key).toList();
   }
 
-  /// Calculate search score for a note
-  double _calculateSearchScore(Note note, String query) {
-    double score = 0;
-    final lowerQuery = query.toLowerCase();
-
-    // Title exact match
-    if (note.title.toLowerCase() == lowerQuery) {
-      score += 10.0;
-    } else if (note.title.toLowerCase().contains(lowerQuery)) {
-      score += 5.0;
-    }
-
-    // Content matches
-    final contentLower = note.content.toLowerCase();
-    if (contentLower.contains(lowerQuery)) {
-      score += 2.0;
-    }
-
-    // Tag matches
-    for (final tag in note.tags) {
-      if (tag.toLowerCase() == lowerQuery) {
-        score += 8.0;
-      } else if (tag.toLowerCase().contains(lowerQuery)) {
-        score += 4.0;
-      }
-    }
-
-    return score;
-  }
-
-  /// Calculate content similarity using simple word overlap
-  double _calculateContentSimilarity(String content1, String content2) {
-    final words1 = content1.toLowerCase().split(RegExp(r'\s+')).toSet();
-    final words2 = content2.toLowerCase().split(RegExp(r'\s+')).toSet();
+  double _calculateContentSimilarity(String c1, String c2) {
+    final words1 = normalize(c1).split(RegExp(r'\s+')).where((w) => w.length > 2 && !_stopWords.contains(w)).toSet();
+    final words2 = normalize(c2).split(RegExp(r'\s+')).where((w) => w.length > 2 && !_stopWords.contains(w)).toSet();
 
     if (words1.isEmpty || words2.isEmpty) return 0.0;
-
     final intersection = words1.intersection(words2);
     final union = words1.union(words2);
-
     return intersection.length / union.length;
   }
 }
