@@ -42,6 +42,7 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void dispose() {
     _widgetService.stopPeriodicUpdates();
+    _sharingService.dispose();
     super.dispose();
   }
 
