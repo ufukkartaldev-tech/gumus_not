@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'idatabase_service.dart';
+import 'database_factory_helper.dart';
 
 /// Concrete implementation of IDatabaseService using SQLite
 /// Follows Single Responsibility Principle: Only handles SQLite operations
@@ -17,7 +19,9 @@ class SqliteDatabaseService implements IDatabaseService {
   }
 
   Future<Database> _initDatabase() async {
-    String path = join(await getDatabasesPath(), _dbName);
+    setupDatabaseFactory();
+
+    final String path = kIsWeb ? _dbName : join(await getDatabasesPath(), _dbName);
 
     return await openDatabase(
       path,
@@ -373,16 +377,12 @@ class SqliteDatabaseService implements IDatabaseService {
   // Database management
   @override
   Future<void> backup(String path) async {
-    final db = await database;
-    // In a real implementation, this would copy the database file
-    // For now, we'll just log the operation
-    print('Backup database to: $path');
+    debugPrint('Backup database to: $path');
   }
 
   @override
   Future<void> restore(String path) async {
-    // In a real implementation, this would restore from backup
-    print('Restore database from: $path');
+    debugPrint('Restore database from: $path');
   }
 
   @override

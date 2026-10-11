@@ -94,6 +94,7 @@ dependencies:
   cross_file: any
   vector_math: any
   markdown: any
+  sqflite_common_ffi_web: ^1.1.1
 dev_dependencies:
   flutter_test:
     sdk: flutter

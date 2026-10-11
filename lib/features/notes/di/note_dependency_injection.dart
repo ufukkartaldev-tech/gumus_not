@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
@@ -30,14 +29,7 @@ class NoteDependencyInjection {
   static List<SingleChildWidget> getProviders() {
     return [
       Provider<IDatabaseService>(
-        create: (context) {
-          if (kIsWeb) {
-            return InMemoryDatabaseService(); // Web doesn't support sqflite natively yet
-          } else {
-            // Import must be added to file level for SqliteDatabaseService
-            return SqliteDatabaseService();
-          }
-        },
+        create: (_) => SqliteDatabaseService(),
       ),
       Provider<GitSyncService>(
         create: (_) => GitSyncService(),
