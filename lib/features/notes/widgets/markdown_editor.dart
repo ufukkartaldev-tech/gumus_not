@@ -22,6 +22,7 @@ import 'package:connected_notebook/features/export/presentation/latex_export_scr
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'package:connected_notebook/features/notes/services/voice_note_service.dart';
 import 'package:connected_notebook/features/ai/providers/ai_provider.dart';
+import 'package:connected_notebook/features/ai/models/ai_exception.dart';
 
 class MarkdownEditor extends StatefulWidget {
   final Note? note;
@@ -394,8 +395,10 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
         });
         _showSuccess('${suggestedTags.length} etiket eklendi!');
       }
+    } on AiException catch (e) {
+      _showError(e.message);
     } catch (e) {
-      _showError('AI Hatası: $e');
+      _showError('AI işlemi gerçekleştirilemedi: $e');
     } finally {
       if (mounted) setState(() => _isAiLoading = false);
     }

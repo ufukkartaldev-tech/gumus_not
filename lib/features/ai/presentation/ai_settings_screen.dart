@@ -16,6 +16,7 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
   final TextEditingController _apiKeyController = TextEditingController();
   final TextEditingController _baseUrlController = TextEditingController();
   final TextEditingController _modelController = TextEditingController();
+  bool _isTesting = false;
 
   @override
   void initState() {
@@ -31,14 +32,85 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
     });
   }
 
-  void _save() async {
-    final provider = context.read<AiProvider>();
-    await provider.saveConfig(AiConfig(
+  @override
+  void dispose() {
+    _apiKeyController.dispose();
+    _baseUrlController.dispose();
+    _modelController.dispose();
+    super.dispose();
+  }
+
+  AiConfig _buildCurrentConfig() {
+    return AiConfig(
       providerType: _selectedType,
       apiKey: _apiKeyController.text.trim(),
       baseUrl: _baseUrlController.text.trim(),
       modelName: _modelController.text.trim(),
-    ));
+    );
+  }
+
+  Future<void> _testConnection() async {
+    final apiKey = _apiKeyController.text.trim();
+    if (_selectedType == AiProviderType.none) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Lütfen önce bir AI sağlayıcısı seçin.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    if (apiKey.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Lütfen test etmeden önce bir API anahtarı girin.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isTesting = true);
+
+    final provider = context.read<AiProvider>();
+    final error = await provider.testConnection(_buildCurrentConfig());
+
+    if (!mounted) return;
+    setState(() => _isTesting = false);
+
+    if (error == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Bağlantı başarılı! AI servisi sorunsuz çalışıyor. ✅'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Bağlantı Hatası: $error'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
+  }
+
+  void _save() async {
+    final apiKey = _apiKeyController.text.trim();
+    if (_selectedType != AiProviderType.none && apiKey.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Lütfen seçili servis için geçerli bir API anahtarı girin veya servisi "Kapalı" yapın.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    final provider = context.read<AiProvider>();
+    await provider.saveConfig(_buildCurrentConfig());
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -57,7 +129,9 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('GümüşNot yapay zeka entegrasyonu tamamen "Kendi Anahtarını Getir" (BYOK) mantığıyla çalışır. İstediğiniz API anahtarını girerek modeli seçebilirsiniz.'),
+            const Text(
+              'GümüşNot yapay zeka entegrasyonu tamamen "Kendi Anahtarını Getir" (BYOK) mantığıyla çalışır. İstediğiniz API anahtarını girerek modeli seçebilirsiniz.',
+            ),
             const SizedBox(height: 24),
             DropdownButtonFormField<AiProviderType>(
               initialValue: _selectedType,
@@ -78,7 +152,7 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
                 decoration: InputDecoration(
                   labelText: 'API Anahtarı (API Key)',
                   border: const OutlineInputBorder(),
-                  helperText: _selectedType == AiProviderType.gemini 
+                  helperText: _selectedType == AiProviderType.gemini
                       ? 'Google AI Studio üzerinden ücretsiz alabilirsiniz.'
                       : 'OpenAI, DeepSeek veya diğer servislerin API anahtarı',
                 ),
@@ -108,7 +182,23 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
                   helperText: 'Boş bırakılırsa varsayılan hızlı model kullanılır.',
                 ),
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: OutlinedButton.icon(
+                  onPressed: _isTesting ? null : _testConnection,
+                  icon: _isTesting
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.bolt_rounded),
+                  label: Text(_isTesting ? 'Test Ediliyor...' : 'Bağlantıyı Test Et'),
+                ),
+              ),
+              const SizedBox(height: 16),
             ],
             SizedBox(
               width: double.infinity,
