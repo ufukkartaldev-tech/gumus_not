@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:home_widget/home_widget.dart';
 import 'package:connected_notebook/features/notes/models/note_model.dart';
-import 'package:connected_notebook/features/notes/repositories/sql_note_repository.dart';
+import 'package:connected_notebook/features/notes/repositories/markdown_note_repository.dart';
 
 class WidgetService {
   bool get _isSupportedPlatform => !kIsWeb;
@@ -10,7 +10,7 @@ class WidgetService {
   factory WidgetService() => _instance;
   WidgetService._internal();
 
-  final SqlNoteRepository _repository = SqlNoteRepository();
+  final MarkdownNoteRepository _repository = MarkdownNoteRepository();
   StreamSubscription? _periodicSubscription;
 
   // Widget'ı güncellemek için ana fonksiyon

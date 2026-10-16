@@ -2,13 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
 
-import 'package:connected_notebook/core/database/idatabase_service.dart';
-import 'package:connected_notebook/core/database/sqlite_database_service.dart';
 import 'package:connected_notebook/features/notes/providers/note_provider.dart';
 import 'package:connected_notebook/features/notes/providers/note_editor_provider.dart';
+import 'package:connected_notebook/features/notes/repositories/markdown_note_repository.dart';
 import 'package:connected_notebook/features/notes/repositories/mock_note_repository.dart';
 import 'package:connected_notebook/features/notes/repositories/note_repository.dart';
-import 'package:connected_notebook/features/notes/repositories/sql_note_repository.dart';
 import 'package:connected_notebook/features/notes/services/git_sync_service.dart';
 import 'package:connected_notebook/features/notes/services/advanced_search_service.dart';
 import 'package:connected_notebook/features/notes/services/backlink_service.dart';
@@ -28,9 +26,6 @@ class NoteDependencyInjection {
 
   static List<SingleChildWidget> getProviders() {
     return [
-      Provider<IDatabaseService>(
-        create: (_) => SqliteDatabaseService(),
-      ),
       Provider<GitSyncService>(
         create: (_) => GitSyncService(),
       ),
@@ -39,7 +34,7 @@ class NoteDependencyInjection {
           if (_isTestMode) {
             return MockNoteRepository();
           }
-          return SqlNoteRepository(context.read<IDatabaseService>());
+          return MarkdownNoteRepository(context.read<GitSyncService>());
         },
       ),
       Provider<BacklinkService>(

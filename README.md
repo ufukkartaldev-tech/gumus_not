@@ -52,7 +52,7 @@ GümüşNot, ekran boyutuna göre çalışma alanını optimize eder:
 ## 🛠 Teknoloji Yığını
 
 *   **UI Framework**: [Flutter](https://flutter.dev/) (Multi-platform)
-*   **Veritabanı**: SQLite (`sqflite` & `sqflite_common_ffi`)
+*   **Depolama**: Düz Markdown dosyaları + YAML frontmatter (`<Belgeler>/GumusNot/notes`), isteğe bağlı yerel git sürüm takibi
 *   **Durum Yönetimi**: `Provider`
 *   **Güvenlik**: `local_auth` (Biyometrik), `flutter_secure_storage`
 *   **Render**: `flutter_markdown`, `flutter_math_fork`
@@ -72,8 +72,8 @@ GümüşNot, ekran boyutuna göre çalışma alanını optimize eder:
    flutter pub get
    ```
 
-2. **Masaüstü Önemli Not (Windows)**:
-   SQLite kullanımı için Windows üzerinde gerekli DLL dosyalarının (sqlite3.dll) sistem yolunda veya proje dizininde olduğundan emin olun. Geliştirme ortamında `sqflite_common_ffi` bunu otomatik yönetir.
+2. **Notlarınız Nerede?**:
+   Tüm notlar ve şablonlar `<Belgeler>/GumusNot` klasöründe sade `.md` dosyaları olarak saklanır; herhangi bir metin editörüyle açıp düzenleyebilirsiniz. Eski SQLite veritabanı kullanan sürümlerden geçiş, ilk açılışta otomatik yapılır.
 
 3. **Çalıştırın**:
    ```bash

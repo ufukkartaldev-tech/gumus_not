@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:connected_notebook/core/storage/sqlite_to_markdown_migrator.dart';
 import 'package:connected_notebook/features/notes/di/note_dependency_injection.dart';
 import 'package:connected_notebook/core/theme/theme_provider.dart';
 import 'package:connected_notebook/core/utils/shortcut_manager.dart';
@@ -67,11 +67,9 @@ void main() async {
     );
   };
 
-  if (!kIsWeb) {
-    // Initialize databaseFactory for desktop platforms
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  }
+  // One-time migration: export legacy SQLite data to markdown files (no-op
+  // after the first successful run or on fresh installs).
+  await SqliteToMarkdownMigrator().migrateIfNeeded();
 
   // Initialize theme provider BEFORE app starts to prevent white flash
   final themeProvider = ThemeProvider();

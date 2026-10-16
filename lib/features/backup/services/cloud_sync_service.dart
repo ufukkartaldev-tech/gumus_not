@@ -1,14 +1,13 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:googleapis/drive/v3.dart' as drive;
 import 'package:http/http.dart' as http;
-import 'package:path/path.dart' as p;
-import 'package:sqflite/sqflite.dart';
 import 'package:archive/archive_io.dart';
 import 'package:encrypt/encrypt.dart' as enc;
 import 'package:crypto/crypto.dart';
+
+import 'package:connected_notebook/features/backup/services/markdown_backup_utils.dart';
 
 class GoogleAuthClient extends http.BaseClient {
   final Map<String, String> _headers;
@@ -23,12 +22,9 @@ class GoogleAuthClient extends http.BaseClient {
 }
 
 class CloudSyncService {
-  static const String _dbName = 'connected_notebook.db';
   static const String _backupFileName = 'gumusnot_secure_backup.enc';
 
-  final GoogleSignIn _googleSignIn = GoogleSignIn(
-    scopes: [drive.DriveApi.driveAppdataScope],
-  );
+  final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
 
   /// Kullanıcının parolasıyla 32-byte (256-bit) AES anahtarı oluşturur
   enc.Key _generateKey(String password) {
@@ -39,13 +35,18 @@ class CloudSyncService {
 
   /// Google ile giriş yapıp yetkilendirilmiş Drive API istemcisi döner
   Future<drive.DriveApi?> _getDriveApi() async {
+    const scopes = <String>[drive.DriveApi.driveAppdataScope];
     try {
-      var account = _googleSignIn.currentUser ?? await _googleSignIn.signInSilently();
-      account ??= await _googleSignIn.signIn();
-      
-      if (account == null) return null; // İptal edildi
+      await _googleSignIn.initialize();
 
-      final authHeaders = await account.authHeaders;
+      // Sessiz giriş dene; olmazsa etkileşimli giriş iste (iptal → istisna).
+      var account = await _googleSignIn.attemptLightweightAuthentication();
+      account ??= await _googleSignIn.authenticate(scopeHint: scopes);
+
+      final authHeaders = await account.authorizationClient
+          .authorizationHeaders(scopes, promptIfNecessary: true);
+      if (authHeaders == null) return null;
+
       final authenticateClient = GoogleAuthClient(authHeaders);
       return drive.DriveApi(authenticateClient);
     } catch (e) {
@@ -62,15 +63,11 @@ class CloudSyncService {
       final driveApi = await _getDriveApi();
       if (driveApi == null) return {'success': false, 'message': 'Google girişi yapılamadı veya iptal edildi.'};
 
-      // 1. Veritabanını Oku ve Zip'le
-      final dbPath = p.join(await getDatabasesPath(), _dbName);
-      final dbFile = File(dbPath);
-      if (!await dbFile.exists()) return {'success': false, 'message': 'Veritabanı dosyası bulunamadı.'};
-
-      final dbBytes = await dbFile.readAsBytes();
-      final archive = Archive()..addFile(ArchiveFile(_dbName, dbBytes.length, dbBytes));
-      final zipBytes = ZipEncoder().encode(archive);
-      if (zipBytes == null) throw Exception('Zip oluşturulamadı.');
+      // 1. Markdown çalışma alanını (notlar + şablonlar) zip'le
+      final zipBytes = await MarkdownBackupUtils.zipWorkspace();
+      if (zipBytes == null || zipBytes.isEmpty) {
+        return {'success': false, 'message': 'Yedeklenecek markdown dosyası bulunamadı.'};
+      }
 
       // 2. Şifrele (AES-256)
       final key = _generateKey(password);
@@ -145,23 +142,15 @@ class CloudSyncService {
         return {'success': false, 'message': 'Parola yanlış! Yedeğiniz açılamadı. ❌'};
       }
 
-      // 4. Zip'i aç ve veritabanını yerine koy
+      // 4. Zip'i aç ve markdown dosyalarını yerine koy
       final archive = ZipDecoder().decodeBytes(decryptedZipBytes);
-      ArchiveFile? dbArchiveFile;
-      for (final file in archive) {
-        if (file.name == _dbName) {
-          dbArchiveFile = file;
-          break;
-        }
-      }
+      final restoredCount = await MarkdownBackupUtils.extractWorkspace(archive);
 
-      if (dbArchiveFile == null) return {'success': false, 'message': 'Şifre çözüldü ancak içinden veritabanı çıkmadı.'};
-
-      final dbPath = p.join(await getDatabasesPath(), _dbName);
-      final newDbBytes = dbArchiveFile.content as List<int>;
-      await File(dbPath).writeAsBytes(newDbBytes, flush: true);
-
-      return {'success': true, 'message': 'Yedek başarıyla indirildi ve şifresi çözülüp geri yüklendi! ✅ Uygulamayı yeniden başlatın.'};
+      return {
+        'success': true,
+        'message': 'Yedek başarıyla indirildi ve şifresi çözülüp geri yüklendi! ✅ '
+            '($restoredCount dosya) Uygulamayı yeniden başlatın.',
+      };
     } catch (e) {
       debugPrint('Bulut geri yükleme hatası: $e');
       return {'success': false, 'message': 'Geri yükleme başarısız: $e'};

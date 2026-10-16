@@ -1,54 +1,43 @@
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:sqflite/sqflite.dart';
-import 'package:path/path.dart' as p;
 import 'package:archive/archive_io.dart';
+import 'dart:io';
+
+import 'package:connected_notebook/features/backup/services/markdown_backup_utils.dart';
 
 class BackupShareService {
   static final BackupShareService _instance = BackupShareService._internal();
   factory BackupShareService() => _instance;
   BackupShareService._internal();
 
-  static const String _dbName = 'connected_notebook.db';
-
-  /// Export database as a ZIP archive.
+  /// Export the markdown workspace (notes + templates) as a ZIP archive.
   Future<bool> exportAndShareBackup(BuildContext context) async {
     try {
       if (kIsWeb) {
-        debugPrint('Web does not support direct SQLite export.');
-        return false; 
-      }
-
-      final dbPath = p.join(await getDatabasesPath(), _dbName);
-      final dbFile = File(dbPath);
-
-      if (!await dbFile.exists()) {
-        debugPrint('Veritabanı dosyası bulunamadı.');
+        debugPrint('Web does not support filesystem backup export.');
         return false;
       }
 
-      final dbBytes = await dbFile.readAsBytes();
-      final archive = Archive();
-      archive.addFile(ArchiveFile(_dbName, dbBytes.length, dbBytes));
-
-      final zipData = ZipEncoder().encode(archive);
-      if (zipData == null) return false;
+      final zipData = await MarkdownBackupUtils.zipWorkspace();
+      if (zipData == null || zipData.isEmpty) {
+        debugPrint('Yedeklenecek markdown dosyası bulunamadı.');
+        return false;
+      }
 
       final tempDir = await getTemporaryDirectory();
       final now = DateTime.now();
       final timestamp = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}-${now.minute.toString().padLeft(2, '0')}';
       final fileName = 'gumusnot_yedek_$timestamp.zip';
       final backupFile = File('${tempDir.path}/$fileName');
-      
+
       await backupFile.writeAsBytes(zipData);
 
       await Share.shareXFiles(
         [XFile(backupFile.path, mimeType: 'application/zip')],
-        text: 'GümüşNot Veritabanı Yedeği',
+        text: 'GümüşNot Not Yedeği',
       );
 
       return true;
@@ -58,7 +47,7 @@ class BackupShareService {
     }
   }
 
-  /// Import database from a ZIP archive.
+  /// Import a markdown workspace ZIP archive created by [exportAndShareBackup].
   Future<Map<String, dynamic>> importAndRestoreBackup(BuildContext context) async {
     try {
       if (kIsWeb) return {'success': false, 'message': 'Web desteklenmiyor.'};
@@ -75,27 +64,12 @@ class BackupShareService {
       final zipBytes = await File(result.files.single.path!).readAsBytes();
       final archive = ZipDecoder().decodeBytes(zipBytes);
 
-      ArchiveFile? dbArchiveFile;
-      for (final file in archive) {
-        if (file.name == _dbName) {
-          dbArchiveFile = file;
-          break;
-        }
-      }
-
-      if (dbArchiveFile == null) {
-        return {'success': false, 'message': 'Geçerli bir yedek dosyası bulunamadı.'};
-      }
-
-      final dbPath = p.join(await getDatabasesPath(), _dbName);
-      final newDbBytes = dbArchiveFile.content as List<int>;
-      
-      await File(dbPath).writeAsBytes(newDbBytes, flush: true);
+      final restoredCount = await MarkdownBackupUtils.extractWorkspace(archive);
 
       return {
         'success': true,
-        'message': 'Yedek başarıyla geri yüklendi. Etkili olması için uygulamayı yeniden başlatın.',
-        'count': 1,
+        'message': 'Yedek başarıyla geri yüklendi ($restoredCount dosya). Etkili olması için uygulamayı yeniden başlatın.',
+        'count': restoredCount,
       };
     } catch (e) {
       debugPrint('Geri yükleme hatası: $e');

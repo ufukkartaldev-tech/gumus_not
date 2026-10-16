@@ -73,7 +73,7 @@ class AboutScreen extends StatelessWidget {
                 alignment: WrapAlignment.center,
                 children: [
                    _buildTechChip(context, 'Flutter', Colors.blue),
-                   _buildTechChip(context, 'SQLite (FTS5 Ready)', Colors.indigo),
+                   _buildTechChip(context, 'Markdown Files', Colors.indigo),
                    _buildTechChip(context, 'AES-256 (Paranoyak Mod)', Colors.green),
                    _buildTechChip(context, 'Force-Directed Graph', Colors.purple),
                 ],

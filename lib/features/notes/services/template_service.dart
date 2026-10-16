@@ -1,65 +1,12 @@
-import 'package:sqflite/sqflite.dart';
-import 'package:path/path.dart';
 import 'package:connected_notebook/features/notes/models/note_model.dart';
+import 'package:connected_notebook/features/notes/services/template_file_storage.dart';
 
+/// Template catalog backed by markdown files (see [TemplateFileStorage]).
+/// The public API is unchanged from the previous SQLite-backed version.
 class TemplateService {
-  static Database? _database;
-  static const String _dbName = 'connected_notebook.db';
-  static const int _dbVersion = 1;
-
-  static Future<Database> get database async {
-    if (_database != null) return _database!;
-    _database = await _initDatabase();
-    return _database!;
-  }
-
-  static Future<Database> _initDatabase() async {
-    String path = join(await getDatabasesPath(), _dbName);
-    
-    return await openDatabase(
-      path,
-      version: _dbVersion,
-      onCreate: _onCreate,
-      onUpgrade: _onUpgrade,
-    );
-  }
-
-  static Future<void> _onCreate(Database db, int version) async {
-    await db.execute('''
-      CREATE TABLE templates (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        content TEXT NOT NULL,
-        category TEXT NOT NULL,
-        description TEXT,
-        icon TEXT,
-        created_at INTEGER NOT NULL,
-        is_default INTEGER DEFAULT 0
-      )
-    ''');
-
-    await db.execute('''
-      CREATE INDEX idx_templates_category ON templates(category);
-      CREATE INDEX idx_templates_name ON templates(name);
-    ''');
-
-    await _insertDefaultTemplates(db);
-  }
-
-  static Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-  }
-
-  static Future<void> _insertDefaultTemplates(Database db) async {
-    final templates = _getDefaultTemplates();
-    final now = DateTime.now().millisecondsSinceEpoch;
-
-    for (final template in templates) {
-      await db.insert('templates', {
-        ...template,
-        'created_at': now,
-        'is_default': 1,
-      });
-    }
+  /// Ensures the bundled default templates exist on first use.
+  static Future<void> _ensureSeeded() async {
+    await TemplateFileStorage.seedDefaultsIfNeeded(_getDefaultTemplates());
   }
 
   static List<Map<String, dynamic>> _getDefaultTemplates() {
@@ -1066,72 +1013,48 @@ Notunuzun içeriğini buraya yazın...
   }
 
   static Future<List<Template>> getAllTemplates() async {
-    final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query(
-      'templates',
-      orderBy: 'category ASC, name ASC',
-    );
-    return List.generate(maps.length, (i) => Template.fromMap(maps[i]));
+    await _ensureSeeded();
+    final templates = await TemplateFileStorage.readAll();
+    templates.sort((a, b) {
+      final byCategory = a.category.compareTo(b.category);
+      return byCategory != 0 ? byCategory : a.name.compareTo(b.name);
+    });
+    return templates;
   }
 
   static Future<List<Template>> getTemplatesByCategory(String category) async {
-    final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query(
-      'templates',
-      where: 'category = ?',
-      whereArgs: [category],
-      orderBy: 'name ASC',
-    );
-    return List.generate(maps.length, (i) => Template.fromMap(maps[i]));
+    final templates = await getAllTemplates();
+    final result = templates.where((t) => t.category == category).toList()
+      ..sort((a, b) => a.name.compareTo(b.name));
+    return result;
   }
 
-  static Future<Template?> getTemplateById(int id) async {
-    final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query(
-      'templates',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
-    if (maps.isNotEmpty) {
-      return Template.fromMap(maps.first);
-    }
-    return null;
+  static Future<Template?> getTemplateById(int id) {
+    return TemplateFileStorage.readById(id);
   }
 
   static Future<int> insertTemplate(Template template) async {
-    final db = await database;
-    return await db.insert('templates', template.toMap());
+    await _ensureSeeded();
+    return TemplateFileStorage.write(template);
   }
 
   static Future<int> updateTemplate(Template template) async {
-    final db = await database;
-    return await db.update(
-      'templates',
-      template.toMap(),
-      where: 'id = ?',
-      whereArgs: [template.id],
-    );
+    if (template.id == null) return insertTemplate(template);
+    final existing = await TemplateFileStorage.readById(template.id!);
+    await TemplateFileStorage.write(template);
+    return existing != null ? 1 : 0;
   }
 
   static Future<int> deleteTemplate(int id) async {
-    final db = await database;
-    return await db.delete(
-      'templates',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    final existing = await TemplateFileStorage.readById(id);
+    await TemplateFileStorage.delete(id);
+    return existing != null ? 1 : 0;
   }
 
   static Future<List<String>> getCategories() async {
-    final db = await database;
-    final List<Map<String, dynamic>> maps = await db.rawQuery(
-      'SELECT DISTINCT category FROM templates ORDER BY category ASC',
-    );
-    return maps.map((map) => map['category'] as String).toList();
+    final templates = await getAllTemplates();
+    return templates.map((t) => t.category).toSet().toList()..sort();
   }
 
-  static Future<void> close() async {
-    final db = await database;
-    await db.close();
-  }
+  static Future<void> close() async {}
 }
