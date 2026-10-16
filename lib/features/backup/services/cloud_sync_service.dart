@@ -142,14 +142,17 @@ class CloudSyncService {
         return {'success': false, 'message': 'Parola yanlış! Yedeğiniz açılamadı. ❌'};
       }
 
-      // 4. Zip'i aç ve markdown dosyalarını yerine koy
+      // 4. Zip'i aç ve markdown dosyalarını yedekteki haliyle değiştir
       final archive = ZipDecoder().decodeBytes(decryptedZipBytes);
-      final restoredCount = await MarkdownBackupUtils.extractWorkspace(archive);
+      final restoredCount = await MarkdownBackupUtils.extractWorkspace(
+        archive,
+        replaceExisting: true,
+      );
 
       return {
         'success': true,
         'message': 'Yedek başarıyla indirildi ve şifresi çözülüp geri yüklendi! ✅ '
-            '($restoredCount dosya) Uygulamayı yeniden başlatın.',
+            '($restoredCount dosya) Not listeniz yenilendi.',
       };
     } catch (e) {
       debugPrint('Bulut geri yükleme hatası: $e');

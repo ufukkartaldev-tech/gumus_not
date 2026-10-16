@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:connected_notebook/features/notes/providers/note_provider.dart';
 import 'package:connected_notebook/features/backup/services/backup_share_service.dart';
+import 'package:connected_notebook/features/backup/services/cloud_sync_service.dart';
 
 class BackupScreen extends StatefulWidget {
   const BackupScreen({super.key});
@@ -12,7 +13,9 @@ class BackupScreen extends StatefulWidget {
 
 class _BackupScreenState extends State<BackupScreen> {
   final BackupShareService _backupService = BackupShareService();
+  final CloudSyncService _cloudSyncService = CloudSyncService();
   bool _isLoading = false;
+  bool _cloudBusy = false;
   int _totalNotes = 0;
 
   @override
@@ -72,7 +75,103 @@ class _BackupScreenState extends State<BackupScreen> {
     }
   }
 
-  Future<bool> _showRestoreConfirmation() async {
+  Future<void> _backupToDrive() async {
+    final password = await _showPasswordDialog(
+      title: 'Drive Yedeği Oluştur',
+      description: 'Yedeğiniz bu parola ile AES-256 ile şifrelenecek. Parolayı '
+          'kimseyle (Google dahil) paylaşmıyoruz; kaybederseniz yedeği açamazsınız.',
+      confirmLabel: 'Şifrele ve Yükle',
+    );
+    if (password == null || password.isEmpty) return;
+
+    setState(() => _cloudBusy = true);
+    try {
+      final result = await _cloudSyncService.backupToDrive(password);
+      if (result['success'] == true) {
+        _showSuccessMessage(result['message']);
+      } else {
+        _showErrorMessage(result['message'] ?? "Bilinmeyen bir hata oluştu.");
+      }
+    } catch (e) {
+      _showErrorMessage("Drive yedekleme hatası: $e");
+    } finally {
+      if (mounted) setState(() => _cloudBusy = false);
+    }
+  }
+
+  Future<void> _restoreFromDrive() async {
+    final confirmed = await _showRestoreConfirmation(
+      description: 'Google Drive yedeğinden geri yükleme, bu cihazdaki tüm '
+          'not ve şablonları yedekteki içerikle değiştirecektir.',
+    );
+    if (!confirmed) return;
+
+    final password = await _showPasswordDialog(
+      title: 'Drive Yedeğini Aç',
+      description: 'Yedeği oluştururken kullandığınız parolayı girin.',
+      confirmLabel: 'İndir ve Geri Yükle',
+    );
+    if (password == null || password.isEmpty) return;
+
+    setState(() => _cloudBusy = true);
+    try {
+      final result = await _cloudSyncService.restoreFromDrive(password);
+      if (result['success'] == true) {
+        await _loadNoteCount();
+        _showSuccessMessage(result['message']);
+      } else {
+        _showErrorMessage(result['message'] ?? "Bilinmeyen bir hata oluştu.");
+      }
+    } catch (e) {
+      _showErrorMessage("Drive geri yükleme hatası: $e");
+    } finally {
+      if (mounted) setState(() => _cloudBusy = false);
+    }
+  }
+
+  Future<String?> _showPasswordDialog({
+    required String title,
+    required String description,
+    required String confirmLabel,
+  }) {
+    final controller = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(title),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(description),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              obscureText: true,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Parola',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.lock_outline),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('İptal'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(dialogContext).pop(controller.text),
+            child: Text(confirmLabel),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<bool> _showRestoreConfirmation({String? description}) async {
     return await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -81,7 +180,12 @@ class _BackupScreenState extends State<BackupScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Yedekten geri yükleme işlemi, bu cihazdaki notlara ekleme yapacaktır.'),
+            Text(
+              description ??
+                  'Yedekten geri yükleme işlemi, bu cihazdaki tüm not ve '
+                  'şablonları yedekteki içerikle değiştirecektir. Yedekte '
+                  'olmayan notlarınız silinecektir.',
+            ),
             const SizedBox(height: 8),
             const Text('Devam etmek istiyor musunuz?', style: TextStyle(color: Colors.orange)),
           ],
@@ -135,12 +239,13 @@ class _BackupScreenState extends State<BackupScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final busy = _isLoading || _cloudBusy;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Yedekleme & Senkronizasyon'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
-      body: _isLoading
+      body: busy
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
               padding: const EdgeInsets.all(16),
@@ -214,6 +319,71 @@ class _BackupScreenState extends State<BackupScreen> {
 
                   const SizedBox(height: 16),
 
+                  // Google Drive Kartı
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.cloud_sync_outlined,
+                                color: Colors.deepPurple,
+                                size: 32,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  'Google Drive Yedekleme',
+                                  style: Theme.of(context).textTheme.titleLarge,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Notlarınız parolanızla şifrelenip (AES-256) '
+                            'Drive\'ın yalnızca uygulamanın görebildiği '
+                            'gizli klasörüne yüklenir.',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: _backupToDrive,
+                                  icon: const Icon(Icons.cloud_upload_outlined),
+                                  label: const Text('Drive\'a Yedekle'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.deepPurple,
+                                    foregroundColor: Colors.white,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: _restoreFromDrive,
+                                  icon: const Icon(Icons.cloud_download_outlined),
+                                  label: const Text('Drive\'dan Yükle'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.deepOrange,
+                                    foregroundColor: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
                   // Bilgi Kartı
                   Card(
                     color: Theme.of(context).colorScheme.surfaceContainerHighest,
@@ -227,9 +397,10 @@ class _BackupScreenState extends State<BackupScreen> {
                             style: Theme.of(context).textTheme.titleMedium,
                           ),
                           const SizedBox(height: 8),
-                          const Text('• Tüm notlarınızı şifreli bir .gnb dosyası olarak dışa aktarabilirsiniz.'),
+                          const Text('• Yedek, tüm not ve şablonlarınızı içeren bir .zip dosyasıdır; içindeki dosyalar herhangi bir metin editörüyle açılabilen sade markdown\'dır.'),
                           const Text('• Oluşturulan yedek dosyasını WhatsApp, Telegram veya e-posta yoluyla kendinize göndererek güvenle saklayabilirsiniz.'),
-                          const Text('• İçe aktarırken daha önceden kaydettiğiniz yedek dosyasını seçmeniz yeterlidir.'),
+                          const Text('• İçe aktarma, cihazdaki not ve şablonları yedekteki içerikle değiştirir; işlem öncesi onay sorulur.'),
+                          const Text('• Drive yedeği parolanızla şifrelenir; parolayı kaybederseniz yedeğe erişilemez.'),
                         ],
                       ),
                     ),

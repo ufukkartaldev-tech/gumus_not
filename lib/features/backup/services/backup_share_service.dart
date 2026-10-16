@@ -48,6 +48,8 @@ class BackupShareService {
   }
 
   /// Import a markdown workspace ZIP archive created by [exportAndShareBackup].
+  /// The restore is destructive: current notes and templates are replaced by
+  /// the backup content.
   Future<Map<String, dynamic>> importAndRestoreBackup(BuildContext context) async {
     try {
       if (kIsWeb) return {'success': false, 'message': 'Web desteklenmiyor.'};
@@ -64,11 +66,14 @@ class BackupShareService {
       final zipBytes = await File(result.files.single.path!).readAsBytes();
       final archive = ZipDecoder().decodeBytes(zipBytes);
 
-      final restoredCount = await MarkdownBackupUtils.extractWorkspace(archive);
+      final restoredCount = await MarkdownBackupUtils.extractWorkspace(
+        archive,
+        replaceExisting: true,
+      );
 
       return {
         'success': true,
-        'message': 'Yedek başarıyla geri yüklendi ($restoredCount dosya). Etkili olması için uygulamayı yeniden başlatın.',
+        'message': 'Yedek başarıyla geri yüklendi ($restoredCount dosya). Not listeniz yenilendi.',
         'count': restoredCount,
       };
     } catch (e) {
