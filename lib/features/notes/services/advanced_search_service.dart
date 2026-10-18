@@ -11,13 +11,10 @@ class AdvancedSearchService implements SearchService {
   
   @override
   Future<List<Note>> searchNotes(String query, [List<Note>? allNotes]) async {
-    if (query.trim().isEmpty) return allNotes ?? [];
+    final cleanQuery = query.trim();
+    if (cleanQuery.isEmpty) return allNotes ?? [];
     
-    // FTS5 prefix search
-    final formattedQuery = '${query.trim()}*';
-    
-    // Use repository's optimized FTS5 search
-    return await _repository.searchNotes(formattedQuery);
+    return await _repository.searchNotes(cleanQuery);
   }
   
   @override
