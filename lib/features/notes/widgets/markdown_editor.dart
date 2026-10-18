@@ -1,32 +1,35 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:connected_notebook/features/notes/models/note_model.dart';
-import 'package:connected_notebook/features/notes/providers/note_provider.dart';
-import 'package:connected_notebook/features/notes/providers/note_editor_provider.dart';
-import 'package:connected_notebook/features/media/services/image_service.dart';
-import 'package:connected_notebook/features/notes/widgets/custom_widgets.dart';
-import 'package:connected_notebook/features/notes/widgets/math_markdown_renderer.dart';
-import 'package:connected_notebook/features/notes/widgets/markdown_live_controller.dart';
-import 'package:connected_notebook/features/notes/widgets/floating_accessory_bar.dart';
-import 'package:connected_notebook/features/notes/widgets/editor_backlink_section.dart';
-import 'package:connected_notebook/features/notes/widgets/editor_bottom_sheets.dart';
-import 'package:connected_notebook/features/tools/widgets/cross_reference_tracker.dart';
-import 'package:connected_notebook/features/tools/widgets/pomodoro_timer.dart';
-import 'package:flutter_colorpicker/flutter_colorpicker.dart';
-import 'package:connected_notebook/features/export/services/pdf_export_service.dart';
-import 'package:connected_notebook/core/utils/shortcut_manager.dart';
-import 'package:connected_notebook/features/export/presentation/latex_export_screen.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
-import 'package:connected_notebook/features/notes/services/voice_note_service.dart';
-import 'package:connected_notebook/features/security/services/biometric_service.dart';
+import 'package:flutter_colorpicker/flutter_colorpicker.dart';
+
 import 'package:connected_notebook/core/security/note_encryption_service.dart';
 import 'package:connected_notebook/features/ai/providers/ai_provider.dart';
-import 'package:connected_notebook/features/ai/models/ai_exception.dart';
+import 'package:connected_notebook/features/export/presentation/latex_export_screen.dart';
+import 'package:connected_notebook/features/export/services/pdf_export_service.dart';
+import 'package:connected_notebook/features/media/services/image_service.dart';
+import 'package:connected_notebook/features/notes/models/note_model.dart';
+import 'package:connected_notebook/features/notes/providers/note_editor_provider.dart';
+import 'package:connected_notebook/features/notes/providers/note_provider.dart';
+import 'package:connected_notebook/features/notes/services/voice_note_service.dart';
+import 'package:connected_notebook/features/notes/widgets/custom_widgets.dart';
+import 'package:connected_notebook/features/notes/widgets/editor_ai_sheet.dart';
+import 'package:connected_notebook/features/notes/widgets/editor_app_bar.dart';
+import 'package:connected_notebook/features/notes/widgets/editor_bottom_sheets.dart';
+import 'package:connected_notebook/features/notes/widgets/editor_vault_dialogs.dart';
+import 'package:connected_notebook/features/notes/widgets/editor_vim_handler.dart';
+import 'package:connected_notebook/features/notes/widgets/editor_zen_canvas.dart';
+import 'package:connected_notebook/features/notes/widgets/floating_accessory_bar.dart';
+import 'package:connected_notebook/features/notes/widgets/markdown_live_controller.dart';
+import 'package:connected_notebook/features/notes/widgets/math_markdown_renderer.dart';
+import 'package:connected_notebook/features/security/services/biometric_service.dart';
+import 'package:connected_notebook/features/tools/widgets/cross_reference_tracker.dart';
+import 'package:connected_notebook/features/tools/widgets/pomodoro_timer.dart';
 
 class MarkdownEditor extends StatefulWidget {
   final Note? note;
@@ -40,6 +43,19 @@ class MarkdownEditor extends StatefulWidget {
     this.onCancel,
   });
 
+  /// Exposes vertical line offset calculations for tests and backward compatibility.
+  @visibleForTesting
+  static int computeVerticalLineOffset(
+    String text,
+    int currentOffset, {
+    required bool moveDown,
+  }) =>
+      EditorVimHandler.computeVerticalLineOffset(
+        text,
+        currentOffset,
+        moveDown: moveDown,
+      );
+
   @override
   State<MarkdownEditor> createState() => _MarkdownEditorState();
 }
@@ -47,6 +63,7 @@ class MarkdownEditor extends StatefulWidget {
 class _MarkdownEditorState extends State<MarkdownEditor> {
   late TextEditingController _titleController;
   late MarkdownLivePreviewController _contentController;
+  late EditorVimHandler _vimHandler;
 
   bool _isPreviewMode = false;
   bool _isFocusMode = false;
@@ -61,7 +78,6 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
   bool _isPomodoroVisible = false;
   bool _isCrossReferenceVisible = false;
   List<String> _tags = [];
-  bool _isVimInsertMode = false; // Start in Normal mode if Vim is enabled
   bool _hasSelection = false;
 
   // Auto-save & dirty state tracking
@@ -78,7 +94,6 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
   final VoiceNoteService _voiceNoteService = VoiceNoteService();
   bool _isRecording = false;
   bool _isAiLoading = false;
-  StreamSubscription<String>? _aiStreamSubscription;
 
   final FocusNode _titleFocusNode = FocusNode();
   final FocusNode _contentFocusNode = FocusNode();
@@ -121,8 +136,6 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
       if (NoteEncryptionService.isEncryptedPayload(_storedEncryptedContent)) {
         content = NoteEncryptionService.lockedNotePlaceholder;
       } else {
-        // Legacy body: the flag used to be a no-op, so the text was stored
-        // in clear. Treat it as already unlocked.
         content = _storedEncryptedContent;
         _isUnlocked = true;
       }
@@ -143,120 +156,17 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
 
     _titleController.addListener(_onEditorFieldChanged);
     _contentController.addListener(_onContentChanged);
-    _setupVimMode();
+
+    _vimHandler = EditorVimHandler(
+      context: context,
+      controller: _contentController,
+      focusNode: _contentFocusNode,
+      onModeChanged: () {
+        if (mounted) setState(() {});
+      },
+    );
+    _vimHandler.attach();
   }
-
-  void _setupVimMode() {
-    _contentFocusNode.onKeyEvent = (node, event) {
-      final shortcutManager = Provider.of<AppShortcutManager>(context, listen: false);
-      if (!shortcutManager.isVimModeEnabled) return KeyEventResult.ignored;
-
-      if (event is KeyDownEvent) {
-        if (event.logicalKey == LogicalKeyboardKey.escape) {
-          setState(() => _isVimInsertMode = false);
-          return KeyEventResult.handled;
-        }
-
-        if (!_isVimInsertMode) {
-          final char = event.character;
-          if (char == 'i' || char == 'a') {
-            setState(() => _isVimInsertMode = true);
-            if (char == 'a') {
-              final offset = _contentController.selection.baseOffset;
-              if (offset >= 0 && offset < _contentController.text.length) {
-                _contentController.selection = TextSelection.collapsed(offset: offset + 1);
-              }
-            }
-            return KeyEventResult.handled;
-          }
-
-          final text = _contentController.text;
-          var selection = _contentController.selection;
-
-          if (!selection.isValid) {
-            selection = const TextSelection.collapsed(offset: 0);
-          }
-
-          final currentOffset = selection.baseOffset.clamp(0, text.length);
-
-          if (char == 'h' && currentOffset > 0) {
-            _contentController.selection = TextSelection.collapsed(offset: currentOffset - 1);
-            return KeyEventResult.handled;
-          } else if (char == 'l' && currentOffset < text.length) {
-            _contentController.selection = TextSelection.collapsed(offset: currentOffset + 1);
-            return KeyEventResult.handled;
-          } else if (char == 'j' || char == 'k') {
-            final nextOffset = computeVerticalLineOffset(
-              text,
-              currentOffset,
-              moveDown: char == 'j',
-            );
-            _contentController.selection = TextSelection.collapsed(offset: nextOffset);
-            return KeyEventResult.handled;
-          } else if (char == '0') {
-            // Move to start of current line
-            final lineStart = text.lastIndexOf('\n', currentOffset > 0 ? currentOffset - 1 : 0);
-            _contentController.selection = TextSelection.collapsed(
-              offset: lineStart == -1 ? 0 : lineStart + 1,
-            );
-            return KeyEventResult.handled;
-          } else if (char == r'$') {
-            // Move to end of current line
-            final lineEnd = text.indexOf('\n', currentOffset);
-            _contentController.selection = TextSelection.collapsed(
-              offset: lineEnd == -1 ? text.length : lineEnd,
-            );
-            return KeyEventResult.handled;
-          } else if (char == 'x' && currentOffset < text.length) {
-            _contentController.text = text.replaceRange(currentOffset, currentOffset + 1, '');
-            _contentController.selection = TextSelection.collapsed(offset: currentOffset);
-            return KeyEventResult.handled;
-          }
-
-          // In normal mode, block all other printable character input
-          if (char != null) {
-            return KeyEventResult.handled;
-          }
-        }
-      }
-      return KeyEventResult.ignored;
-    };
-  }
-
-  /// Computes the target cursor offset when moving vertically (`j` = down, `k` = up)
-  /// across newline boundaries while preserving the current column index.
-  @visibleForTesting
-  static int computeVerticalLineOffset(
-    String text,
-    int currentOffset, {
-    required bool moveDown,
-  }) {
-    if (text.isEmpty) return 0;
-    final clamped = currentOffset.clamp(0, text.length);
-
-    // Find start and end of current line
-    final prevNewline = clamped == 0 ? -1 : text.lastIndexOf('\n', clamped - 1);
-    final currentLineStart = prevNewline + 1;
-    final nextNewline = text.indexOf('\n', clamped);
-    final column = clamped - currentLineStart;
-
-    if (moveDown) {
-      if (nextNewline == -1) return clamped; // Already on last line
-      final targetLineStart = nextNewline + 1;
-      final nextNextNewline = text.indexOf('\n', targetLineStart);
-      final targetLineEnd = nextNextNewline == -1 ? text.length : nextNextNewline;
-      final targetLineLength = targetLineEnd - targetLineStart;
-      return targetLineStart + (column <= targetLineLength ? column : targetLineLength);
-    } else {
-      if (prevNewline == -1) return clamped; // Already on first line
-      final prevPrevNewline = prevNewline == 0 ? -1 : text.lastIndexOf('\n', prevNewline - 1);
-      final targetLineStart = prevPrevNewline + 1;
-      final targetLineEnd = prevNewline;
-      final targetLineLength = targetLineEnd - targetLineStart;
-      return targetLineStart + (column <= targetLineLength ? column : targetLineLength);
-    }
-  }
-
 
   void _onEditorFieldChanged() {
     if (!mounted) return;
@@ -371,7 +281,6 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
       return;
     }
 
-    // If title is non-empty, offer to save or discard; if title is empty, warn before discarding.
     final canSave = _titleController.text.trim().isNotEmpty;
     final decision = await showDialog<String>(
       context: context,
@@ -425,7 +334,6 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
   @override
   void dispose() {
     _autoSaveTimer?.cancel();
-    _aiStreamSubscription?.cancel();
     _titleController.removeListener(_onEditorFieldChanged);
     _contentController.removeListener(_onContentChanged);
     _titleController.dispose();
@@ -477,13 +385,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
         _insertTextAtCursor('\n$markdownImage\n');
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Görsel başarıyla eklendi'),
-              backgroundColor: Colors.green,
-              duration: Duration(seconds: 2),
-            ),
-          );
+          _showSuccess('Görsel başarıyla eklendi');
         }
       }
     } catch (e) {
@@ -516,13 +418,13 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
       if (success) {
         setState(() => _isRecording = true);
         final initialText = _contentController.text;
-        
+
         await _voiceNoteService.startListening((text) {
-           final separator = initialText.isEmpty || initialText.endsWith(' ') || initialText.endsWith('\n') ? '' : ' ';
-           setState(() {
-              _contentController.text = initialText + separator + text;
-              _contentController.selection = TextSelection.collapsed(offset: _contentController.text.length);
-           });
+          final separator = initialText.isEmpty || initialText.endsWith(' ') || initialText.endsWith('\n') ? '' : ' ';
+          setState(() {
+            _contentController.text = initialText + separator + text;
+            _contentController.selection = TextSelection.collapsed(offset: _contentController.text.length);
+          });
         });
       } else {
         _showError('Mikrofon izni alınamadı veya sistem desteklemiyor.');
@@ -553,16 +455,27 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
   }
 
+  void _showSuccess(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.green));
+  }
+
   Future<void> _toggleEncryption() async {
     if (!_isEncrypted) {
       final hasEnv = await _encryptionService.hasEnvelope();
       final hasLocal = await _encryptionService.hasLocalKey();
 
       if (!hasEnv) {
-        final created = await _promptSetupMasterPassword();
+        final created = await EditorVaultDialogs.promptSetupMasterPassword(
+          context,
+          _encryptionService,
+        );
         if (!created) return;
       } else if (!hasLocal) {
-        final unlocked = await _promptUnlockWithMasterPassword();
+        final unlocked = await EditorVaultDialogs.promptUnlockWithMasterPassword(
+          context,
+          _encryptionService,
+        );
         if (!unlocked) return;
       }
 
@@ -582,24 +495,8 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
       return;
     }
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Şifreleme Kaldırılsın mı?'),
-        content: const Text('Not düz metin olarak saklanacak. Devam edilsin mi?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('İptal'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Kaldır'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
+    final confirmed = await EditorVaultDialogs.confirmRemoveEncryption(context);
+    if (!confirmed) return;
 
     setState(() {
       _isEncrypted = false;
@@ -607,149 +504,6 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
     });
     _scheduleAutoSave();
     _showSuccess('Şifreleme kaldırıldı');
-  }
-
-  Future<bool> _promptSetupMasterPassword() async {
-    final passController = TextEditingController();
-    final confirmController = TextEditingController();
-    String? errorText;
-
-    final result = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Kasa Parolası Belirleyin 🔒'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Notlarınızı başka bir cihaza taşıdığınızda veya cihazınız sıfırlandığında şifreli notlarınızı kurtarabilmek için bir Kasa Parolası belirleyin.',
-                style: TextStyle(fontSize: 13),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: passController,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'Kasa Parolası (en az 6 karakter)',
-                ),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: confirmController,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'Parola Tekrar',
-                ),
-              ),
-              if (errorText != null) ...[
-                const SizedBox(height: 8),
-                Text(
-                  errorText!,
-                  style: const TextStyle(color: Colors.red, fontSize: 12),
-                ),
-              ],
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('İptal'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final p1 = passController.text;
-                final p2 = confirmController.text;
-                if (p1.length < 6) {
-                  setDialogState(() => errorText = 'Parola en az 6 karakter olmalıdır.');
-                  return;
-                }
-                if (p1 != p2) {
-                  setDialogState(() => errorText = 'Parolalar eşleşmiyor.');
-                  return;
-                }
-                try {
-                  await _encryptionService.setupMasterPassword(p1);
-                  if (dialogContext.mounted) {
-                    Navigator.of(dialogContext).pop(true);
-                  }
-                } catch (e) {
-                  setDialogState(() => errorText = 'Hata: $e');
-                }
-              },
-              child: const Text('Kaydet'),
-            ),
-          ],
-        ),
-      ),
-    );
-    return result == true;
-  }
-
-  Future<bool> _promptUnlockWithMasterPassword() async {
-    final passController = TextEditingController();
-    String? errorText;
-
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Kasa Parolasını Girin 🔑'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Şifreli kasa anahtarını (.vault_key.json) bu cihazda açmak için kasa parolanızı girin.',
-                style: TextStyle(fontSize: 13),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: passController,
-                obscureText: true,
-                autofocus: true,
-                decoration: const InputDecoration(
-                  labelText: 'Kasa Parolası',
-                ),
-              ),
-              if (errorText != null) ...[
-                const SizedBox(height: 8),
-                Text(
-                  errorText!,
-                  style: const TextStyle(color: Colors.red, fontSize: 12),
-                ),
-              ],
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('İptal'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                try {
-                  await _encryptionService.unlockWithMasterPassword(
-                    passController.text,
-                  );
-                  if (dialogContext.mounted) {
-                    Navigator.of(dialogContext).pop(true);
-                  }
-                } on InvalidVaultPasswordException {
-                  setDialogState(() => errorText = 'Parola hatalı.');
-                } catch (e) {
-                  setDialogState(() => errorText = 'Kasa açılamadı: $e');
-                }
-              },
-              child: const Text('Kasayı Aç'),
-            ),
-          ],
-        ),
-      ),
-    );
-    return result == true;
   }
 
   Future<void> _unlockVault() async {
@@ -767,7 +521,10 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
           }
         }
       } else if (hasEnv) {
-        final unlocked = await _promptUnlockWithMasterPassword();
+        final unlocked = await EditorVaultDialogs.promptUnlockWithMasterPassword(
+          context,
+          _encryptionService,
+        );
         if (!unlocked) return;
       }
 
@@ -776,7 +533,10 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
         decrypted = await _encryptionService.decrypt(_storedEncryptedContent);
       } on NoteDecryptionException {
         if (hasEnv) {
-          final unlocked = await _promptUnlockWithMasterPassword();
+          final unlocked = await EditorVaultDialogs.promptUnlockWithMasterPassword(
+            context,
+            _encryptionService,
+          );
           if (!unlocked) return;
           decrypted = await _encryptionService.decrypt(_storedEncryptedContent);
         } else {
@@ -799,354 +559,34 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
     }
   }
 
-  void _showSuccess(String msg) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.green));
-  }
-
-  Future<String?> _promptCustomAiInstruction(bool hasSelection) async {
-    final promptController = TextEditingController();
-    final result = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('✨ Özel AI Komutu'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              hasSelection
-                  ? 'Seçili kod/metin bloğu üzerinde yapay zekanın ne yapmasını istiyorsunuz?'
-                  : 'Not içeriği üzerinde yapay zekanın ne yapmasını istiyorsunuz?',
-              style: const TextStyle(fontSize: 13),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: promptController,
-              autofocus: true,
-              maxLines: 3,
-              decoration: const InputDecoration(
-                hintText: 'Örn: Bu fonksiyon için birim testleri (unit test) yaz...',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(null),
-            child: const Text('İptal'),
-          ),
-          ElevatedButton.icon(
-            onPressed: () {
-              final text = promptController.text.trim();
-              if (text.isNotEmpty) {
-                Navigator.of(dialogContext).pop(text);
-              }
-            },
-            icon: const Icon(Icons.play_arrow_rounded, size: 18),
-            label: const Text('Çalıştır'),
-          ),
-        ],
-      ),
-    );
-    return result;
-  }
-
-  Future<void> _streamBlockIntoEditor({
-    required Stream<String> stream,
-    required String blockTitle,
-    required int insertPos,
-    required String successMessage,
-    bool useBlockquote = false,
-  }) async {
-    _autoSaveTimer?.cancel();
-
-    final initialText = _contentController.text;
-    final blockStart = insertPos.clamp(0, initialText.length);
-    final header = useBlockquote
-        ? '\n\n> **$blockTitle**\n> '
-        : '\n\n### $blockTitle\n\n';
-    const footer = '\n\n';
-
-    // Insert the initial empty block header once at [blockStart]
-    final initialBlock = '$header$footer';
-    final textWithHeader = initialText.replaceRange(
-      blockStart,
-      blockStart,
-      initialBlock,
-    );
-    var currentBlockLength = initialBlock.length;
-
-    _contentController.value = TextEditingValue(
-      text: textWithHeader,
-      selection: TextSelection.collapsed(
-        offset: blockStart + header.length,
-      ),
-    );
-
-    final pendingChunkBuffer = StringBuffer();
-    var formattedBody = '';
-    var lastFlushTime = DateTime.now();
-    const flushInterval = Duration(milliseconds: 85);
-
-    void flushPendingChunks({bool force = false}) {
-      if (!mounted || pendingChunkBuffer.isEmpty) return;
-      final now = DateTime.now();
-      if (!force && now.difference(lastFlushTime) < flushInterval) {
-        return;
-      }
-      lastFlushTime = now;
-
-      final rawDelta = pendingChunkBuffer.toString();
-      pendingChunkBuffer.clear();
-
-      final formattedDelta = useBlockquote
-          ? rawDelta.replaceAll('\n', '\n> ')
-          : rawDelta;
-      formattedBody += formattedDelta;
-
-      final newBlock = '$header$formattedBody$footer';
-      final currentText = _contentController.text;
-      final safeStart = blockStart.clamp(0, currentText.length);
-      final safeEnd = (blockStart + currentBlockLength).clamp(
-        safeStart,
-        currentText.length,
-      );
-
-      final updatedText = currentText.replaceRange(
-        safeStart,
-        safeEnd,
-        newBlock,
-      );
-      currentBlockLength = newBlock.length;
-
-      _contentController.value = TextEditingValue(
-        text: updatedText,
-        selection: TextSelection.collapsed(
-          offset: (safeStart + newBlock.length).clamp(0, updatedText.length),
-        ),
-      );
-    }
-
-    await for (final chunk in stream) {
-      if (!mounted) break;
-      pendingChunkBuffer.write(chunk);
-      flushPendingChunks(force: false);
-    }
-
-    // Final flush for any remaining tokens in the buffer
-    flushPendingChunks(force: true);
-    _checkDirtyAndScheduleAutoSave();
-    _showSuccess(successMessage);
-  }
-
-  Future<void> _showAiMenu() async {
+  void _showAiAssistantMenu() {
     final aiProvider = context.read<AiProvider>();
-    if (!aiProvider.isAiEnabled) {
-      _showError('Lütfen önce Ayarlar\'dan AI sağlayıcınızı yapılandırın.');
-      return;
-    }
+    final noteId = (_persistedNoteId ?? widget.note?.id)?.toString() ??
+        _titleController.text.trim();
 
-    final fullText = _contentController.text;
-    if (fullText.trim().isEmpty) {
-      _showError('Lütfen önce biraz not veya kod yazın.');
-      return;
-    }
-
-    final selection = _contentController.selection;
-    final hasSelection = selection.isValid &&
-        !selection.isCollapsed &&
-        selection.start >= 0 &&
-        selection.end <= fullText.length;
-    final selectedText = hasSelection
-        ? fullText.substring(selection.start, selection.end).trim()
-        : '';
-    final targetText = selectedText.isNotEmpty ? selectedText : fullText.trim();
-    final insertPos = hasSelection
-        ? selection.end
-        : (selection.isValid ? selection.start : fullText.length);
-
-    final action = await showModalBottomSheet<String>(
+    final sheet = EditorAiSheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        final theme = Theme.of(context);
-        final isDark = theme.brightness == Brightness.dark;
-        return Container(
-          padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1E1F24) : Colors.white,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  '✨ Geliştirici AI Asistanı',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 6),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    selectedText.isNotEmpty
-                        ? 'Hedef: Seçili Metin / Kod (${selectedText.length} karakter)'
-                        : 'Hedef: Tüm Not (${targetText.length} karakter)',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: theme.colorScheme.primary,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                ListTile(
-                  leading: const Icon(Icons.code_rounded, color: Colors.teal),
-                  title: const Text('Kodu Açıkla & Analiz Et'),
-                  subtitle: const Text('Adım adım çalışma mantığı, Big-O ve uç durumlar'),
-                  onTap: () => Navigator.pop(context, 'explain_code'),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.auto_fix_high_rounded, color: Colors.indigo),
-                  title: const Text('Kodu Refactor Et & İyileştir'),
-                  subtitle: const Text('Clean Code, SOLID ve performans optimizasyonu'),
-                  onTap: () => Navigator.pop(context, 'refactor_code'),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.description_outlined, color: Colors.cyan),
-                  title: const Text('Teknik Dokümantasyon Üret'),
-                  subtitle: const Text('Parametreler, dönüş tipleri ve kullanım örneği'),
-                  onTap: () => Navigator.pop(context, 'generate_docs'),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.terminal_rounded, color: Colors.deepPurple),
-                  title: const Text('Özel Komut Çalıştır (Serbest Prompt)'),
-                  subtitle: const Text('Birim testi yazdır, dil çevir veya özel soru sor'),
-                  onTap: () => Navigator.pop(context, 'custom_prompt'),
-                ),
-                const Divider(),
-                ListTile(
-                  leading: const Icon(Icons.summarize_rounded, color: Colors.blue),
-                  title: Text(selectedText.isNotEmpty ? 'Seçimi Özetle' : 'Notu Özetle'),
-                  onTap: () => Navigator.pop(context, 'summary'),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.local_offer_rounded, color: Colors.orange),
-                  title: const Text('Etiket Öner'),
-                  onTap: () => Navigator.pop(context, 'tags'),
-                ),
-              ],
-            ),
-          ),
-        );
+      contentController: _contentController,
+      noteId: noteId,
+      isEncrypted: _isEncrypted,
+      onStartLoading: () => setState(() => _isAiLoading = true),
+      onStopLoading: () {
+        if (mounted) setState(() => _isAiLoading = false);
       },
-    );
-
-    if (action == null) return;
-
-    String? customInstruction;
-    if (action == 'custom_prompt') {
-      customInstruction = await _promptCustomAiInstruction(selectedText.isNotEmpty);
-      if (customInstruction == null || customInstruction.isEmpty) return;
-    }
-
-    setState(() => _isAiLoading = true);
-
-    try {
-      final String noteId = (_persistedNoteId ?? widget.note?.id)?.toString() ??
-          _titleController.text.trim();
-
-      if (action == 'summary') {
-        await _streamBlockIntoEditor(
-          stream: aiProvider.streamSummary(
-            targetText,
-            noteId: noteId,
-            isEncrypted: _isEncrypted,
-          ),
-          blockTitle: '✨ AI Özeti:',
-          insertPos: insertPos,
-          successMessage: 'Özet eklendi!',
-          useBlockquote: true,
-        );
-      } else if (action == 'explain_code') {
-        await _streamBlockIntoEditor(
-          stream: aiProvider.streamCodeExplanation(
-            targetText,
-            noteId: noteId,
-            isEncrypted: _isEncrypted,
-          ),
-          blockTitle: '🔍 AI Kod & Mimari Analizi',
-          insertPos: insertPos,
-          successMessage: 'Kod analizi eklendi!',
-        );
-      } else if (action == 'refactor_code') {
-        await _streamBlockIntoEditor(
-          stream: aiProvider.streamCodeRefactor(
-            targetText,
-            noteId: noteId,
-            isEncrypted: _isEncrypted,
-          ),
-          blockTitle: '🛠️ AI Refactoring Önerisi',
-          insertPos: insertPos,
-          successMessage: 'Refactoring önerisi eklendi!',
-        );
-      } else if (action == 'generate_docs') {
-        await _streamBlockIntoEditor(
-          stream: aiProvider.streamTechnicalDocs(
-            targetText,
-            noteId: noteId,
-            isEncrypted: _isEncrypted,
-          ),
-          blockTitle: '📚 Teknik Dokümantasyon',
-          insertPos: insertPos,
-          successMessage: 'Teknik dokümantasyon eklendi!',
-        );
-      } else if (action == 'custom_prompt' && customInstruction != null) {
-        await _streamBlockIntoEditor(
-          stream: aiProvider.streamCustomPrompt(
-            customInstruction,
-            targetText,
-            noteId: noteId,
-            cacheActionKey: 'custom_prompt',
-            isEncrypted: _isEncrypted,
-          ),
-          blockTitle: '🤖 AI Yanıtı',
-          insertPos: insertPos,
-          successMessage: 'AI yanıtı eklendi!',
-        );
-      } else if (action == 'tags') {
-        final suggestedTags = await aiProvider.getTags(
-          targetText,
-          noteId: noteId,
-          isEncrypted: _isEncrypted,
-        );
+      onError: _showError,
+      onSuccess: _showSuccess,
+      onTagsSuggested: (tags) {
         setState(() {
-          for (var tag in suggestedTags) {
+          for (final tag in tags) {
             if (!_tags.contains(tag)) _tags.add(tag);
           }
         });
-        _checkDirtyAndScheduleAutoSave();
-        _showSuccess('${suggestedTags.length} etiket eklendi!');
-      }
-    } on AiException catch (e) {
-      _showError(e.message);
-    } catch (e) {
-      _showError('AI işlemi gerçekleştirilemedi: $e');
-    } finally {
-      if (mounted) {
-        setState(() => _isAiLoading = false);
-        _checkDirtyAndScheduleAutoSave();
-      }
-    }
-  }
+      },
+      onContentModified: _checkDirtyAndScheduleAutoSave,
+    );
 
+    sheet.show(aiProvider);
+  }
 
   void _showColorPicker() {
     showDialog(
@@ -1218,9 +658,62 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
     );
   }
 
+  void _showEmojiPicker() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => SizedBox(
+        height: 300,
+        child: EmojiPicker(
+          onEmojiSelected: (category, emoji) {
+            setState(() {
+              _emojiIcon = emoji.emoji;
+              _isDirty = true;
+            });
+            _scheduleAutoSave();
+            Navigator.pop(ctx);
+          },
+          config: const Config(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPreview() {
+    return Container(
+      color: Colors.transparent,
+      margin: const EdgeInsets.symmetric(horizontal: 28),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 24),
+            if (_emojiIcon != null) ...[
+              Text(_emojiIcon!, style: const TextStyle(fontSize: 64)),
+              const SizedBox(height: 8),
+            ],
+            Text(
+              _titleController.text.isEmpty ? 'Başlıksız Not' : _titleController.text,
+              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 32,
+                    letterSpacing: -0.6,
+                  ),
+            ),
+            const SizedBox(height: 16),
+            MathMarkdownRenderer(
+              data: _contentController.text,
+              selectable: true,
+            ),
+            const SizedBox(height: 100),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-
     final bgColor = _selectedColor != null
         ? Color(_selectedColor!)
         : Theme.of(context).colorScheme.surface;
@@ -1228,7 +721,11 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
     final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
     final width = MediaQuery.of(context).size.width;
     final isDesktop = width >= 800;
-    final hasSelection = _contentController.selection.isValid && !_contentController.selection.isCollapsed;
+    final hasSelection = _hasSelection;
+
+    final statusLabel = _isAutoSaving
+        ? 'Otomatik kaydediliyor...'
+        : (_isDirty ? 'Kaydedilmemiş değişiklik' : '');
 
     return PopScope(
       canPop: _allowPop || !_isDirty,
@@ -1238,7 +735,55 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
       },
       child: Scaffold(
         backgroundColor: bgColor,
-        appBar: _isFocusMode ? null : _buildMinimalAppBar(context),
+        appBar: _isFocusMode
+            ? null
+            : EditorAppBar(
+                statusLabel: statusLabel,
+                isDirty: _isDirty,
+                isAutoSaving: _isAutoSaving,
+                isLoading: _isLoading,
+                isEncrypted: _isEncrypted,
+                isUnlocked: _isUnlocked,
+                isPreviewMode: _isPreviewMode,
+                isRecording: _isRecording,
+                isAiLoading: _isAiLoading,
+                selectedColor: _selectedColor,
+                isPomodoroVisible: _isPomodoroVisible,
+                isCrossReferenceVisible: _isCrossReferenceVisible,
+                canShowBacklinks: widget.note != null || _persistedNoteId != null,
+                onBackPressed: _handleBackOrCancel,
+                onToggleEncryption: _toggleEncryption,
+                onTogglePreview: () => setState(() => _isPreviewMode = !_isPreviewMode),
+                onToggleVoiceRecording: _toggleVoiceRecording,
+                onShowAiMenu: _showAiAssistantMenu,
+                onSaveNote: _saveNote,
+                onSelectColor: _showColorPicker,
+                onShowTagSheet: _showTagAndMoodSheet,
+                onTogglePomodoro: () => setState(() => _isPomodoroVisible = !_isPomodoroVisible),
+                onToggleBacklinks: () => setState(() => _isCrossReferenceVisible = !_isCrossReferenceVisible),
+                onExportPdf: _exportToPdf,
+                onExportLatex: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (ctx) => LatexExportScreen(
+                        note: _buildCurrentNoteSnapshot(),
+                      ),
+                    ),
+                  );
+                },
+                onShare: () async {
+                  final textToShare = '${_titleController.text.trim()}\n\n${_contentController.text}';
+                  if (kIsWeb) {
+                    await Clipboard.setData(ClipboardData(text: textToShare));
+                    if (context.mounted) {
+                      _showSuccess('Metin panoya kopyalandı!');
+                    }
+                  } else {
+                    Share.share(textToShare);
+                  }
+                },
+                onToggleFocusMode: () => setState(() => _isFocusMode = true),
+              ),
         body: SafeArea(
           child: Stack(
             children: [
@@ -1248,7 +793,26 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
                   tag: 'note_${_persistedNoteId ?? widget.note?.id ?? 'new_$_createdAt'}',
                   child: Material(
                     color: Colors.transparent,
-                    child: _isPreviewMode ? _buildPreview() : _buildZenEditor(context),
+                    child: _isPreviewMode
+                        ? _buildPreview()
+                        : EditorZenCanvas(
+                            titleController: _titleController,
+                            titleFocusNode: _titleFocusNode,
+                            contentController: _contentController,
+                            contentFocusNode: _contentFocusNode,
+                            emojiIcon: _emojiIcon,
+                            tags: _tags,
+                            currentNote: _buildCurrentNoteSnapshot(),
+                            onSelectBacklinkNote: (note) {
+                              Navigator.of(context).pushNamed(
+                                '/note-editor',
+                                arguments: note,
+                              );
+                            },
+                            onShowEmojiPicker: _showEmojiPicker,
+                            onShowColorPicker: _showColorPicker,
+                            onShowTagSheet: _showTagAndMoodSheet,
+                          ),
                   ),
                 ),
               ),
@@ -1347,476 +911,6 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
                 ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  PreferredSizeWidget _buildMinimalAppBar(BuildContext context) {
-    final theme = Theme.of(context);
-    final statusLabel = _isAutoSaving
-        ? 'Otomatik kaydediliyor...'
-        : (_isDirty ? 'Kaydedilmemiş değişiklik' : '');
-
-    return CustomAppBar(
-      title: statusLabel,
-      showBackButton: true,
-      onBackPressed: _handleBackOrCancel,
-      actions: [
-        // Vault Lock / Unlock Toggle
-        IconButton(
-          icon: Icon(
-            !_isEncrypted
-                ? Icons.lock_outline
-                : (_isUnlocked ? Icons.lock_open : Icons.lock),
-            color: _isEncrypted ? theme.colorScheme.primary : null,
-          ),
-          onPressed: _toggleEncryption,
-          tooltip: !_isEncrypted
-              ? 'Notu Şifrele'
-              : (_isUnlocked ? 'Şifrelemeyi Kaldır' : 'Kasayı Aç'),
-        ),
-
-        // Live Preview / Preview Toggle
-        IconButton(
-          icon: Icon(
-            _isPreviewMode ? Icons.edit_note_rounded : Icons.remove_red_eye_outlined,
-            color: _isPreviewMode ? theme.colorScheme.primary : null,
-          ),
-          onPressed: () => setState(() => _isPreviewMode = !_isPreviewMode),
-          tooltip: _isPreviewMode ? 'Düzenleme Modu' : 'Tam Önizleme',
-        ),
-
-        // Voice Note Toggle
-        IconButton(
-          icon: Icon(
-            _isRecording ? Icons.mic : Icons.mic_none,
-            color: _isRecording ? Colors.red : null,
-          ),
-          onPressed: _toggleVoiceRecording,
-          tooltip: 'Sesli Not',
-        ),
-
-        // AI Assistant Toggle
-        IconButton(
-          icon: _isAiLoading
-              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-              : const Icon(Icons.auto_awesome, color: Colors.deepPurple),
-          onPressed: _isAiLoading ? null : _showAiMenu,
-          tooltip: 'Yapay Zeka Asistanı',
-        ),
-
-        // Save Button (Clean and prominent)
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 6.0),
-          child: ElevatedButton.icon(
-            onPressed: _isLoading ? null : _saveNote,
-            icon: _isAutoSaving
-                ? const SizedBox(
-                    width: 14,
-                    height: 14,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : const Icon(Icons.check_rounded, size: 18),
-            label: Text(_isDirty ? 'Kaydet*' : 'Kaydet'),
-            style: ElevatedButton.styleFrom(
-              elevation: 0,
-              backgroundColor: theme.primaryColor,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              minimumSize: const Size(0, 36),
-            ),
-          ),
-        ),
-
-        // Overflow Options Menu
-        PopupMenuButton<String>(
-          icon: const Icon(Icons.more_vert_rounded),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          tooltip: 'Daha Fazla Seçenek',
-          onSelected: (value) async {
-            switch (value) {
-              case 'color':
-                _showColorPicker();
-                break;
-              case 'tags':
-                _showTagAndMoodSheet();
-                break;
-              case 'pomodoro':
-                setState(() => _isPomodoroVisible = !_isPomodoroVisible);
-                break;
-              case 'backlinks':
-                setState(() => _isCrossReferenceVisible = !_isCrossReferenceVisible);
-                break;
-              case 'pdf':
-                _exportToPdf();
-                break;
-              case 'latex':
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (ctx) => LatexExportScreen(
-                      note: _buildCurrentNoteSnapshot(),
-                    ),
-                  ),
-                );
-                break;
-              case 'share':
-                final textToShare = '${_titleController.text.trim()}\n\n${_contentController.text}';
-                if (kIsWeb) {
-                  await Clipboard.setData(ClipboardData(text: textToShare));
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Metin panoya kopyalandı!')),
-                    );
-                  }
-                } else {
-                  Share.share(textToShare);
-                }
-                break;
-              case 'focus':
-                setState(() => _isFocusMode = true);
-                break;
-            }
-          },
-          itemBuilder: (context) => [
-            PopupMenuItem(
-              value: 'tags',
-              child: Row(
-                children: [
-                  Icon(Icons.label_outline_rounded, size: 20, color: theme.colorScheme.primary),
-                  const SizedBox(width: 12),
-                  const Text('Etiketler & Mod'),
-                ],
-              ),
-            ),
-            PopupMenuItem(
-              value: 'color',
-              child: Row(
-                children: [
-                  Icon(Icons.palette_outlined, size: 20, color: _selectedColor != null ? Color(_selectedColor!) : null),
-                  const SizedBox(width: 12),
-                  const Text('Kağıt Rengi'),
-                ],
-              ),
-            ),
-            PopupMenuItem(
-              value: 'focus',
-              child: const Row(
-                children: [
-                  Icon(Icons.fullscreen_rounded, size: 20),
-                  SizedBox(width: 12),
-                  Text('Zen Odak Modu'),
-                ],
-              ),
-            ),
-            PopupMenuItem(
-              value: 'pomodoro',
-              child: Row(
-                children: [
-                  Icon(Icons.timer_outlined, size: 20, color: _isPomodoroVisible ? Colors.red : null),
-                  const SizedBox(width: 12),
-                  Text(_isPomodoroVisible ? 'Pomodoro Gizle' : 'Pomodoro Sayacı'),
-                ],
-              ),
-            ),
-            if (widget.note != null || _persistedNoteId != null)
-              PopupMenuItem(
-                value: 'backlinks',
-                child: const Row(
-                  children: [
-                    Icon(Icons.hub_outlined, size: 20),
-                    SizedBox(width: 12),
-                    Text('Çapraz Bağlantılar'),
-                  ],
-                ),
-              ),
-            PopupMenuItem(
-              value: 'share',
-              child: const Row(
-                children: [
-                  Icon(Icons.share_rounded, size: 20),
-                  SizedBox(width: 12),
-                  Text('Notu Paylaş'),
-                ],
-              ),
-            ),
-            PopupMenuItem(
-              value: 'pdf',
-              child: const Row(
-                children: [
-                  Icon(Icons.picture_as_pdf_outlined, size: 20),
-                  SizedBox(width: 12),
-                  Text('PDF Olarak Kaydet'),
-                ],
-              ),
-            ),
-            PopupMenuItem(
-              value: 'latex',
-              child: const Row(
-                children: [
-                  Icon(Icons.text_format_rounded, size: 20),
-                  SizedBox(width: 12),
-                  Text('LaTeX Olarak Dışa Aktar'),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  /// The Content-First Zen Mode Editor
-  Widget _buildZenEditor(BuildContext context) {
-    final theme = Theme.of(context);
-
-    final mood = EditorTagAndMoodSheet.findCurrentMood(_tags);
-    final nonMoodTags = _tags.where((t) => !t.startsWith('mood:')).toList();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // Title Field - Large H1 Notion-like header
-        // Notion-like header: emoji icon + color picker
-        Padding(
-          padding: const EdgeInsets.fromLTRB(28, 12, 28, 0),
-          child: Row(
-            children: [
-              if (_emojiIcon != null)
-                GestureDetector(
-                  onTap: _showEmojiPicker,
-                  child: Text(_emojiIcon!, style: const TextStyle(fontSize: 56)),
-                ),
-              if (_emojiIcon == null)
-                TextButton.icon(
-                  onPressed: _showEmojiPicker,
-                  icon: const Icon(Icons.add_reaction_outlined, size: 18),
-                  label: const Text('İkon Ekle'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: theme.disabledColor,
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                ),
-              const SizedBox(width: 12),
-              TextButton.icon(
-                onPressed: _showColorPicker,
-                icon: const Icon(Icons.color_lens_outlined, size: 18),
-                label: const Text('Renk'),
-                style: TextButton.styleFrom(
-                  foregroundColor: theme.disabledColor,
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        Padding(
-          padding: const EdgeInsets.fromLTRB(28, 8, 28, 4),
-          child: TextField(
-            controller: _titleController,
-            focusNode: _titleFocusNode,
-            textInputAction: TextInputAction.next,
-            onSubmitted: (_) => _contentFocusNode.requestFocus(),
-            style: theme.textTheme.headlineMedium?.copyWith(
-              fontWeight: FontWeight.w800,
-              fontSize: 32,
-              letterSpacing: -0.6,
-              color: theme.colorScheme.onSurface,
-            ),
-            decoration: InputDecoration(
-              hintText: 'Başlıksız Not',
-              hintStyle: TextStyle(
-                color: theme.disabledColor.withValues(alpha: 0.28),
-                fontWeight: FontWeight.w800,
-              ),
-              border: InputBorder.none,
-              contentPadding: EdgeInsets.zero,
-            ),
-          ),
-        ),
-
-        // Subtle, integrated Metadata Strip (Mood & Tag chips)
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 4),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                // Mood Chip
-                InkWell(
-                  borderRadius: BorderRadius.circular(12),
-                  onTap: _showTagAndMoodSheet,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(mood ?? '😊', style: const TextStyle(fontSize: 14)),
-                        const SizedBox(width: 4),
-                        Text(
-                          mood == null ? 'Mod ekle' : 'Mod',
-                          style: TextStyle(fontSize: 12, color: theme.disabledColor, fontWeight: FontWeight.w500),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-
-                // Tags chips
-                ...nonMoodTags.map((tag) => Container(
-                      margin: const EdgeInsets.only(right: 6),
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.primary.withValues(alpha: 0.09),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        '#$tag',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: theme.colorScheme.primary,
-                        ),
-                      ),
-                    )),
-
-                // Add Tag Chip
-                InkWell(
-                  borderRadius: BorderRadius.circular(12),
-                  onTap: _showTagAndMoodSheet,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: theme.dividerColor.withValues(alpha: 0.2), width: 0.8),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.add_rounded, size: 14, color: theme.disabledColor),
-                        const SizedBox(width: 2),
-                        Text(
-                          'Etiket',
-                          style: TextStyle(fontSize: 12, color: theme.disabledColor, fontWeight: FontWeight.w500),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-
-        const SizedBox(height: 10),
-
-      // The Smooth Continuous Canvas Body (No dividers, no boxes)
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 28),
-            child: TextField(
-              controller: _contentController,
-              focusNode: _contentFocusNode,
-              maxLines: null,
-              expands: true,
-              style: theme.textTheme.bodyLarge?.copyWith(
-                height: 1.7,
-                fontSize: 16.5,
-                letterSpacing: 0.1,
-              ),
-              cursorColor: theme.colorScheme.primary,
-              cursorWidth: 2.2,
-              cursorRadius: const Radius.circular(2),
-              decoration: InputDecoration(
-                hintText: 'Düşüncelerinizi buraya dökün...',
-                hintStyle: TextStyle(
-                  color: theme.disabledColor.withValues(alpha: 0.3),
-                  fontStyle: FontStyle.italic,
-                  fontSize: 16,
-                ),
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.zero,
-              ),
-            ),
-          ),
-        ),
-
-        // Backlinks Section
-        EditorBacklinkSection(
-          currentNoteId: _persistedNoteId ?? widget.note?.id,
-          currentTitle: _titleController.text,
-        ),
-
-        // Bottom spacer to ensure text is never covered by the floating bar
-        const SizedBox(height: 72),
-      ],
-    );
-  }
-
-  Widget _buildPreview() {
-    return Container(
-      color: Colors.transparent,
-      margin: const EdgeInsets.symmetric(horizontal: 28),
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 24),
-            if (_emojiIcon != null) ...[
-              Text(_emojiIcon!, style: const TextStyle(fontSize: 64)),
-              const SizedBox(height: 8),
-            ],
-            Text(
-              _titleController.text.isEmpty ? 'Başlıksız Not' : _titleController.text,
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 32,
-                    letterSpacing: -0.6,
-                  ),
-            ),
-            const SizedBox(height: 16),
-            MathMarkdownRenderer(
-              data: _contentController.text,
-              selectable: true,
-            ),
-            const SizedBox(height: 100),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showEmojiPicker() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (ctx) => SizedBox(
-        height: 300,
-        child: EmojiPicker(
-          onEmojiSelected: (category, emoji) {
-            setState(() {
-              _emojiIcon = emoji.emoji;
-              _isDirty = true;
-            });
-            _scheduleAutoSave();
-            Navigator.pop(ctx);
-          },
-          config: const Config(),
         ),
       ),
     );
