@@ -204,6 +204,31 @@ class MarkdownNoteRepository implements NoteRepository {
     return null;
   }
 
+  /// Atomically writes [contents] to [targetFile] by first writing and flushing
+  /// to a temporary sibling file (`<target>.tmp`), then renaming it over
+  /// [targetFile]. Prevents 0-byte or half-written markdown files on crash or
+  /// sudden power loss.
+  Future<void> _writeFileAtomically(File targetFile, String contents) async {
+    final parentDir = targetFile.parent;
+    if (!await parentDir.exists()) {
+      await parentDir.create(recursive: true);
+    }
+    final tmpPath =
+        '${targetFile.path}.${DateTime.now().microsecondsSinceEpoch}.tmp';
+    final tmpFile = File(tmpPath);
+    try {
+      await tmpFile.writeAsString(contents, flush: true);
+      await tmpFile.rename(targetFile.path);
+    } catch (e) {
+      if (await tmpFile.exists()) {
+        try {
+          await tmpFile.delete();
+        } catch (_) {}
+      }
+      rethrow;
+    }
+  }
+
   Future<void> _writeAndReplaceOldFile({
     required Directory dir,
     required Note noteToSave,
@@ -222,7 +247,10 @@ class MarkdownNoteRepository implements NoteRepository {
       await existingFile.rename(targetFile.path);
     }
 
-    await targetFile.writeAsString(NoteMarkdownCodec.serialize(noteToSave));
+    await _writeFileAtomically(
+      targetFile,
+      NoteMarkdownCodec.serialize(noteToSave),
+    );
 
     if (existingFile != null &&
         _normPath(existingFile.path) != _normPath(targetFile.path)) {
@@ -312,7 +340,7 @@ class MarkdownNoteRepository implements NoteRepository {
     final body = await _persistableBody(note);
     final toSave = note.copyWith(id: id, content: body);
     final file = await NoteMarkdownCodec.resolveUniqueFileAsync(dir, toSave);
-    await file.writeAsString(NoteMarkdownCodec.serialize(toSave));
+    await _writeFileAtomically(file, NoteMarkdownCodec.serialize(toSave));
     await _cacheSavedNote(file, toSave);
     await _commit('Add note: ${note.title}');
     return id;

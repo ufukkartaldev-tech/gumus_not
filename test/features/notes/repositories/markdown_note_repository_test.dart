@@ -211,6 +211,21 @@ eski düz metin''');
       expect(byTitle.length, 1);
       expect(byTitle.first.title, 'Gizli Kasa');
     });
+
+    test('atomic write leaves zero leftover .tmp files in notes directory', () async {
+      final id = await repository.addNote(
+        note(title: 'Atomik Not', content: 'v1 içerik'),
+      );
+      final saved = await repository.getNoteById(id);
+      await repository.updateNote(saved!.copyWith(content: 'v2 içerik'));
+
+      final leftovers = notesDir
+          .listSync()
+          .where((e) => e.path.endsWith('.tmp'))
+          .toList();
+      expect(leftovers, isEmpty);
+      expect((await repository.getNoteById(id))?.content, 'v2 içerik');
+    });
   });
 }
 
