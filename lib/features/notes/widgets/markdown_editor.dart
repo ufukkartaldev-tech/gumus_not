@@ -649,6 +649,91 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.green));
   }
 
+  Future<String?> _promptCustomAiInstruction(bool hasSelection) async {
+    final promptController = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('✨ Özel AI Komutu'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              hasSelection
+                  ? 'Seçili kod/metin bloğu üzerinde yapay zekanın ne yapmasını istiyorsunuz?'
+                  : 'Not içeriği üzerinde yapay zekanın ne yapmasını istiyorsunuz?',
+              style: const TextStyle(fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: promptController,
+              autofocus: true,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                hintText: 'Örn: Bu fonksiyon için birim testleri (unit test) yaz...',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(null),
+            child: const Text('İptal'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () {
+              final text = promptController.text.trim();
+              if (text.isNotEmpty) {
+                Navigator.of(dialogContext).pop(text);
+              }
+            },
+            icon: const Icon(Icons.play_arrow_rounded, size: 18),
+            label: const Text('Çalıştır'),
+          ),
+        ],
+      ),
+    );
+    return result;
+  }
+
+  Future<void> _streamBlockIntoEditor({
+    required Stream<String> stream,
+    required String blockTitle,
+    required int insertPos,
+    required String successMessage,
+    bool useBlockquote = false,
+  }) async {
+    final baseText = _contentController.text;
+    final safePos = insertPos.clamp(0, baseText.length);
+    final before = baseText.substring(0, safePos);
+    final after = baseText.substring(safePos);
+
+    final header = useBlockquote
+        ? '\n\n> **$blockTitle**\n> '
+        : '\n\n### $blockTitle\n\n';
+
+    final streamedBuffer = StringBuffer();
+    await for (final chunk in stream) {
+      if (!mounted) break;
+      streamedBuffer.write(chunk);
+      final rawBody = streamedBuffer.toString();
+      final formattedBody = useBlockquote
+          ? rawBody.replaceAll('\n', '\n> ')
+          : rawBody;
+      final liveBlock = '$header$formattedBody\n\n';
+      final updatedText = '$before$liveBlock$after';
+      _contentController.value = TextEditingValue(
+        text: updatedText,
+        selection: TextSelection.collapsed(
+          offset: before.length + liveBlock.length,
+        ),
+      );
+    }
+    _showSuccess(successMessage);
+  }
+
   Future<void> _showAiMenu() async {
     final aiProvider = context.read<AiProvider>();
     if (!aiProvider.isAiEnabled) {
@@ -656,40 +741,102 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
       return;
     }
 
-    final String text = _contentController.text.trim();
-    if (text.isEmpty) {
-      _showError('Lütfen önce biraz not yazın.');
+    final fullText = _contentController.text;
+    if (fullText.trim().isEmpty) {
+      _showError('Lütfen önce biraz not veya kod yazın.');
       return;
     }
 
+    final selection = _contentController.selection;
+    final hasSelection = selection.isValid &&
+        !selection.isCollapsed &&
+        selection.start >= 0 &&
+        selection.end <= fullText.length;
+    final selectedText = hasSelection
+        ? fullText.substring(selection.start, selection.end).trim()
+        : '';
+    final targetText = selectedText.isNotEmpty ? selectedText : fullText.trim();
+    final insertPos = hasSelection
+        ? selection.end
+        : (selection.isValid ? selection.start : fullText.length);
+
     final action = await showModalBottomSheet<String>(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
         final theme = Theme.of(context);
         final isDark = theme.brightness == Brightness.dark;
         return Container(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
           decoration: BoxDecoration(
             color: isDark ? const Color(0xFF1E1F24) : Colors.white,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('✨ Yapay Zeka Asistanı', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 16),
-              ListTile(
-                leading: const Icon(Icons.summarize_rounded, color: Colors.blue),
-                title: const Text('Notu Özetle'),
-                onTap: () => Navigator.pop(context, 'summary'),
-              ),
-              ListTile(
-                leading: const Icon(Icons.local_offer_rounded, color: Colors.orange),
-                title: const Text('Etiket Öner'),
-                onTap: () => Navigator.pop(context, 'tags'),
-              ),
-            ],
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  '✨ Geliştirici AI Asistanı',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    selectedText.isNotEmpty
+                        ? 'Hedef: Seçili Metin / Kod (${selectedText.length} karakter)'
+                        : 'Hedef: Tüm Not (${targetText.length} karakter)',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ListTile(
+                  leading: const Icon(Icons.code_rounded, color: Colors.teal),
+                  title: const Text('Kodu Açıkla & Analiz Et'),
+                  subtitle: const Text('Adım adım çalışma mantığı, Big-O ve uç durumlar'),
+                  onTap: () => Navigator.pop(context, 'explain_code'),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.auto_fix_high_rounded, color: Colors.indigo),
+                  title: const Text('Kodu Refactor Et & İyileştir'),
+                  subtitle: const Text('Clean Code, SOLID ve performans optimizasyonu'),
+                  onTap: () => Navigator.pop(context, 'refactor_code'),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.description_outlined, color: Colors.cyan),
+                  title: const Text('Teknik Dokümantasyon Üret'),
+                  subtitle: const Text('Parametreler, dönüş tipleri ve kullanım örneği'),
+                  onTap: () => Navigator.pop(context, 'generate_docs'),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.terminal_rounded, color: Colors.deepPurple),
+                  title: const Text('Özel Komut Çalıştır (Serbest Prompt)'),
+                  subtitle: const Text('Birim testi yazdır, dil çevir veya özel soru sor'),
+                  onTap: () => Navigator.pop(context, 'custom_prompt'),
+                ),
+                const Divider(),
+                ListTile(
+                  leading: const Icon(Icons.summarize_rounded, color: Colors.blue),
+                  title: Text(selectedText.isNotEmpty ? 'Seçimi Özetle' : 'Notu Özetle'),
+                  onTap: () => Navigator.pop(context, 'summary'),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.local_offer_rounded, color: Colors.orange),
+                  title: const Text('Etiket Öner'),
+                  onTap: () => Navigator.pop(context, 'tags'),
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -697,43 +844,78 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
 
     if (action == null) return;
 
+    String? customInstruction;
+    if (action == 'custom_prompt') {
+      customInstruction = await _promptCustomAiInstruction(selectedText.isNotEmpty);
+      if (customInstruction == null || customInstruction.isEmpty) return;
+    }
+
     setState(() => _isAiLoading = true);
 
     try {
       final String noteId = widget.note?.id?.toString() ?? _titleController.text.trim();
-      
-      if (action == 'summary') {
-        const header = '\n\n> **✨ AI Özeti:**\n> ';
-        final baseText = _contentController.text;
-        final insertPos = _contentController.selection.isValid
-            ? _contentController.selection.start
-            : baseText.length;
-        final before = baseText.substring(0, insertPos);
-        final after = baseText.substring(insertPos);
 
-        final streamedBuffer = StringBuffer();
-        await for (final chunk in aiProvider.streamSummary(
-          text,
-          noteId: noteId,
-          isEncrypted: _isEncrypted,
-        )) {
-          if (!mounted) break;
-          streamedBuffer.write(chunk);
-          final formattedBody =
-              streamedBuffer.toString().replaceAll('\n', '\n> ');
-          final liveBlock = '$header$formattedBody\n\n';
-          final updatedText = '$before$liveBlock$after';
-          _contentController.value = TextEditingValue(
-            text: updatedText,
-            selection: TextSelection.collapsed(
-              offset: before.length + liveBlock.length,
-            ),
-          );
-        }
-        _showSuccess('Özet eklendi!');
+      if (action == 'summary') {
+        await _streamBlockIntoEditor(
+          stream: aiProvider.streamSummary(
+            targetText,
+            noteId: noteId,
+            isEncrypted: _isEncrypted,
+          ),
+          blockTitle: '✨ AI Özeti:',
+          insertPos: insertPos,
+          successMessage: 'Özet eklendi!',
+          useBlockquote: true,
+        );
+      } else if (action == 'explain_code') {
+        await _streamBlockIntoEditor(
+          stream: aiProvider.streamCodeExplanation(
+            targetText,
+            noteId: noteId,
+            isEncrypted: _isEncrypted,
+          ),
+          blockTitle: '🔍 AI Kod & Mimari Analizi',
+          insertPos: insertPos,
+          successMessage: 'Kod analizi eklendi!',
+        );
+      } else if (action == 'refactor_code') {
+        await _streamBlockIntoEditor(
+          stream: aiProvider.streamCodeRefactor(
+            targetText,
+            noteId: noteId,
+            isEncrypted: _isEncrypted,
+          ),
+          blockTitle: '🛠️ AI Refactoring Önerisi',
+          insertPos: insertPos,
+          successMessage: 'Refactoring önerisi eklendi!',
+        );
+      } else if (action == 'generate_docs') {
+        await _streamBlockIntoEditor(
+          stream: aiProvider.streamTechnicalDocs(
+            targetText,
+            noteId: noteId,
+            isEncrypted: _isEncrypted,
+          ),
+          blockTitle: '📚 Teknik Dokümantasyon',
+          insertPos: insertPos,
+          successMessage: 'Teknik dokümantasyon eklendi!',
+        );
+      } else if (action == 'custom_prompt' && customInstruction != null) {
+        await _streamBlockIntoEditor(
+          stream: aiProvider.streamCustomPrompt(
+            customInstruction,
+            targetText,
+            noteId: noteId,
+            cacheActionKey: 'custom_prompt',
+            isEncrypted: _isEncrypted,
+          ),
+          blockTitle: '🤖 AI Yanıtı',
+          insertPos: insertPos,
+          successMessage: 'AI yanıtı eklendi!',
+        );
       } else if (action == 'tags') {
         final suggestedTags = await aiProvider.getTags(
-          text,
+          targetText,
           noteId: noteId,
           isEncrypted: _isEncrypted,
         );

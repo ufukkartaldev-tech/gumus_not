@@ -261,6 +261,21 @@ void main() {
         () => provider.getTags('Metin', noteId: '1'),
         throwsA(isA<AiException>().having((e) => e.message, 'message', contains('yapılandırılmamış'))),
       );
+
+      expect(
+        () => provider.streamCodeExplanation('void main() {}', noteId: '1').toList(),
+        throwsA(isA<AiException>().having((e) => e.message, 'message', contains('yapılandırılmamış'))),
+      );
+
+      expect(
+        () => provider.streamCodeRefactor('void main() {}', noteId: '1').toList(),
+        throwsA(isA<AiException>().having((e) => e.message, 'message', contains('yapılandırılmamış'))),
+      );
+
+      expect(
+        () => provider.streamTechnicalDocs('void main() {}', noteId: '1').toList(),
+        throwsA(isA<AiException>().having((e) => e.message, 'message', contains('yapılandırılmamış'))),
+      );
     });
 
     test('testConnection should return error string instead of throwing when not configured', () async {

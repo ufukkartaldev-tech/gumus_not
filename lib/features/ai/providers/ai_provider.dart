@@ -265,4 +265,128 @@ class AiProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  /// Streams a custom or developer-specific prompt response token-by-token,
+  /// optionally caching the result under [cacheActionKey] via SimHash LSH.
+  Stream<String> streamCustomPrompt(
+    String prompt,
+    String content, {
+    required String noteId,
+    String? cacheActionKey,
+    bool isEncrypted = false,
+  }) async* {
+    if (!isAiEnabled) {
+      throw AiException.unconfigured(
+        'AI servisi kapalı veya yapılandırılmamış. Lütfen Ayarlar > Yapay Zeka ekranından yapılandırın.',
+      );
+    }
+
+    _isLoading = true;
+    _lastError = null;
+    notifyListeners();
+
+    final cacheInput = '$prompt\n---\n$content';
+
+    try {
+      if (cacheActionKey != null) {
+        final cached = await _cacheService.getCached(
+          cacheActionKey,
+          noteId,
+          cacheInput,
+          allowDiskRead: !isEncrypted,
+        );
+        if (cached != null) {
+          debugPrint('AI Cache Hit (SimHash LSH): $cacheActionKey önbellekten getirildi.');
+          yield cached;
+          return;
+        }
+      }
+
+      final buffer = StringBuffer();
+      await for (final chunk in _activeService!.streamCustomPrompt(prompt, content)) {
+        buffer.write(chunk);
+        yield chunk;
+      }
+
+      final fullResult = buffer.toString().trim();
+      if (cacheActionKey != null && fullResult.isNotEmpty) {
+        await _cacheService.setCached(
+          cacheActionKey,
+          noteId,
+          cacheInput,
+          fullResult,
+          persistToDisk: !isEncrypted,
+        );
+      }
+    } on AiException catch (e) {
+      _lastError = e.message;
+      rethrow;
+    } catch (e) {
+      final message = 'AI komutu çalıştırılırken beklenmeyen bir hata oluştu: $e';
+      _lastError = message;
+      throw AiException(message);
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Explains code or technical architecture, including algorithmic complexity
+  /// and potential edge cases.
+  Stream<String> streamCodeExplanation(
+    String codeOrText, {
+    required String noteId,
+    bool isEncrypted = false,
+  }) {
+    const prompt =
+        'Sen kıdemli bir yazılım mimarısın. Aşağıdaki kod parçasını veya teknik metni Türkçe olarak analiz et:\n'
+        '1. Ne yaptığını adım adım açıkla.\n'
+        '2. Varsa zaman ve bellek karmaşıklığını (Big-O) belirt.\n'
+        '3. Olası uç durumları (edge-cases), güvenlik veya performans risklerini maddeler halinde yaz.';
+    return streamCustomPrompt(
+      prompt,
+      codeOrText,
+      noteId: noteId,
+      cacheActionKey: 'explain_code',
+      isEncrypted: isEncrypted,
+    );
+  }
+
+  /// Refactors code according to Clean Code, SOLID, and idiomatic best practices.
+  Stream<String> streamCodeRefactor(
+    String codeOrText, {
+    required String noteId,
+    bool isEncrypted = false,
+  }) {
+    const prompt =
+        'Sen kıdemli bir yazılım mühendisisin. Aşağıdaki kodu Clean Code, SOLID prensipleri, '
+        'tip güvenliği ve performans açısından refactor et. Önce iyileştirilmiş kodu Markdown kod bloğu '
+        'içinde ver, ardından yaptığın temel değişiklikleri kısaca Türkçe maddeler halinde açıkla.';
+    return streamCustomPrompt(
+      prompt,
+      codeOrText,
+      noteId: noteId,
+      cacheActionKey: 'refactor_code',
+      isEncrypted: isEncrypted,
+    );
+  }
+
+  /// Generates structured technical documentation for functions, classes, or APIs.
+  Stream<String> streamTechnicalDocs(
+    String codeOrText, {
+    required String noteId,
+    bool isEncrypted = false,
+  }) {
+    const prompt =
+        'Aşağıdaki kod veya teknik yapı için profesyonel Türkçe Markdown teknik dokümantasyonu üret. '
+        'Mimari amaç, parametreler/girdiler, dönüş değerleri, örnek kullanım (kod bloğu ile) '
+        've dikkat edilmesi gereken kısıtları içersin.';
+    return streamCustomPrompt(
+      prompt,
+      codeOrText,
+      noteId: noteId,
+      cacheActionKey: 'generate_docs',
+      isEncrypted: isEncrypted,
+    );
+  }
 }
