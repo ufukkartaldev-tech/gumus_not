@@ -159,6 +159,40 @@ eski düz metin''');
       expect(loaded!.isEncrypted, isTrue);
       expect(loaded.content, 'eski düz metin');
     });
+
+    test('in-memory cache serves repeated queries with zero extra disk reads', () async {
+      final id1 = await repository.addNote(
+        note(title: 'Birinci', content: '[[İkinci]] bağlantı'),
+      );
+      final id2 = await repository.addNote(
+        note(title: 'İkinci', content: '- [ ] görev'),
+      );
+
+      final readsAfterWrites = repository.debugDiskReadCount;
+
+      // Repeated queries should all be served from the warm in-memory cache.
+      await repository.getAllNotes();
+      await repository.searchNotes('görev');
+      await repository.getBacklinksForNote(id2);
+      await repository.getOutgoingLinksForNote(id1);
+      await repository.getFolders();
+      await repository.getTagFrequency();
+      await repository.getNoteById(id1);
+
+      expect(repository.debugDiskReadCount, readsAfterWrites);
+
+      // Even after invalidating the TTL, unchanged files on disk are skipped via FileStat.
+      repository.invalidateCache();
+      await repository.getAllNotes();
+      expect(repository.debugDiskReadCount, readsAfterWrites);
+
+      // An externally dropped file is read once, while existing files stay cached.
+      await File(p.join(notesDir.path, 'Dışarıdan.md')).writeAsString('# Merhaba');
+      repository.invalidateCache();
+      final all = await repository.getAllNotes();
+      expect(all.length, 3);
+      expect(repository.debugDiskReadCount, readsAfterWrites + 1);
+    });
   });
 }
 

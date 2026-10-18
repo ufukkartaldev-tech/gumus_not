@@ -85,6 +85,34 @@ class NoteMarkdownCodec {
     }
   }
 
+  /// Asynchronous counterpart to [resolveUniqueFile] that avoids blocking the
+  /// UI isolate on disk reads.
+  static Future<File> resolveUniqueFileAsync(
+    Directory dir,
+    Note note, {
+    File? currentFile,
+  }) async {
+    var index = 1;
+    while (true) {
+      final fileName = fileNameForTitle(note.title, collisionIndex: index);
+      final candidate = File(p.join(dir.path, fileName));
+      if (!await candidate.exists()) {
+        return candidate;
+      }
+      if (currentFile != null &&
+          candidate.path.toLowerCase() == currentFile.path.toLowerCase()) {
+        return candidate;
+      }
+      try {
+        final existing = await deserializeFromFileAsync(candidate);
+        if (note.id != null && existing.id == note.id) {
+          return candidate;
+        }
+      } catch (_) {}
+      index++;
+    }
+  }
+
   /// Returns the note id encoded in [fileName], or a stable fallback derived
   /// from the file name for hand-dropped markdown files without a numeric id.
   static int idFromFileName(String fileName) {
@@ -142,6 +170,15 @@ class NoteMarkdownCodec {
     return deserialize(
       idFromFileName(fileName),
       file.readAsStringSync(),
+      fileName: fileName,
+    );
+  }
+
+  static Future<Note> deserializeFromFileAsync(File file) async {
+    final fileName = p.basename(file.path);
+    return deserialize(
+      idFromFileName(fileName),
+      await file.readAsString(),
       fileName: fileName,
     );
   }
