@@ -63,6 +63,8 @@ class _CrossReferenceTrackerState extends State<CrossReferenceTracker> {
     // Build inverted index and document frequencies
     for (int i = 0; i < allNotes.length; i++) {
       final note = allNotes[i];
+      final noteId = note.id;
+      if (noteId == null || note.isEncrypted) continue;
       final concepts = _extractConcepts(note.content);
       
       for (final concept in concepts) {
@@ -70,7 +72,7 @@ class _CrossReferenceTrackerState extends State<CrossReferenceTracker> {
           invertedIndex[concept] = [];
           documentFrequencies[concept] = 0;
         }
-        invertedIndex[concept]!.add(note.id!);
+        invertedIndex[concept]!.add(noteId);
         documentFrequencies[concept] = (documentFrequencies[concept] ?? 0) + 1;
       }
     }

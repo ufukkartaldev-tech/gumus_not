@@ -80,7 +80,9 @@ class BacklinkService {
     final orphanedNotes = <Note>[];
 
     for (final note in allNotes) {
-      final referringNotes = await getReferringNotes(note.id!);
+      final id = note.id;
+      if (id == null) continue;
+      final referringNotes = await getReferringNotes(id);
       if (referringNotes.isEmpty) {
         orphanedNotes.add(note);
       }
@@ -93,20 +95,22 @@ class BacklinkService {
   Future<List<Note>> getHubNotes({int minimumLinks = 3}) async {
     final allNotes = await _repository.getAllNotes();
     final hubNotes = <Note>[];
+    final linkCounts = <int, int>{};
 
     for (final note in allNotes) {
-      final linkedNotes = await getLinkedNotes(note.id!);
+      final id = note.id;
+      if (id == null) continue;
+      final linkedNotes = await getLinkedNotes(id);
       if (linkedNotes.length >= minimumLinks) {
         hubNotes.add(note);
+        linkCounts[id] = linkedNotes.length;
       }
     }
 
     // Sort by outgoing link count (descending)
-    final linkCounts = <int, int>{};
-    for (final note in hubNotes) {
-      linkCounts[note.id!] = (await getLinkedNotes(note.id!)).length;
-    }
-    hubNotes.sort((a, b) => (linkCounts[b.id!] ?? 0).compareTo(linkCounts[a.id!] ?? 0));
+    hubNotes.sort(
+      (a, b) => (linkCounts[b.id] ?? 0).compareTo(linkCounts[a.id] ?? 0),
+    );
 
     return hubNotes;
   }
@@ -133,7 +137,8 @@ class BacklinkService {
     final matches = linkRegex.allMatches(content);
 
     for (final match in matches) {
-      final linkText = match.group(1)!;
+      final linkText = match.group(1);
+      if (linkText == null) continue;
 
       final targetNote = allNotes.firstWhere(
         (note) => note.title.toLowerCase() == linkText.toLowerCase(),
@@ -173,9 +178,10 @@ class BacklinkService {
     // Find notes that link to similar targets
     final linkedNotes = await getLinkedNotes(noteId);
     for (final otherNote in allNotes) {
-      if (otherNote.id == noteId || suggestions.contains(otherNote)) continue;
+      final otherId = otherNote.id;
+      if (otherId == null || otherId == noteId || suggestions.contains(otherNote)) continue;
 
-      final otherLinkedNotes = await getLinkedNotes(otherNote.id!);
+      final otherLinkedNotes = await getLinkedNotes(otherId);
       final commonLinks = linkedNotes.where((link) => otherLinkedNotes.contains(link));
 
       if (commonLinks.isNotEmpty) {

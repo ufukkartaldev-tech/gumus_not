@@ -101,6 +101,19 @@ void main() {
       expect(result.first.id, 1);
       expect(result.any((n) => n.id == 2), isTrue);
     });
+
+    test('Should handle multiple null-ID notes with outgoing and incoming links safely', () async {
+      final notes = [
+        Note(id: null, title: 'Taslak A', content: 'Kuantum hesaplama ve [[Taslak B]]', createdAt: 1, updatedAt: 1),
+        Note(id: null, title: 'Taslak B', content: 'İlgili alt başlık', createdAt: 1, updatedAt: 1),
+      ];
+
+      final result = await SearchService.searchNotes('Kuantum', notes);
+
+      expect(result.length, 2);
+      expect(result.first.title, 'Taslak A');
+      expect(result.last.title, 'Taslak B');
+    });
   });
 }
 

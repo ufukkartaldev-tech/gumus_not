@@ -44,12 +44,10 @@ class SearchService {
        // Ancak döngü içinde gereksiz Levenshtein çalıştırmayacağız.
     }
 
-    for (var note in candidateNotes) {
-      // PERFORMANS: Şifreli notların içeriğine erişemiyoruz, bu yüzden onları 
-      // sadece başlık/etiket için süz veya içerik araması varsa direkt atla?
-      // Şimdilik sadece içerik araması kısmında süzüyoruz ama döngü başında süzmek daha mantıklı.
-      // Eğer not şifreliyse ve biz içerikte kelime arıyorsak, bu notu sadece başlığından yakalayabiliriz.
-      
+    for (int index = 0; index < candidateNotes.length; index++) {
+      final note = candidateNotes[index];
+      final int nodeKey = note.id ?? -(index + 1);
+
       int score = 0;
       final title = note.title.toLowerCase();
       final content = note.content.toLowerCase();
@@ -88,6 +86,7 @@ class SearchService {
 
       if (score > 0) {
         scoredNotes.add({
+          'key': nodeKey,
           'note': note,
           'score': score,
         });
@@ -101,29 +100,31 @@ class SearchService {
     // Her notun bağlantılarını hızlıca haritalayalım (Regex ile)
     final linkRegex = RegExp(r'\[\[(.*?)\]\]');
     final Map<int, List<String>> noteOutgoingLinks = {};
-    final Map<String, int> titleToId = {
-      for (var n in allNotes)
-        if (n.id != null) n.title.toLowerCase(): n.id!,
-    };
+    final Map<String, int> titleToId = {};
+    final Map<int, Note> resultNodes = {};
 
-    for (var note in allNotes) {
-      final id = note.id;
-      if (id == null) continue;
+    for (int index = 0; index < allNotes.length; index++) {
+      final note = allNotes[index];
+      final int nodeKey = note.id ?? -(index + 1);
+      resultNodes[nodeKey] = note;
+      titleToId[note.title.toLowerCase()] = nodeKey;
+
       if (note.isEncrypted) {
-        noteOutgoingLinks[id] = const [];
+        noteOutgoingLinks[nodeKey] = const [];
         continue;
       }
       final matches = linkRegex.allMatches(note.content);
-      noteOutgoingLinks[id] =
-          matches.map((m) => m.group(1)!.toLowerCase()).toList();
+      noteOutgoingLinks[nodeKey] = matches
+          .map((m) => m.group(1)?.toLowerCase())
+          .whereType<String>()
+          .toList();
     }
 
     // A) Komşu Desteği (Direct Neighbors)
     // Eğer bir not "Bilgisayar Mimarisi" ise, ona link veren veya ondan link alan tüm notlara puan ver.
     for (var item in scoredNotes) {
       final seedNote = item['note'] as Note;
-      final seedId = seedNote.id;
-      if (seedId == null) continue;
+      final seedId = item['key'] as int;
 
       // Bu notun bağlandığı (target) notlara puan ekle
       final targets = noteOutgoingLinks[seedId] ?? const [];
@@ -136,16 +137,13 @@ class SearchService {
       }
 
       // Bu nota bağlanan (source) notları bul ve onlara puan ekle
-      for (var otherNote in allNotes) {
-        final otherId = otherNote.id;
-        if (otherId == null || otherId == seedId) continue;
-        if (noteOutgoingLinks[otherId]
-                ?.contains(seedNote.title.toLowerCase()) ??
-            false) {
+      final seedTitleLower = seedNote.title.toLowerCase();
+      noteOutgoingLinks.forEach((otherId, outgoing) {
+        if (otherId != seedId && outgoing.contains(seedTitleLower)) {
           semanticScores[otherId] =
               (semanticScores[otherId] ?? 0) + SCORE_SEMANTIC_BOOST;
         }
-      }
+      });
     }
 
     // B) Co-Citation Desteği (Kardeş Notlar)
@@ -154,22 +152,12 @@ class SearchService {
     // (Karmaşıklık nedeniyle sadece yüksek puanlı çekirdekler üzerinden hesaplanacaktır)
 
     // 5. TÜM PUANLARI BİRLEŞTİR
-    final Map<int, Note> resultNodes = {
-      for (var n in allNotes)
-        if (n.id != null) n.id!: n,
-    };
     final Map<int, int> finalScores = {};
-    final List<Map<String, dynamic>> finalResultList = [];
 
     // Önce keyword puanlarını ekle
     for (var item in scoredNotes) {
-      final n = item['note'] as Note;
-      final id = n.id;
-      if (id != null) {
-        finalScores[id] = item['score'] as int;
-      } else {
-        finalResultList.add(item);
-      }
+      final id = item['key'] as int;
+      finalScores[id] = item['score'] as int;
     }
 
     // Sonra semantik puanları ekle (Tüm notlar üzerinden, çünkü hiç keyword eşleşmesi olmayıp sadece bağlı olanlar da gelebilir)
@@ -179,6 +167,7 @@ class SearchService {
       }
     });
 
+    final List<Map<String, dynamic>> finalResultList = [];
     finalScores.forEach((id, totalScore) {
       final node = resultNodes[id];
       if (totalScore > 0 && node != null) {
