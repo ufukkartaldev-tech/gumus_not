@@ -165,8 +165,8 @@ class _NoteCardState extends State<NoteCard>
                                           Container(
                                             padding: const EdgeInsets.all(4),
                                             decoration: BoxDecoration(
-                                              color: Colors.orange.withOpacity(
-                                                0.2,
+                                              color: Colors.orange.withValues(
+                                                alpha: 0.2,
                                               ),
                                               shape: BoxShape.circle,
                                             ),
@@ -186,8 +186,8 @@ class _NoteCardState extends State<NoteCard>
                                               shape: BoxShape.circle,
                                               boxShadow: [
                                                 BoxShadow(
-                                                  color: noteColor.withOpacity(
-                                                    0.4,
+                                                  color: noteColor.withValues(
+                                                    alpha: 0.4,
                                                   ),
                                                   blurRadius: 4,
                                                   spreadRadius: 1,

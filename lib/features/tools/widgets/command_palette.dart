@@ -163,7 +163,7 @@ class _CommandPaletteState extends State<CommandPalette> {
               widget.onNoteSelected!(note);
             } else {
               Navigator.of(context).pushNamed('/note-editor', arguments: note).then((_) {
-                Provider.of<NoteProvider>(context, listen: false).loadNotes();
+                noteProvider.loadNotes();
               });
             }
           },
@@ -199,6 +199,7 @@ class _CommandPaletteState extends State<CommandPalette> {
     ThemeProvider themeProvider,
   ) {
     final isDark = themeProvider.themeMode == ThemeMode.dark;
+    final noteProvider = Provider.of<NoteProvider>(context, listen: false);
 
     return [
       // Quick Note
@@ -212,7 +213,7 @@ class _CommandPaletteState extends State<CommandPalette> {
         shortcut: 'Ctrl+N',
         action: () {
           Navigator.of(context).pushNamed('/note-editor').then((_) {
-            Provider.of<NoteProvider>(context, listen: false).loadNotes();
+            noteProvider.loadNotes();
           });
         },
       ),

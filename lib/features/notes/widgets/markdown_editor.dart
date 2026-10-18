@@ -681,7 +681,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
             pickerColor: _selectedColor != null ? Color(_selectedColor!) : Colors.white,
             availableColors: _noteColors,
             onColorChanged: (c) {
-              setState(() => _selectedColor = c.value);
+              setState(() => _selectedColor = c.toARGB32());
               Navigator.pop(context);
             },
           ),

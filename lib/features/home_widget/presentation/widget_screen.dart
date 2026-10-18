@@ -39,6 +39,7 @@ class _WidgetScreenState extends State<WidgetScreen> {
         _isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Widget verisi yüklenemedi: $e')),
@@ -53,12 +54,14 @@ class _WidgetScreenState extends State<WidgetScreen> {
       await _widgetService.updateWidget();
       await _widgetService.updateQuickNoteWidget();
 
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('✅ Widget\'lar başarıyla güncellendi')),
       );
 
       _loadWidgetData();
     } catch (e) {
+      if (!mounted) return;
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('❌ Widget güncellenemedi: $e')),

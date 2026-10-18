@@ -24,27 +24,27 @@ class _CrossReferenceTrackerState extends State<CrossReferenceTracker> {
   List<String> _suggestedTags = [];
   bool _isLoading = true;
   bool _isCalculatingSimilarity = false;
-  final Set<String> _stopwords = <String>[
+  static const Set<String> _stopwords = <String>{
     'bu', 've', 'veya', 'ama', 'ancak', 'ile', 'için', 'gibi', 'olarak', 'daha',
     'çok', 'az', 'bir', 'iki', 'üç', 'dört', 'beş', 'altı', 'yedi', 'sekiz',
     'dokuz', 'on', 'yüz', 'bin', 'milyon', 'milyar', 'yok', 'var', 'değil',
     'mi', 'mı', 'mu', 'mü', 'ise', 'ne', 'nasıl', 'neden', 'nerede', 'ne zaman',
-    'kim', 'hangi', 'kaç', 'kaçıncı', 'en', 'daha', 'az', 'çok', 'az', 'hiç',
-    'her', 'tüm', 'bazı', 'birkaç', 'birçok', 'pek', 'oldukça', 'gayet', 'çok',
-    'az', 'biraz', 'fazla', 'az', 'çok', 'oldukça', 'gayet', 'pek', 'çok',
+    'kim', 'hangi', 'kaç', 'kaçıncı', 'en', 'hiç',
+    'her', 'tüm', 'bazı', 'birkaç', 'birçok', 'pek', 'oldukça', 'gayet',
+    'biraz', 'fazla',
     'the', 'and', 'or', 'but', 'however', 'with', 'for', 'like', 'as', 'to',
-    'from', 'at', 'in', 'on', 'by', 'of', 'is', 'are', 'was', 'were', 'be',
+    'from', 'at', 'in', 'by', 'of', 'is', 'are', 'was', 'were', 'be',
     'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would',
-    'could', 'should', 'may', 'might', 'must', 'can', 'shall', 'a', 'an', 'the',
+    'could', 'should', 'may', 'might', 'must', 'can', 'shall', 'a', 'an',
     'this', 'that', 'these', 'those', 'it', 'its', 'they', 'them', 'their',
-    'he', 'she', 'him', 'her', 'his', 'hers', 'we', 'us', 'our', 'you', 'your',
+    'he', 'she', 'him', 'his', 'hers', 'we', 'us', 'our', 'you', 'your',
     'what', 'when', 'where', 'why', 'who', 'how', 'which', 'whom', 'whose',
     'if', 'then', 'else', 'than', 'so', 'such', 'too', 'very', 'quite', 'rather',
-    'quite', 'pretty', 'just', 'only', 'also', 'even', 'still', 'yet', 'already',
-    'now', 'then', 'here', 'there', 'up', 'down', 'out', 'off', 'over', 'under',
-    'again', 'further', 'then', 'once', 'more', 'most', 'some', 'such', 'no',
-    'nor', 'not', 'only', 'own', 'same', 'so', 'than', 'too', 'very', 'you'
-  ].toSet();
+    'pretty', 'just', 'only', 'also', 'even', 'still', 'yet', 'already',
+    'now', 'here', 'there', 'up', 'down', 'out', 'off', 'over', 'under',
+    'again', 'further', 'once', 'more', 'most', 'some', 'no',
+    'nor', 'not', 'own', 'same'
+  };
 
   @override
   void initState() {
@@ -203,27 +203,7 @@ class _CrossReferenceTrackerState extends State<CrossReferenceTracker> {
 
   static List<String> _extractConceptsStatic(String text) {
     final concepts = <String>{};
-    final stopwords = <String>[
-      'bu', 've', 'veya', 'ama', 'ancak', 'ile', 'için', 'gibi', 'olarak', 'daha',
-      'çok', 'az', 'bir', 'iki', 'üç', 'dört', 'beş', 'altı', 'yedi', 'sekiz',
-      'dokuz', 'on', 'yüz', 'bin', 'milyon', 'milyar', 'yok', 'var', 'değil',
-      'mi', 'mı', 'mu', 'mü', 'ise', 'ne', 'nasıl', 'neden', 'nerede', 'ne zaman',
-      'kim', 'hangi', 'kaç', 'kaçıncı', 'en', 'daha', 'az', 'çok', 'az', 'hiç',
-      'her', 'tüm', 'bazı', 'birkaç', 'birçok', 'pek', 'oldukça', 'gayet', 'çok',
-      'az', 'biraz', 'fazla', 'az', 'çok', 'oldukça', 'gayet', 'pek', 'çok',
-      'the', 'and', 'or', 'but', 'however', 'with', 'for', 'like', 'as', 'to',
-      'from', 'at', 'in', 'on', 'by', 'of', 'is', 'are', 'was', 'were', 'be',
-      'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would',
-      'could', 'should', 'may', 'might', 'must', 'can', 'shall', 'a', 'an', 'the',
-      'this', 'that', 'these', 'those', 'it', 'its', 'they', 'them', 'their',
-      'he', 'she', 'him', 'her', 'his', 'hers', 'we', 'us', 'our', 'you', 'your',
-      'what', 'when', 'where', 'why', 'who', 'how', 'which', 'whom', 'whose',
-      'if', 'then', 'else', 'than', 'so', 'such', 'too', 'very', 'quite', 'rather',
-      'quite', 'pretty', 'just', 'only', 'also', 'even', 'still', 'yet', 'already',
-      'now', 'then', 'here', 'there', 'up', 'down', 'out', 'off', 'over', 'under',
-      'again', 'further', 'then', 'once', 'more', 'most', 'some', 'such', 'no',
-      'nor', 'not', 'only', 'own', 'same', 'so', 'than', 'too', 'very', 'you'
-    ].toSet();
+    const stopwords = _stopwords;
     
     // Extract [[wiki-style links]]
     final wikiLinks = RegExp(r'\[\[([^\]]+)\]\]').allMatches(text);

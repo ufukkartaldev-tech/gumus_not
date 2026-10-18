@@ -119,42 +119,34 @@ class _LatexExportScreenState extends State<LatexExportScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            Column(
-              children: [
-                RadioListTile<String>(
-                  title: const Text('Makale (Article)'),
-                  subtitle: const Text('Standart makale formatı'),
-                  value: 'article',
-                  groupValue: _selectedFormat,
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedFormat = value!;
-                    });
-                  },
-                ),
-                RadioListTile<String>(
-                  title: const Text('Sunum (Beamer)'),
-                  subtitle: const Text('Sunum formatı'),
-                  value: 'beamer',
-                  groupValue: _selectedFormat,
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedFormat = value!;
-                    });
-                  },
-                ),
-                RadioListTile<String>(
-                  title: const Text('Rapor (Report)'),
-                  subtitle: const Text('Detaylı rapor formatı'),
-                  value: 'report',
-                  groupValue: _selectedFormat,
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedFormat = value!;
-                    });
-                  },
-                ),
-              ],
+            RadioGroup<String>(
+              groupValue: _selectedFormat,
+              onChanged: (value) {
+                if (value != null) {
+                  setState(() {
+                    _selectedFormat = value;
+                  });
+                }
+              },
+              child: const Column(
+                children: [
+                  RadioListTile<String>(
+                    title: Text('Makale (Article)'),
+                    subtitle: Text('Standart makale formatı'),
+                    value: 'article',
+                  ),
+                  RadioListTile<String>(
+                    title: Text('Sunum (Beamer)'),
+                    subtitle: Text('Sunum formatı'),
+                    value: 'beamer',
+                  ),
+                  RadioListTile<String>(
+                    title: Text('Rapor (Report)'),
+                    subtitle: Text('Detaylı rapor formatı'),
+                    value: 'report',
+                  ),
+                ],
+              ),
             ),
             
             const SizedBox(height: 16),

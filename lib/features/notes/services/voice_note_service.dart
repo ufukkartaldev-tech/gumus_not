@@ -33,9 +33,10 @@ class VoiceNoteService {
       onResult: (result) {
         onResult(result.recognizedWords);
       },
-      localeId: 'tr_TR', // Varsayılan Türkçe, ileride ayarlardan çekilebilir
-      cancelOnError: true,
-      partialResults: true,
+      listenOptions: stt.SpeechListenOptions(
+        cancelOnError: true,
+        partialResults: true,
+      ),
     );
   }
 

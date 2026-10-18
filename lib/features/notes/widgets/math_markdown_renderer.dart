@@ -118,7 +118,8 @@ class MathMarkdownRenderer extends StatelessWidget {
               border: Border(left: BorderSide(color: Theme.of(context).primaryColor, width: 4)),
             ),
           ),
-          imageBuilder: _buildMarkdownImage,
+          sizedImageBuilder: (config) =>
+              _buildMarkdownImage(config.uri, config.title, config.alt),
         ));
       }
       

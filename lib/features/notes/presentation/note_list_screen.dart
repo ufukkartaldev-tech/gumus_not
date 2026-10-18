@@ -866,6 +866,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
       templateContent = selectedContent;
     }
 
+    if (!mounted) return;
     final width = MediaQuery.of(context).size.width;
 
     // Geçici bir "Yeni Not" oluştur (İçeriği şablonlu veya boş)
@@ -886,17 +887,17 @@ class _NoteListScreenState extends State<NoteListScreen> {
     } else {
       Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (context) => Scaffold(
+          builder: (routeContext) => Scaffold(
             body: MarkdownEditor(
               note: newNote, // Şablonlu notu editöre ver
               onSave: (savedNote) async {
                 await _handleSave(savedNote, null);
-                if (context.mounted) {
-                  Navigator.of(context).pop();
+                if (routeContext.mounted) {
+                  Navigator.of(routeContext).pop();
                 }
               },
               onCancel: () {
-                Navigator.of(context).pop();
+                Navigator.of(routeContext).pop();
               },
             ),
           ),
@@ -920,20 +921,21 @@ class _NoteListScreenState extends State<NoteListScreen> {
         // For standard impl, we handle it in onSave wrapper in build method
       });
     } else {
+      final noteProvider = Provider.of<NoteProvider>(context, listen: false);
       Navigator.of(context).push(
         PageRouteBuilder(
           transitionDuration: const Duration(milliseconds: 400),
-          pageBuilder: (context, animation, secondaryAnimation) => Scaffold(
+          pageBuilder: (routeContext, animation, secondaryAnimation) => Scaffold(
             body: MarkdownEditor(
               note: note,
               onSave: (updatedNote) async {
                 await _handleSave(updatedNote, encryptionPassword);
-                if (mounted) {
-                   Navigator.pop(context);
-                   Provider.of<NoteProvider>(context, listen: false).loadNotes();
+                if (routeContext.mounted) {
+                  Navigator.pop(routeContext);
                 }
+                await noteProvider.loadNotes();
               },
-              onCancel: () => Navigator.pop(context),
+              onCancel: () => Navigator.pop(routeContext),
             ),
           ),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
@@ -1084,12 +1086,13 @@ class _NoteListScreenState extends State<NoteListScreen> {
 
 
   void _showExportOptions(Note note) {
+    final messenger = ScaffoldMessenger.of(context);
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => Container(
+      builder: (sheetContext) => Container(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1097,7 +1100,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
           children: [
             Text(
               'İşlemler',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              style: Theme.of(sheetContext).textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -1108,13 +1111,13 @@ class _NoteListScreenState extends State<NoteListScreen> {
               title: const Text('Notu Paylaş'),
               subtitle: const Text('Metin olarak paylaş veya panoya kopyala'),
               onTap: () async {
-                Navigator.pop(context);
+                Navigator.pop(sheetContext);
                 final paylasilacakMetin = '${note.title}\n\n${note.content}';
                 if (kIsWeb) {
                   // Webdeysek paylaşım menüsü açılmaz, metni panoya kopyalayalım
                   await Clipboard.setData(ClipboardData(text: paylasilacakMetin));
                   if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    messenger.showSnackBar(
                       const SnackBar(content: Text('Bağlantı/Metin panoya kopyalandı!')),
                     );
                   }
@@ -1142,10 +1145,11 @@ class _NoteListScreenState extends State<NoteListScreen> {
     }
   }
 
-  void _openDailyNote() {
+  Future<void> _openDailyNote() async {
     final now = DateTime.now();
     final title = 'Günlük Not: ${now.day}.${now.month}.${now.year}';
-    final notes = Provider.of<NoteProvider>(context, listen: false).notes;
+    final noteProvider = Provider.of<NoteProvider>(context, listen: false);
+    final notes = noteProvider.notes;
 
     try {
       final existingNote = notes.firstWhere((n) => n.title == title);
@@ -1159,18 +1163,12 @@ class _NoteListScreenState extends State<NoteListScreen> {
         updatedAt: now.millisecondsSinceEpoch,
       );
 
-      Provider.of<NoteProvider>(context, listen: false).addNote(newNote).then((_) {
-         // After adding, we need to select it.
-         // But the provider reload might be async.
-         // Let's rely on finding it again or passing the ID if NoteProvider returns it.
-         // Assuming basic add, let's find it by title again safely after a small delay or reload
-         Provider.of<NoteProvider>(context, listen: false).loadNotes().then((_) {
-             final created = Provider.of<NoteProvider>(context, listen: false).notes.firstWhere((n) => n.title == title);
-             _selectNote(created);
-         });
-      });
+      await noteProvider.addNote(newNote);
+      await noteProvider.loadNotes();
+      if (!mounted) return;
+      final created = noteProvider.notes.firstWhere((n) => n.title == title);
+      _selectNote(created);
     }
-
   }
 
   void _togglePin(Note note) {

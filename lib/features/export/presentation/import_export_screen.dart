@@ -282,7 +282,9 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
       });
       
       // Refresh notes list
-      Provider.of<NoteProvider>(context, listen: false).loadNotes();
+      if (mounted) {
+        Provider.of<NoteProvider>(context, listen: false).loadNotes();
+      }
     } catch (e) {
       setState(() {
         _statusMessage = 'İçe aktarım hatası: $e';
@@ -355,6 +357,7 @@ ${note.content}
   }
 
   Future<void> _importFromJson() async {
+    final noteProvider = Provider.of<NoteProvider>(context, listen: false);
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['json'],
@@ -364,8 +367,6 @@ ${note.content}
       final jsonString = utf8.decode(result.files.single.bytes!);
       final List<dynamic> data = json.decode(jsonString);
       
-      final noteProvider = Provider.of<NoteProvider>(context, listen: false);
-      
       for (final item in data) {
         final note = Note.fromMap(item as Map<String, dynamic>);
         await noteProvider.addNote(note);
@@ -374,6 +375,7 @@ ${note.content}
   }
 
   Future<void> _importFromMarkdown() async {
+    final noteProvider = Provider.of<NoteProvider>(context, listen: false);
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['md', 'markdown'],
@@ -381,8 +383,6 @@ ${note.content}
     );
 
     if (result != null) {
-      final noteProvider = Provider.of<NoteProvider>(context, listen: false);
-      
       for (final file in result.files) {
         if (file.bytes != null) {
           final content = utf8.decode(file.bytes!);
@@ -411,6 +411,7 @@ ${note.content}
   }
 
   Future<void> _importFromArchive() async {
+    final noteProvider = Provider.of<NoteProvider>(context, listen: false);
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['zip'],
@@ -419,8 +420,6 @@ ${note.content}
     if (result != null && result.files.single.bytes != null) {
       final bytes = result.files.single.bytes!;
       final archive = ZipDecoder().decodeBytes(bytes);
-      
-      final noteProvider = Provider.of<NoteProvider>(context, listen: false);
       
       for (final file in archive) {
         if (file.name == 'notes.json') {

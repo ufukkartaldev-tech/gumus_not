@@ -56,7 +56,7 @@ class _BackupScreenState extends State<BackupScreen> {
   Future<void> _importBackup() async {
     // Onay dialogu göster
     final confirmed = await _showRestoreConfirmation();
-    if (!confirmed) return;
+    if (!confirmed || !mounted) return;
 
     setState(() => _isLoading = true);
 

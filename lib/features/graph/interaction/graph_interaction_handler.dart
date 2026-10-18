@@ -107,8 +107,8 @@ class GraphInteractionHandler {
     final translateY = (screenHeight / 2) - (boundingBox.center.dy * scale);
     
     final matrix = Matrix4.identity()
-      ..translate(translateX, translateY)
-      ..scale(scale);
+      ..translateByDouble(translateX, translateY, 0.0, 1.0)
+      ..scaleByDouble(scale, scale, 1.0, 1.0);
     
     transformationController.value = matrix;
   }

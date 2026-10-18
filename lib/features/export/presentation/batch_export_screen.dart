@@ -65,13 +65,19 @@ class _BatchExportScreenState extends State<BatchExportScreen> {
       } else if (_exportFormat == 'latex') {
         await _exportToLatex(directory);
       }
-      _showSuccess(context, 'Notlar başarıyla dışa aktarıldı!', directoryPath: directory);
+      if (mounted) {
+        _showSuccess(context, 'Notlar başarıyla dışa aktarıldı!', directoryPath: directory);
+      }
     } catch (e) {
-      _showError(context, 'Dışa aktarma hatası: $e');
+      if (mounted) {
+        _showError(context, 'Dışa aktarma hatası: $e');
+      }
     } finally {
-      setState(() {
-        _isExporting = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isExporting = false;
+        });
+      }
     }
   }
 
@@ -107,8 +113,8 @@ class _BatchExportScreenState extends State<BatchExportScreen> {
         
         final bytes = await PdfExportService.generatePdfDocument(note);
         await file.writeAsBytes(bytes);
-      } catch (e) {
-        print('PDF Export Error for ${note.title}: $e');
+      } catch (_) {
+        // Skip failed individual PDF export
       }
       setState(() {
         _progress = ((i + 1) / _selectedNotes.length * 100).round();
@@ -173,7 +179,9 @@ class _BatchExportScreenState extends State<BatchExportScreen> {
         await Process.run('xdg-open', [directoryPath]);
       }
     } catch (e) {
-      _showError(context, 'Klasör açılamadı: $e');
+      if (mounted) {
+        _showError(context, 'Klasör açılamadı: $e');
+      }
     }
   }
 
@@ -227,45 +235,37 @@ class _BatchExportScreenState extends State<BatchExportScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: RadioListTile<String>(
-                  title: const Text('TXT'),
-                  value: 'txt',
-                  groupValue: _exportFormat,
-                  onChanged: (value) {
-                    setState(() {
-                      _exportFormat = value!;
-                    });
-                  },
+          RadioGroup<String>(
+            groupValue: _exportFormat,
+            onChanged: (value) {
+              if (value != null) {
+                setState(() {
+                  _exportFormat = value;
+                });
+              }
+            },
+            child: const Row(
+              children: [
+                Expanded(
+                  child: RadioListTile<String>(
+                    title: Text('TXT'),
+                    value: 'txt',
+                  ),
                 ),
-              ),
-              Expanded(
-                child: RadioListTile<String>(
-                  title: const Text('PDF'),
-                  value: 'pdf',
-                  groupValue: _exportFormat,
-                  onChanged: (value) {
-                    setState(() {
-                      _exportFormat = value!;
-                    });
-                  },
+                Expanded(
+                  child: RadioListTile<String>(
+                    title: Text('PDF'),
+                    value: 'pdf',
+                  ),
                 ),
-              ),
-              Expanded(
-                child: RadioListTile<String>(
-                  title: const Text('LaTeX'),
-                  value: 'latex',
-                  groupValue: _exportFormat,
-                  onChanged: (value) {
-                    setState(() {
-                      _exportFormat = value!;
-                    });
-                  },
+                Expanded(
+                  child: RadioListTile<String>(
+                    title: Text('LaTeX'),
+                    value: 'latex',
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),

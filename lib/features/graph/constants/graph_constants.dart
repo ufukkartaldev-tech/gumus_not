@@ -127,8 +127,8 @@ class GraphConstants {
         : Shadow(blurRadius: 4, color: Colors.white.withValues(alpha: 0.9));
 
     return TextStyle(
-      color: dynamicLabelColor.withOpacity(
-        isGhost ? ghostLabelOpacity : realLabelOpacity,
+      color: dynamicLabelColor.withValues(
+        alpha: isGhost ? ghostLabelOpacity : realLabelOpacity,
       ),
       fontSize: calculateFontSize(radius),
       fontWeight: calculateFontWeight(radius),
