@@ -113,8 +113,8 @@ class NoteProvider with ChangeNotifier {
     }
   }
 
-  /// Add a new note
-  Future<void> addNote(Note note) async {
+  /// Add a new note and return the persisted instance with its assigned ID
+  Future<Note> addNote(Note note) async {
     try {
       final id = await _repository.addNote(note);
       final newNote = note.copyWith(id: id);
@@ -127,6 +127,7 @@ class NoteProvider with ChangeNotifier {
       _invalidateDerivedCaches();
       await _performSearch(_searchQuery); // Update search results
       _notifyOnce();
+      return newNote;
     } catch (e) {
       debugPrint('Error adding note: $e');
       rethrow;

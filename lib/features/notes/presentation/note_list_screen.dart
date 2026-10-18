@@ -356,14 +356,12 @@ class _NoteListScreenState extends State<NoteListScreen> {
       return MarkdownEditor(
         key: ValueKey(_selectedNote?.id ?? 'new_note'),
         note: _selectedNote,
-        onSave: (savedNote) async {
-          await _handleSave(savedNote, null);
+        onSave: (savedNote) {
           if (mounted) {
             setState(() {
               _selectedNote = savedNote;
               _isCreatingNewNote = false;
             });
-            Provider.of<NoteProvider>(context, listen: false).loadNotes();
           }
         },
         onCancel: () {
@@ -890,8 +888,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
           builder: (routeContext) => Scaffold(
             body: MarkdownEditor(
               note: newNote, // Şablonlu notu editöre ver
-              onSave: (savedNote) async {
-                await _handleSave(savedNote, null);
+              onSave: (savedNote) {
                 if (routeContext.mounted) {
                   Navigator.of(routeContext).pop();
                 }
@@ -906,34 +903,28 @@ class _NoteListScreenState extends State<NoteListScreen> {
     }
   }
 
-  void _selectNote(Note note) async {
-
-    _openEditor(note, null);
+  void _selectNote(Note note) {
+    _openEditor(note);
   }
 
-  void _openEditor(Note note, String? encryptionPassword) {
+  void _openEditor(Note note) {
     final width = MediaQuery.of(context).size.width;
     if (width >= 800) {
       setState(() {
         _selectedNote = note;
         _isCreatingNewNote = false;
-        // Password handling logic inside Editor/onSave would be needed here
-        // For standard impl, we handle it in onSave wrapper in build method
       });
     } else {
-      final noteProvider = Provider.of<NoteProvider>(context, listen: false);
       Navigator.of(context).push(
         PageRouteBuilder(
           transitionDuration: const Duration(milliseconds: 400),
           pageBuilder: (routeContext, animation, secondaryAnimation) => Scaffold(
             body: MarkdownEditor(
               note: note,
-              onSave: (updatedNote) async {
-                await _handleSave(updatedNote, encryptionPassword);
+              onSave: (updatedNote) {
                 if (routeContext.mounted) {
                   Navigator.pop(routeContext);
                 }
-                await noteProvider.loadNotes();
               },
               onCancel: () => Navigator.pop(routeContext),
             ),
@@ -943,17 +934,6 @@ class _NoteListScreenState extends State<NoteListScreen> {
           },
         ),
       );
-    }
-  }
-
-  // Handle saving logic centrally (yeni/not-olanı ayırt ederek)
-  Future<void> _handleSave(Note savedNote, String? encryptionPassword) async {
-    final noteProvider = Provider.of<NoteProvider>(context, listen: false);
-
-    if (savedNote.id == null) {
-      await noteProvider.addNote(savedNote);
-    } else {
-      await noteProvider.updateNote(savedNote);
     }
   }
 

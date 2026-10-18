@@ -16,28 +16,20 @@ class BacklinkService {
     await _updateBacklinksInternal(noteId, content, allNotes);
   }
 
-  /// Get all notes that link to the specified note
+  /// Get all notes that link to the specified note (`O(N)` single pass)
   Future<List<Note>> getReferringNotes(int noteId) async {
     final allNotes = await _repository.getAllNotes();
+    final target = allNotes.where((n) => n.id == noteId).firstOrNull;
+    if (target == null) return [];
+
+    final targetTitleLower = target.title.trim().toLowerCase();
+    if (targetTitleLower.isEmpty) return [];
+
     final referringNotes = <Note>[];
-
     for (final note in allNotes) {
+      if (note.id == noteId || note.isEncrypted) continue;
       final links = note.extractLinks();
-      final targetNote = allNotes.firstWhere(
-        (n) => n.title.toLowerCase() == links.firstWhere(
-          (link) => allNotes.any((n) => n.title.toLowerCase() == link.toLowerCase()),
-          orElse: () => '',
-        ).toLowerCase(),
-        orElse: () => Note(
-          id: -1,
-          title: '',
-          content: '',
-          createdAt: 0,
-          updatedAt: 0,
-        ),
-      );
-
-      if (targetNote.id == noteId) {
+      if (links.any((link) => link.trim().toLowerCase() == targetTitleLower)) {
         referringNotes.add(note);
       }
     }
@@ -45,28 +37,24 @@ class BacklinkService {
     return referringNotes;
   }
 
-  /// Get all notes that the specified note links to
+  /// Get all notes that the specified note links to (`O(N)` with title index map)
   Future<List<Note>> getLinkedNotes(int noteId) async {
     final note = await _repository.getNoteById(noteId);
-    if (note == null) return [];
+    if (note == null || note.isEncrypted) return [];
 
     final allNotes = await _repository.getAllNotes();
+    final byTitle = <String, Note>{
+      for (final n in allNotes) n.title.trim().toLowerCase(): n,
+    };
+
     final linkedNotes = <Note>[];
-    final links = note.extractLinks();
-
-    for (final link in links) {
-      final targetNote = allNotes.firstWhere(
-        (n) => n.title.toLowerCase() == link.toLowerCase(),
-        orElse: () => Note(
-          id: -1,
-          title: link,
-          content: '',
-          createdAt: DateTime.now().millisecondsSinceEpoch,
-          updatedAt: DateTime.now().millisecondsSinceEpoch,
-        ),
-      );
-
-      if (targetNote.id != -1) {
+    final seenIds = <int>{};
+    for (final link in note.extractLinks()) {
+      final targetNote = byTitle[link.trim().toLowerCase()];
+      if (targetNote != null &&
+          targetNote.id != null &&
+          targetNote.id != noteId &&
+          seenIds.add(targetNote.id!)) {
         linkedNotes.add(targetNote);
       }
     }
@@ -74,40 +62,51 @@ class BacklinkService {
     return linkedNotes;
   }
 
-  /// Find orphaned notes (notes with no incoming links)
+  /// Find orphaned notes (notes with no incoming links) in a single `O(N)` pass
   Future<List<Note>> getOrphanedNotes() async {
     final allNotes = await _repository.getAllNotes();
-    final orphanedNotes = <Note>[];
+    final referencedTitles = <String>{};
 
     for (final note in allNotes) {
-      final id = note.id;
-      if (id == null) continue;
-      final referringNotes = await getReferringNotes(id);
-      if (referringNotes.isEmpty) {
-        orphanedNotes.add(note);
+      if (note.isEncrypted) continue;
+      for (final link in note.extractLinks()) {
+        referencedTitles.add(link.trim().toLowerCase());
       }
     }
 
-    return orphanedNotes;
+    return allNotes
+        .where((n) =>
+            n.id != null &&
+            !referencedTitles.contains(n.title.trim().toLowerCase()))
+        .toList();
   }
 
-  /// Find hub notes (notes with many outgoing links)
+  /// Find hub notes (notes with many outgoing links) in a single `O(N)` pass
   Future<List<Note>> getHubNotes({int minimumLinks = 3}) async {
     final allNotes = await _repository.getAllNotes();
+    final existingTitles = <String>{
+      for (final n in allNotes) n.title.trim().toLowerCase(),
+    };
+
     final hubNotes = <Note>[];
     final linkCounts = <int, int>{};
 
     for (final note in allNotes) {
       final id = note.id;
-      if (id == null) continue;
-      final linkedNotes = await getLinkedNotes(id);
-      if (linkedNotes.length >= minimumLinks) {
+      if (id == null || note.isEncrypted) continue;
+      final validOutgoingCount = note
+          .extractLinks()
+          .map((l) => l.trim().toLowerCase())
+          .where((l) => l != note.title.trim().toLowerCase() && existingTitles.contains(l))
+          .toSet()
+          .length;
+
+      if (validOutgoingCount >= minimumLinks) {
         hubNotes.add(note);
-        linkCounts[id] = linkedNotes.length;
+        linkCounts[id] = validOutgoingCount;
       }
     }
 
-    // Sort by outgoing link count (descending)
     hubNotes.sort(
       (a, b) => (linkCounts[b.id] ?? 0).compareTo(linkCounts[a.id] ?? 0),
     );

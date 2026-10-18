@@ -139,21 +139,26 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
         }
 
         if (!_isVimInsertMode) {
-          // Normal mode commands
           final char = event.character;
           if (char == 'i' || char == 'a') {
             setState(() => _isVimInsertMode = true);
+            if (char == 'a') {
+              final offset = _contentController.selection.baseOffset;
+              if (offset >= 0 && offset < _contentController.text.length) {
+                _contentController.selection = TextSelection.collapsed(offset: offset + 1);
+              }
+            }
             return KeyEventResult.handled;
           }
 
           final text = _contentController.text;
           var selection = _contentController.selection;
-          
+
           if (!selection.isValid) {
             selection = const TextSelection.collapsed(offset: 0);
           }
 
-          int currentOffset = selection.baseOffset;
+          final currentOffset = selection.baseOffset.clamp(0, text.length);
 
           if (char == 'h' && currentOffset > 0) {
             _contentController.selection = TextSelection.collapsed(offset: currentOffset - 1);
@@ -161,14 +166,27 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
           } else if (char == 'l' && currentOffset < text.length) {
             _contentController.selection = TextSelection.collapsed(offset: currentOffset + 1);
             return KeyEventResult.handled;
-          } else if (char == 'k' || char == 'j') {
-            // Very basic j/k navigation - move by approx characters or lines if we could compute it easily
-            // For a robust vim we need line offsets, but here we can just skip 50 chars for demo
-            if (char == 'j' && currentOffset + 50 <= text.length) {
-               _contentController.selection = TextSelection.collapsed(offset: currentOffset + 50);
-            } else if (char == 'k' && currentOffset - 50 >= 0) {
-               _contentController.selection = TextSelection.collapsed(offset: currentOffset - 50);
-            }
+          } else if (char == 'j' || char == 'k') {
+            final nextOffset = computeVerticalLineOffset(
+              text,
+              currentOffset,
+              moveDown: char == 'j',
+            );
+            _contentController.selection = TextSelection.collapsed(offset: nextOffset);
+            return KeyEventResult.handled;
+          } else if (char == '0') {
+            // Move to start of current line
+            final lineStart = text.lastIndexOf('\n', currentOffset > 0 ? currentOffset - 1 : 0);
+            _contentController.selection = TextSelection.collapsed(
+              offset: lineStart == -1 ? 0 : lineStart + 1,
+            );
+            return KeyEventResult.handled;
+          } else if (char == r'$') {
+            // Move to end of current line
+            final lineEnd = text.indexOf('\n', currentOffset);
+            _contentController.selection = TextSelection.collapsed(
+              offset: lineEnd == -1 ? text.length : lineEnd,
+            );
             return KeyEventResult.handled;
           } else if (char == 'x' && currentOffset < text.length) {
             _contentController.text = text.replaceRange(currentOffset, currentOffset + 1, '');
@@ -176,14 +194,49 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
             return KeyEventResult.handled;
           }
 
-          // In normal mode, block all other character input
+          // In normal mode, block all other printable character input
           if (char != null) {
-             return KeyEventResult.handled; 
+            return KeyEventResult.handled;
           }
         }
       }
       return KeyEventResult.ignored;
     };
+  }
+
+  /// Computes the target cursor offset when moving vertically (`j` = down, `k` = up)
+  /// across newline boundaries while preserving the current column index.
+  @visibleForTesting
+  static int computeVerticalLineOffset(
+    String text,
+    int currentOffset, {
+    required bool moveDown,
+  }) {
+    if (text.isEmpty) return 0;
+    final clamped = currentOffset.clamp(0, text.length);
+
+    // Find start and end of current line
+    final prevNewline = clamped == 0 ? -1 : text.lastIndexOf('\n', clamped - 1);
+    final currentLineStart = prevNewline + 1;
+    final nextNewline = text.indexOf('\n', clamped);
+    final currentLineEnd = nextNewline == -1 ? text.length : nextNewline;
+    final column = clamped - currentLineStart;
+
+    if (moveDown) {
+      if (nextNewline == -1) return clamped; // Already on last line
+      final targetLineStart = nextNewline + 1;
+      final nextNextNewline = text.indexOf('\n', targetLineStart);
+      final targetLineEnd = nextNextNewline == -1 ? text.length : nextNextNewline;
+      final targetLineLength = targetLineEnd - targetLineStart;
+      return targetLineStart + (column <= targetLineLength ? column : targetLineLength);
+    } else {
+      if (prevNewline == -1) return clamped; // Already on first line
+      final prevPrevNewline = prevNewline == 0 ? -1 : text.lastIndexOf('\n', prevNewline - 1);
+      final targetLineStart = prevPrevNewline + 1;
+      final targetLineEnd = prevNewline;
+      final targetLineLength = targetLineEnd - targetLineStart;
+      return targetLineStart + (column <= targetLineLength ? column : targetLineLength);
+    }
   }
 
 
@@ -331,12 +384,15 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
         emojiIcon: _emojiIcon,
       );
 
-      if (widget.note == null) {
-        await Provider.of<NoteProvider>(context, listen: false).addNote(note);
+      final noteProvider = Provider.of<NoteProvider>(context, listen: false);
+      final Note persistedNote;
+      if (note.id == null) {
+        persistedNote = await noteProvider.addNote(note);
       } else {
-        await Provider.of<NoteProvider>(context, listen: false).updateNote(note);
+        await noteProvider.updateNote(note);
+        persistedNote = note;
       }
-      widget.onSave(note);
+      widget.onSave(persistedNote);
     } catch (e) {
       _showError('Kayıt hatası: $e');
     } finally {

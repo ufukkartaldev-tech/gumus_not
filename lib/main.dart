@@ -209,8 +209,6 @@ class ConnectedNotebookApp extends StatelessWidget {
                               note: note,
                               onSave: (savedNote) {
                                 Navigator.of(context).pop();
-                                // context.noteProvider.loadNotes(); - using provider context safely:
-                                Provider.of<NoteProvider>(context, listen: false).loadNotes();
                               },
                               onCancel: () {
                                 Navigator.of(context).pop();
