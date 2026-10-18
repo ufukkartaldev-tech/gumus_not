@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -34,6 +35,7 @@ class NoteListScreen extends StatefulWidget {
 
 class _NoteListScreenState extends State<NoteListScreen> {
   final TextEditingController _searchController = TextEditingController();
+  Timer? _searchDebounce;
   String _selectedTag = '';
   String _selectedFolder = ''; // 'Genel' vs. Empty means Show All (or use 'Tümü')
   bool _showFavoritesOnly = false; // Filter pinned / favorite notes
@@ -70,8 +72,17 @@ class _NoteListScreenState extends State<NoteListScreen> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _onSearchChanged(String value) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 250), () {
+      if (!mounted) return;
+      Provider.of<NoteProvider>(context, listen: false).searchNotes(value);
+    });
   }
 
   void _showCommandPalette() {
@@ -661,9 +672,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
                 CustomSearchBar(
                   hintText: 'Notlarda ara...',
                   controller: _searchController,
-                  onChanged: (value) {
-                    Provider.of<NoteProvider>(context, listen: false).searchNotes(value);
-                  },
+                  onChanged: _onSearchChanged,
                 ),
                 const SizedBox(height: 10),
                 Row(
@@ -710,7 +719,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
   Widget _buildDesktopEditorPanel() {
     if (_selectedNote != null || _isCreatingNewNote) {
       return MarkdownEditor(
-        key: ValueKey(_selectedNote?.id ?? 'new_note_${DateTime.now().millisecondsSinceEpoch}'),
+        key: ValueKey(_selectedNote?.id ?? 'new_note'),
         note: _selectedNote,
         onSave: (savedNote) async {
           await _handleSave(savedNote, null);
@@ -968,10 +977,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
       children: [
         CustomSearchBar(
           hintText: 'Notlarda ara...',
-          onChanged: (value) {
-            Provider.of<NoteProvider>(context, listen: false)
-                .searchNotes(value);
-          },
+          onChanged: _onSearchChanged,
           controller: _searchController,
         ),
         _buildTagFilter(),

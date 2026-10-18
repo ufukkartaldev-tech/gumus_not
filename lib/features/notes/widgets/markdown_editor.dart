@@ -60,6 +60,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
   bool _isCrossReferenceVisible = false;
   List<String> _tags = [];
   bool _isVimInsertMode = false; // Start in Normal mode if Vim is enabled
+  bool _hasSelection = false;
 
   final VoiceNoteService _voiceNoteService = VoiceNoteService();
   bool _isRecording = false;
@@ -186,8 +187,13 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
 
 
   void _onContentChanged() {
-    if (mounted) {
-      setState(() {});
+    if (!mounted) return;
+    final hasSelection = _contentController.selection.isValid &&
+        !_contentController.selection.isCollapsed;
+    if (hasSelection != _hasSelection || _isPreviewMode) {
+      setState(() {
+        _hasSelection = hasSelection;
+      });
     }
   }
 
@@ -1427,7 +1433,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
 
     // Find notes that link to this one
     final backlinks = noteProvider.notes.where((n) {
-      if (n.id == widget.note?.id) return false;
+      if (n.id == widget.note?.id || n.isEncrypted) return false;
       return n.content.toLowerCase().contains('[[$currentTitle]]');
     }).toList();
 

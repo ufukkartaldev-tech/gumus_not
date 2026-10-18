@@ -61,7 +61,8 @@ class SearchService {
         if (!STOP_WORDS.contains(normalizedQuery) && normalizedQuery.length > 2) {
           final words = title.split(' ');
           for (var word in words) {
-            if (_levenshteinDistance(word, normalizedQuery) <= MAX_DISTANCE) {
+            if ((word.length - normalizedQuery.length).abs() <= MAX_DISTANCE &&
+                _levenshteinDistance(word, normalizedQuery) <= MAX_DISTANCE) {
               score += SCORE_FUZZY_TITLE;
               break; 
             }
@@ -73,7 +74,10 @@ class SearchService {
       for (var tag in tags) {
         if (tag.contains(normalizedQuery)) {
           score += SCORE_EXACT_TAG;
-        } else if (!STOP_WORDS.contains(normalizedQuery) && normalizedQuery.length > 2 && _levenshteinDistance(tag, normalizedQuery) <= MAX_DISTANCE) {
+        } else if (!STOP_WORDS.contains(normalizedQuery) &&
+            normalizedQuery.length > 2 &&
+            (tag.length - normalizedQuery.length).abs() <= MAX_DISTANCE &&
+            _levenshteinDistance(tag, normalizedQuery) <= MAX_DISTANCE) {
           score += SCORE_FUZZY_TAG;
         }
       }
@@ -152,12 +156,15 @@ class SearchService {
     // (Karmaşıklık nedeniyle sadece yüksek puanlı çekirdekler üzerinden hesaplanacaktır)
 
     // 5. TÜM PUANLARI BİRLEŞTİR
+    final Map<int, int> directScores = {};
     final Map<int, int> finalScores = {};
 
     // Önce keyword puanlarını ekle
     for (var item in scoredNotes) {
       final id = item['key'] as int;
-      finalScores[id] = item['score'] as int;
+      final directScore = item['score'] as int;
+      directScores[id] = directScore;
+      finalScores[id] = directScore;
     }
 
     // Sonra semantik puanları ekle (Tüm notlar üzerinden, çünkü hiç keyword eşleşmesi olmayıp sadece bağlı olanlar da gelebilir)
@@ -174,13 +181,21 @@ class SearchService {
         finalResultList.add({
           'note': node,
           'score': totalScore,
+          'hasDirectMatch': (directScores[id] ?? 0) > 0,
         });
       }
     });
 
-    // Sonuçları sırala
-    finalResultList
-        .sort((a, b) => (b['score'] as int).compareTo(a['score'] as int));
+    // Sonuçları sırala: Doğrudan arama terimiyle eşleşen (seed) notlar,
+    // yalnızca komşuluk (semantic boost) ile gelen notların önünde yer alır.
+    finalResultList.sort((a, b) {
+      final aDirect = a['hasDirectMatch'] as bool;
+      final bDirect = b['hasDirectMatch'] as bool;
+      if (aDirect != bDirect) {
+        return aDirect ? -1 : 1;
+      }
+      return (b['score'] as int).compareTo(a['score'] as int);
+    });
 
     return finalResultList.map((item) => item['note'] as Note).toList();
   }

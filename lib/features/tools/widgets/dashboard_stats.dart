@@ -9,12 +9,24 @@ class DashboardStats extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final totalNotes = notes.length;
+    final readableNotes = notes.where((n) => !n.isEncrypted);
     // Basit bir regex ile kelime sayımı (boşluklara göre)
-    final totalWords = notes.fold<int>(0, (prev, note) => prev + (note.content.trim().isEmpty ? 0 : note.content.trim().split(RegExp(r'\s+')).length));
+    final totalWords = readableNotes.fold<int>(
+      0,
+      (prev, note) =>
+          prev +
+          (note.content.trim().isEmpty
+              ? 0
+              : note.content.trim().split(RegExp(r'\s+')).length),
+    );
     final encryptedNotes = notes.where((n) => n.isEncrypted).length;
     
     // Bağlantı sayısı: [[link]] formatındaki her şeyi sayar
-    final totalLinks = notes.fold<int>(0, (prev, note) => prev + RegExp(r'\[\[.*?\]\]').allMatches(note.content).length);
+    final linkRegex = RegExp(r'\[\[.*?\]\]');
+    final totalLinks = readableNotes.fold<int>(
+      0,
+      (prev, note) => prev + linkRegex.allMatches(note.content).length,
+    );
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
