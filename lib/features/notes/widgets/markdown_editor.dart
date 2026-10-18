@@ -297,9 +297,10 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
         content: plaintextContent,
         createdAt: widget.note?.createdAt ?? DateTime.now().millisecondsSinceEpoch,
         updatedAt: DateTime.now().millisecondsSinceEpoch,
-        isEncrypted: false,
+        isEncrypted: widget.note?.isEncrypted ?? false,
         tags: _tags,
         color: _selectedColor,
+        folderName: widget.note?.folderName ?? 'Genel',
         emojiIcon: _emojiIcon,
       );
 
