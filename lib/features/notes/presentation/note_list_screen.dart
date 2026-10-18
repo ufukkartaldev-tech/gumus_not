@@ -992,41 +992,33 @@ class _NoteListScreenState extends State<NoteListScreen> {
           return const Center(child: CircularProgressIndicator());
         }
 
-        var notes = _selectedTag.isEmpty
-            ? noteProvider.searchResults
-            : noteProvider.getNotesByTag(_selectedTag);
+        var notes = noteProvider.searchResults;
+
+        if (_selectedTag.isNotEmpty) {
+          notes = notes.where((n) => n.tags.contains(_selectedTag)).toList();
+        }
 
         if (_selectedFolder.isNotEmpty) {
-           notes = notes.where((n) => n.folderName == _selectedFolder).toList();
+          notes = notes.where((n) => n.folderName == _selectedFolder).toList();
         }
 
         if (_showFavoritesOnly) {
-           notes = notes.where((n) => n.tags.contains('sabit')).toList();
+          notes = notes.where((n) => n.tags.contains('sabit')).toList();
         }
 
-        // Sort: Pinned first, then UpdatedAt
-        // We create a new list to avoid modifying the provider's list directly if it is used elsewhere
+        // Sort: Pinned first, then UpdatedAt (preserve relevance order when searching)
         final sortedNotes = List<Note>.from(notes);
-        sortedNotes.sort((a, b) {
-          final aPinned = a.tags.contains('sabit');
-          final bPinned = b.tags.contains('sabit');
-          if (aPinned && !bPinned) return -1;
-          if (!aPinned && bPinned) return 1;
-          return b.updatedAt.compareTo(a.updatedAt);
-        });
-
-        // Calculate Activity Data (heatmap)
-        final activityData = <DateTime, int>{}; // Declare map here
-
-        // Populate if map is empty (first load) or even if notes are empty but user has history?
-        // Actually best is to iterate through ALL notes from provider, not just filtered ones, for the heatmap.
-        // User wants global productivity view usually.
-        for (var note in noteProvider.notes) {
-           final date = DateTime.fromMillisecondsSinceEpoch(note.updatedAt);
-           // Normalize date to YMD
-           final normalized = DateTime(date.year, date.month, date.day);
-           activityData[normalized] = (activityData[normalized] ?? 0) + 1;
+        if (noteProvider.searchQuery.trim().isEmpty) {
+          sortedNotes.sort((a, b) {
+            final aPinned = a.tags.contains('sabit');
+            final bPinned = b.tags.contains('sabit');
+            if (aPinned && !bPinned) return -1;
+            if (!aPinned && bPinned) return 1;
+            return b.updatedAt.compareTo(a.updatedAt);
+          });
         }
+
+        final activityData = noteProvider.activityData;
 
         if (notes.isEmpty) {
           return Center(

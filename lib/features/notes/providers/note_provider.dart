@@ -19,6 +19,19 @@ class NoteProvider with ChangeNotifier {
   String? _selectedFolder;
   String? _selectedTag;
 
+  // Cached derived state (invalidated whenever _notes mutates)
+  List<String>? _cachedFolders;
+  Map<String, int>? _cachedFolderCounts;
+  Map<String, int>? _cachedTagFrequency;
+  Map<DateTime, int>? _cachedActivityData;
+
+  void _invalidateDerivedCaches() {
+    _cachedFolders = null;
+    _cachedFolderCounts = null;
+    _cachedTagFrequency = null;
+    _cachedActivityData = null;
+  }
+
   // Getters
   List<Note> get notes => _notes;
   List<Note> get searchResults => _searchResults;
@@ -27,29 +40,52 @@ class NoteProvider with ChangeNotifier {
   String? get selectedFolder => _selectedFolder;
   String? get selectedTag => _selectedTag;
 
-  // Computed properties
+  // Computed properties (memoized)
   List<String> get folders {
+    if (_cachedFolders != null) return _cachedFolders!;
     final folderSet = _notes.map((n) => n.folderName).where((f) => f.isNotEmpty).toSet();
     if (!folderSet.contains('Genel')) folderSet.add('Genel');
     final list = folderSet.toList()..sort();
-    return list;
+    _cachedFolders = List.unmodifiable(list);
+    return _cachedFolders!;
   }
 
   int getNoteCountInFolder(String folderName) {
-    return _notes.where((n) => n.folderName == folderName).length;
+    if (_cachedFolderCounts == null) {
+      final counts = <String, int>{};
+      for (final note in _notes) {
+        counts[note.folderName] = (counts[note.folderName] ?? 0) + 1;
+      }
+      _cachedFolderCounts = counts;
+    }
+    return _cachedFolderCounts![folderName] ?? 0;
   }
 
   Map<String, int> get tagFrequency {
+    if (_cachedTagFrequency != null) return _cachedTagFrequency!;
     final Map<String, int> frequency = {};
     for (final note in _notes) {
       for (final tag in note.tags) {
         frequency[tag] = (frequency[tag] ?? 0) + 1;
       }
     }
-    return frequency;
+    _cachedTagFrequency = Map.unmodifiable(frequency);
+    return _cachedTagFrequency!;
   }
 
   Map<String, int> getTagFrequency() => tagFrequency;
+
+  Map<DateTime, int> get activityData {
+    if (_cachedActivityData != null) return _cachedActivityData!;
+    final data = <DateTime, int>{};
+    for (final note in _notes) {
+      final date = DateTime.fromMillisecondsSinceEpoch(note.updatedAt);
+      final normalized = DateTime(date.year, date.month, date.day);
+      data[normalized] = (data[normalized] ?? 0) + 1;
+    }
+    _cachedActivityData = Map.unmodifiable(data);
+    return _cachedActivityData!;
+  }
 
   /// Constructor with dependency injection
   NoteProvider({
@@ -63,12 +99,14 @@ class NoteProvider with ChangeNotifier {
 
     try {
       _notes = await _repository.getAllNotes();
-      _searchResults = _notes;
+      _invalidateDerivedCaches();
+      await _performSearch(_searchQuery);
       _notifyOnce(); // Single notification after all state changes
     } catch (e) {
       debugPrint('Error loading notes: $e');
       _notes = [];
       _searchResults = [];
+      _invalidateDerivedCaches();
       _notifyOnce();
     } finally {
       _setLoading(false);
@@ -86,6 +124,7 @@ class NoteProvider with ChangeNotifier {
 
       // Update local state
       _notes.insert(0, newNote);
+      _invalidateDerivedCaches();
       await _performSearch(_searchQuery); // Update search results
       _notifyOnce();
     } catch (e) {
@@ -107,6 +146,7 @@ class NoteProvider with ChangeNotifier {
       if (index != -1) {
         _notes[index] = note;
       }
+      _invalidateDerivedCaches();
 
       await _performSearch(_searchQuery); // Update search results
       _notifyOnce();
@@ -123,6 +163,7 @@ class NoteProvider with ChangeNotifier {
 
       // Update local state
       _notes.removeWhere((note) => note.id == noteId);
+      _invalidateDerivedCaches();
       await _performSearch(_searchQuery); // Update search results
       _notifyOnce();
     } catch (e) {
@@ -149,29 +190,17 @@ class NoteProvider with ChangeNotifier {
 
   /// Filter notes by folder
   Future<void> filterByFolder(String? folderName) async {
-    _selectedFolder = folderName;
+    _selectedFolder = (folderName != null && folderName.isEmpty) ? null : folderName;
     _selectedTag = null; // Clear tag filter
-
-    if (folderName == null) {
-      _searchResults = _notes;
-    } else {
-      _searchResults = _notes.where((n) => n.folderName == folderName).toList();
-    }
-
+    await _performSearch(_searchQuery);
     _notifyOnce();
   }
 
   /// Filter notes by tag
   Future<void> filterByTag(String? tag) async {
-    _selectedTag = tag;
+    _selectedTag = (tag != null && tag.isEmpty) ? null : tag;
     _selectedFolder = null; // Clear folder filter
-
-    if (tag == null) {
-      _searchResults = _notes;
-    } else {
-      _searchResults = _notes.where((n) => n.tags.contains(tag)).toList();
-    }
-
+    await _performSearch(_searchQuery);
     _notifyOnce();
   }
 
@@ -270,6 +299,7 @@ class NoteProvider with ChangeNotifier {
     _searchQuery = '';
     _selectedFolder = null;
     _selectedTag = null;
+    _invalidateDerivedCaches();
     _notifyOnce();
   }
 }

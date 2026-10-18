@@ -17,9 +17,9 @@ class NoteEditorProvider with ChangeNotifier {
   String? get errorMessage => _errorMessage;
 
   Future<void> initialize(Note? note) async {
-    _isEncrypted = false;
-    _isDecrypted = true;
-    _resolvedContent = note?.content;
+    _isEncrypted = note?.isEncrypted ?? false;
+    _isDecrypted = !_isEncrypted;
+    _resolvedContent = _isEncrypted ? null : note?.content;
     _errorMessage = null;
     notifyListeners();
   }
