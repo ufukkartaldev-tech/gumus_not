@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:connected_notebook/core/theme/theme_provider.dart';
 import 'package:connected_notebook/core/theme/app_theme.dart';
@@ -8,6 +8,7 @@ import 'package:connected_notebook/core/utils/shortcut_manager.dart';
 
 import 'package:connected_notebook/features/ai/presentation/ai_settings_screen.dart';
 import 'package:connected_notebook/features/settings/screens/theme_selection_screen.dart';
+import 'package:connected_notebook/features/security/services/biometric_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -17,9 +18,24 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  final BiometricService _biometricService = BiometricService();
+  bool _isAppLockEnabled = false;
+  bool _isLoadingLockSetting = true;
+
   @override
   void initState() {
     super.initState();
+    _loadAppLockSetting();
+  }
+
+  Future<void> _loadAppLockSetting() async {
+    final enabled = await _biometricService.isAppLockEnabled();
+    if (mounted) {
+      setState(() {
+        _isAppLockEnabled = enabled;
+        _isLoadingLockSetting = false;
+      });
+    }
   }
 
   void _showError(String message) {
@@ -49,6 +65,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16.0),
         children: [
+          _buildSecuritySection(),
+          const SizedBox(height: 24),
           _buildAiSection(),
           const SizedBox(height: 24),
           _buildDeveloperSection(),
@@ -59,6 +77,78 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 24),
           _buildAboutSection(),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSecuritySection() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.security, size: 24),
+                SizedBox(width: 8),
+                Text(
+                  'Güvenlik ve Gizlilik',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Uygulama Kilidi',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      Text(
+                        'Uygulama açılışında parmak izi veya cihaz şifresi iste',
+                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                ),
+                _isLoadingLockSetting
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Switch(
+                        value: _isAppLockEnabled,
+                        onChanged: (val) async {
+                          if (val) {
+                            // Açmak isterse önce bir kere kimlik doğrulasın
+                            final authenticated = await _biometricService.authenticate();
+                            if (!authenticated) {
+                              _showError('Kimlik doğrulanamadığı için kilit etkinleştirilemedi');
+                              return;
+                            }
+                          }
+                          await _biometricService.setAppLockEnabled(val);
+                          setState(() {
+                            _isAppLockEnabled = val;
+                          });
+                          _showSuccess(
+                            val
+                                ? 'Uygulama kilidi etkinleştirildi'
+                                : 'Uygulama kilidi kapatıldı',
+                          );
+                        },
+                      ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

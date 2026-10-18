@@ -18,6 +18,7 @@ import 'package:connected_notebook/features/notes/widgets/markdown_editor.dart';
 import 'package:connected_notebook/features/notes/models/note_model.dart';
 import 'package:connected_notebook/features/calendar/presentation/calendar_screen.dart';
 import 'package:connected_notebook/features/security/presentation/lock_screen.dart';
+import 'package:connected_notebook/features/security/services/biometric_service.dart';
 import 'package:connected_notebook/features/ai/providers/ai_provider.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -97,10 +98,13 @@ class ConnectedNotebookApp extends StatelessWidget {
     for (final part in parts) {
       if (part == 'meta' || part == 'cmd') {
         isMeta = true;
-      } else if (part == 'ctrl') isCtrl = true;
-      else if (part == 'shift') isShift = true;
-      else if (part == 'alt') isAlt = true;
-      else {
+      } else if (part == 'ctrl') {
+        isCtrl = true;
+      } else if (part == 'shift') {
+        isShift = true;
+      } else if (part == 'alt') {
+        isAlt = true;
+      } else {
         // Basic mapping for alphabet keys
         if (part.length == 1) {
           final code = part.toLowerCase().codeUnitAt(0);
@@ -178,8 +182,13 @@ class ConnectedNotebookApp extends StatelessWidget {
                 initialRoute: kIsWeb ? '/' : '/splash',
                 routes: {
                   '/splash': (context) => SplashScreen(
-                    onInitialized: () =>
-                        Navigator.of(context).pushReplacementNamed('/lock'),
+                    onInitialized: () async {
+                      final biometricService = BiometricService();
+                      final isLockEnabled = await biometricService.isAppLockEnabled();
+                      if (context.mounted) {
+                        Navigator.of(context).pushReplacementNamed(isLockEnabled ? '/lock' : '/');
+                      }
+                    },
                   ),
                   '/lock': (context) => const LockScreen(),
                   '/': (context) => const MainScreen(),
