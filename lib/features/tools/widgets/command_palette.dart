@@ -399,16 +399,16 @@ class _CommandPaletteState extends State<CommandPalette> {
 
     final taskLine = '- [ ] $taskText';
 
+    Note savedTaskNote;
     if (targetNote != null) {
       final updatedContent = targetNote.content.isEmpty
           ? taskLine
           : '${targetNote.content}\n$taskLine';
-      await noteProvider.updateNote(
-        targetNote.copyWith(
-          content: updatedContent,
-          updatedAt: DateTime.now().millisecondsSinceEpoch,
-        ),
+      savedTaskNote = targetNote.copyWith(
+        content: updatedContent,
+        updatedAt: DateTime.now().millisecondsSinceEpoch,
       );
+      await noteProvider.updateNote(savedTaskNote);
     } else {
       final now = DateTime.now().millisecondsSinceEpoch;
       final newNote = Note(
@@ -419,6 +419,10 @@ class _CommandPaletteState extends State<CommandPalette> {
         tags: ['gorevler', 'hizli'],
       );
       await noteProvider.addNote(newNote);
+      savedTaskNote = noteProvider.notes.firstWhere(
+        (n) => n.title.trim().toLowerCase() == 'hızlı görevler',
+        orElse: () => newNote,
+      );
     }
 
     if (context.mounted) {
@@ -427,7 +431,10 @@ class _CommandPaletteState extends State<CommandPalette> {
           content: Text('Görev eklendi: "$taskText"'),
           action: SnackBarAction(
             label: 'Görevler',
-            onPressed: () => Navigator.of(context).pushNamed('/task-hub'),
+            onPressed: () => Navigator.of(context).pushNamed(
+              '/note-editor',
+              arguments: savedTaskNote,
+            ),
           ),
         ),
       );

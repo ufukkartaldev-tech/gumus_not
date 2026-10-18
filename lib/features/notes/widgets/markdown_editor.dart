@@ -16,7 +16,7 @@ import 'package:connected_notebook/features/tools/widgets/cross_reference_tracke
 import 'package:connected_notebook/features/tools/widgets/tag_manager_widget.dart';
 import 'package:connected_notebook/features/tools/widgets/pomodoro_timer.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
-import 'package:connected_notebook/features/export/services/pdf_service.dart';
+import 'package:connected_notebook/features/export/services/pdf_export_service.dart';
 import 'package:connected_notebook/core/utils/shortcut_manager.dart';
 import 'package:connected_notebook/features/export/presentation/latex_export_screen.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
@@ -227,7 +227,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
       ),
     );
 
-    if (source == null) return;
+    if (source == null || !mounted) return;
 
     try {
       String? imagePath;
@@ -688,6 +688,10 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
       _showError('Önce notu kaydetmelisiniz');
       return;
     }
+    if (_isEncrypted && !_isUnlocked) {
+      _showError('Şifreli notu dışa aktarmak için önce kilidini açmalısınız');
+      return;
+    }
 
     try {
       final currentNote = widget.note!.copyWith(
@@ -695,7 +699,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
         title: _titleController.text,
       );
 
-      await PdfService.exportToPdf(currentNote);
+      await PdfExportService.exportToPdf(currentNote);
     } catch (e) {
       _showError('PDF oluşturulurken hata: $e');
     }

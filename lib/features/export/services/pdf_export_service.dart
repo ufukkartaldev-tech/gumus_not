@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:connected_notebook/features/notes/models/note_model.dart';
@@ -147,6 +147,17 @@ class PdfExportService {
     return await pdf.save();
   }
 
+  /// Bir notu PDF olarak önizle/yazdır (Editör içi dışa aktarma için)
+  static Future<void> exportToPdf(Note note) async {
+    final safeTitle = note.title.trim().isEmpty
+        ? 'gumusnot'
+        : note.title.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_');
+    await Printing.layoutPdf(
+      onLayout: (format) async => generatePdfDocument(note),
+      name: '${safeTitle}_gumusnot.pdf',
+    );
+  }
+
   static Future<void> exportNoteToPdf(Note note) async {
     final bytes = await generatePdfDocument(note);
     final fileName = '${note.title.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_')}.pdf';
@@ -154,7 +165,7 @@ class PdfExportService {
     try {
       await Printing.sharePdf(bytes: bytes, filename: fileName);
     } catch (e) {
-      print('PDF Export Error: $e');
+      debugPrint('PDF Export Error: $e');
     }
   }
 }

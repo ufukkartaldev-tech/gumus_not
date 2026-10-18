@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
 
 import 'package:connected_notebook/core/security/note_encryption_service.dart';
+import 'package:connected_notebook/features/media/services/image_service.dart';
 import 'package:connected_notebook/features/notes/providers/note_provider.dart';
 import 'package:connected_notebook/features/notes/providers/note_editor_provider.dart';
 import 'package:connected_notebook/features/notes/repositories/markdown_note_repository.dart';
@@ -27,6 +28,9 @@ class NoteDependencyInjection {
 
   static List<SingleChildWidget> getProviders() {
     return [
+      Provider<ImageService>(
+        create: (_) => ImageService(),
+      ),
       Provider<GitSyncService>(
         create: (_) => GitSyncService(),
       ),
@@ -106,6 +110,7 @@ class NoteDependencyInjection {
 }
 
 extension NoteDependencyInjectionExtension on BuildContext {
+  ImageService get imageService => read<ImageService>();
   NoteRepository get noteRepository => read<NoteRepository>();
   SearchService get searchService => read<SearchService>();
   NoteProvider get noteProvider => read<NoteProvider>();

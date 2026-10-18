@@ -836,14 +836,9 @@ class _NoteListScreenState extends State<NoteListScreen> {
           onPressed: _showCommandPalette,
         ),
         IconButton(
-          icon: const Icon(Icons.insights_rounded),
-          tooltip: 'Aktivite & Analiz',
-          onPressed: () => Navigator.of(context).pushNamed('/dashboard'),
-        ),
-        IconButton(
-          icon: const Icon(Icons.check_circle_outline),
-          tooltip: 'Görev Merkezi',
-          onPressed: () => Navigator.of(context).pushNamed('/task-hub'),
+          icon: const Icon(Icons.calendar_month_outlined),
+          tooltip: 'Takvim & Günlük',
+          onPressed: () => Navigator.of(context).pushNamed('/calendar'),
         ),
         if (MediaQuery.of(context).size.width > 600)
           IconButton(
@@ -1608,15 +1603,6 @@ class _NoteListScreenState extends State<NoteListScreen> {
               padding: EdgeInsets.zero,
               children: [
                 ListTile(
-                  leading: const Icon(Icons.insights_rounded, color: Colors.purpleAccent),
-                  title: const Text('Aktivite & Analiz'),
-                  subtitle: const Text('İstatistikler ve Verimlilik'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.of(context).pushNamed('/dashboard');
-                  },
-                ),
-                ListTile(
                   leading: const Icon(Icons.push_pin_outlined, color: Colors.amber),
                   title: const Text('Sabitlenen Notlar'),
                   onTap: () {
@@ -1645,11 +1631,11 @@ class _NoteListScreenState extends State<NoteListScreen> {
                   },
                 ),
                 ListTile(
-                  leading: const Icon(Icons.check_circle_outline, color: Colors.green),
-                  title: const Text('Görev Merkezi'),
+                  leading: const Icon(Icons.calendar_month_outlined, color: Colors.orangeAccent),
+                  title: const Text('Takvim & Günlük'),
                   onTap: () {
                     Navigator.pop(context);
-                    Navigator.of(context).pushNamed('/task-hub');
+                    Navigator.of(context).pushNamed('/calendar');
                   },
                 ),
                 ListTile(
