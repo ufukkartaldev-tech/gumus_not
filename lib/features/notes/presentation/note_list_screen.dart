@@ -14,10 +14,11 @@ import 'package:connected_notebook/features/notes/widgets/custom_widgets.dart';
 import 'package:connected_notebook/features/tools/widgets/activity_heatmap.dart';
 import 'package:connected_notebook/features/tools/widgets/command_palette.dart';
 import 'package:connected_notebook/features/notes/widgets/tag_cloud_widget.dart';
+import 'package:connected_notebook/features/notes/widgets/note_desktop_sidebar.dart';
+import 'package:connected_notebook/features/notes/widgets/note_navigation_drawer.dart';
+import 'package:connected_notebook/features/notes/widgets/note_timeline_sliver.dart';
 
-import 'package:connected_notebook/features/settings/presentation/settings_screen.dart';
 import 'package:connected_notebook/features/export/presentation/batch_export_screen.dart';
-import 'package:connected_notebook/features/graph/presentation/graph_view_screen.dart';
 import 'package:connected_notebook/features/notes/presentation/template_selection_screen.dart';
 import 'package:connected_notebook/features/notes/presentation/tag_management_screen.dart';
 import 'package:connected_notebook/features/search/presentation/advanced_search_screen.dart';
@@ -166,411 +167,45 @@ class _NoteListScreenState extends State<NoteListScreen> {
   }
 
   Widget _buildDesktopSidebar() {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final noteProvider = Provider.of<NoteProvider>(context);
-    final allNotes = noteProvider.notes;
-    final pinnedNotesCount = allNotes.where((n) => n.tags.contains('sabit')).length;
-    final tagFreq = noteProvider.getTagFrequency();
-    final folderList = noteProvider.folders;
-
-    final sidebarWidth = _isSidebarCollapsed ? 64.0 : 250.0;
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      curve: Curves.easeInOut,
-      width: sidebarWidth,
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1F24) : const Color(0xFFF7F8FA),
-        border: Border(
-          right: BorderSide(
-            color: theme.dividerColor.withValues(alpha: isDark ? 0.08 : 0.12),
-          ),
-        ),
-      ),
-      child: Column(
-        children: [
-          // Sidebar Header
-          Container(
-            height: 56,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Row(
-              mainAxisAlignment: _isSidebarCollapsed
-                  ? MainAxisAlignment.center
-                  : MainAxisAlignment.spaceBetween,
-              children: [
-                if (!_isSidebarCollapsed) ...[
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: theme.primaryColor.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(Icons.sticky_note_2, color: theme.primaryColor, size: 20),
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        'GümüşNot',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 16,
-                          letterSpacing: -0.3,
-                          color: theme.colorScheme.onSurface,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-                IconButton(
-                  icon: Icon(
-                    _isSidebarCollapsed
-                        ? Icons.view_sidebar_outlined
-                        : Icons.menu_open_rounded,
-                    size: 20,
-                  ),
-                  tooltip: _isSidebarCollapsed ? 'Kenar Çubuğunu Genişlet' : 'Kenar Çubuğunu Daralt',
-                  onPressed: () {
-                    setState(() {
-                      _isSidebarCollapsed = !_isSidebarCollapsed;
-                    });
-                  },
-                ),
-              ],
-            ),
-          ),
-          const Divider(height: 1),
-
-          // Navigation items
-          Expanded(
-            child: _isSidebarCollapsed
-                ? _buildCollapsedSidebarIcons(pinnedNotesCount)
-                : _buildExpandedSidebarContent(
-                    allNotes.length,
-                    pinnedNotesCount,
-                    folderList,
-                    tagFreq,
-                  ),
-          ),
-
-          // Sidebar Footer
-          const Divider(height: 1),
-          _buildSidebarFooter(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildExpandedSidebarContent(
-    int totalNotesCount,
-    int pinnedNotesCount,
-    List<String> folderList,
-    Map<String, int> tagFreq,
-  ) {
-    final theme = Theme.of(context);
-    final isAllSelected = !_showFavoritesOnly && _selectedFolder.isEmpty && _selectedTag.isEmpty;
-
-    return ListView(
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-      children: [
-        // Main Navigation
-        _buildSidebarItem(
-          icon: Icons.article_outlined,
-          selectedIcon: Icons.article,
-          title: 'Tüm Notlar',
-          count: totalNotesCount,
-          isSelected: isAllSelected,
-          onTap: () {
-            setState(() {
-              _showFavoritesOnly = false;
-              _selectedFolder = '';
-              _selectedTag = '';
-            });
-          },
-        ),
-        _buildSidebarItem(
-          icon: Icons.push_pin_outlined,
-          selectedIcon: Icons.push_pin,
-          title: 'Favoriler & Sabitler',
-          count: pinnedNotesCount,
-          isSelected: _showFavoritesOnly,
-          iconColor: Colors.amber,
-          onTap: () {
-            setState(() {
-              _showFavoritesOnly = true;
-              _selectedFolder = '';
-              _selectedTag = '';
-            });
-          },
-        ),
-
-        const SizedBox(height: 16),
-        // Modules Section
-        _buildSectionHeader('MODÜLLER'),
-        _buildSidebarItem(
-          icon: Icons.hub_outlined,
-          title: 'Zihin Haritası',
-          iconColor: Colors.indigoAccent,
-          onTap: () => Navigator.of(context).pushNamed('/graph'),
-        ),
-        _buildSidebarItem(
-          icon: Icons.calendar_month_outlined,
-          title: 'Takvim & Günlük',
-          iconColor: Colors.orangeAccent,
-          onTap: () => Navigator.of(context).pushNamed('/calendar'),
-        ),
-
-        const SizedBox(height: 16),
-        // Folders Section
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            _buildSectionHeader('KLASÖRLER'),
-            IconButton(
-              icon: const Icon(Icons.create_new_folder_outlined, size: 18),
-              tooltip: 'Yeni Klasör',
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-              onPressed: _showCreateFolderDialog,
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        if (folderList.isEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            child: Text(
-              'Henüz klasör yok',
-              style: TextStyle(fontSize: 12, color: theme.disabledColor),
-            ),
-          )
-        else
-          ...folderList.map((folder) {
-            final count = Provider.of<NoteProvider>(context, listen: false)
-                .getNoteCountInFolder(folder);
-            final isSelected = !_showFavoritesOnly && _selectedFolder == folder;
-            return _buildSidebarItem(
-              icon: isSelected ? Icons.folder_open : Icons.folder_outlined,
-              title: folder,
-              count: count,
-              isSelected: isSelected,
-              onTap: () {
-                setState(() {
-                  _selectedFolder = folder;
-                  _showFavoritesOnly = false;
-                  _selectedTag = '';
-                });
-              },
-            );
-          }),
-
-        const SizedBox(height: 16),
-        // Tags Section
-        _buildSectionHeader('ETİKETLER'),
-        const SizedBox(height: 4),
-        if (tagFreq.isEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            child: Text(
-              'Henüz etiket yok',
-              style: TextStyle(fontSize: 12, color: theme.disabledColor),
-            ),
-          )
-        else
-          ...tagFreq.entries.map((entry) {
-            final isSelected = !_showFavoritesOnly && _selectedTag == entry.key;
-            return _buildSidebarItem(
-              icon: Icons.tag_rounded,
-              title: '#${entry.key}',
-              count: entry.value,
-              isSelected: isSelected,
-              onTap: () {
-                setState(() {
-                  _selectedTag = entry.key;
-                  _showFavoritesOnly = false;
-                  _selectedFolder = '';
-                });
-              },
-            );
-          }),
-      ],
-    );
-  }
-
-  Widget _buildCollapsedSidebarIcons(int pinnedCount) {
-    final theme = Theme.of(context);
-    final isAllSelected = !_showFavoritesOnly && _selectedFolder.isEmpty && _selectedTag.isEmpty;
-
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          const SizedBox(height: 8),
-          IconButton(
-            icon: Icon(
-              Icons.article_outlined,
-              color: isAllSelected ? theme.primaryColor : theme.colorScheme.onSurface.withValues(alpha: 0.7),
-            ),
-            tooltip: 'Tüm Notlar',
-            onPressed: () {
-              setState(() {
-                _showFavoritesOnly = false;
-                _selectedFolder = '';
-                _selectedTag = '';
-              });
-            },
-          ),
-          IconButton(
-            icon: Icon(
-              Icons.push_pin_outlined,
-              color: _showFavoritesOnly ? Colors.amber : theme.colorScheme.onSurface.withValues(alpha: 0.7),
-            ),
-            tooltip: 'Favoriler & Sabitler ($pinnedCount)',
-            onPressed: () {
-              setState(() {
-                _showFavoritesOnly = true;
-                _selectedFolder = '';
-                _selectedTag = '';
-              });
-            },
-          ),
-          const Divider(indent: 12, endIndent: 12),
-          IconButton(
-            icon: const Icon(Icons.hub_outlined, color: Colors.indigoAccent),
-            tooltip: 'Zihin Haritası',
-            onPressed: () => Navigator.of(context).pushNamed('/graph'),
-          ),
-          const Divider(indent: 12, endIndent: 12),
-          IconButton(
-            icon: const Icon(Icons.create_new_folder_outlined),
-            tooltip: 'Yeni Klasör',
-            onPressed: _showCreateFolderDialog,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSidebarFooter() {
-
-    if (_isSidebarCollapsed) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: IconButton(
-          icon: const Icon(Icons.settings_outlined),
-          tooltip: 'Ayarlar',
-          onPressed: () => Navigator.of(context).pushNamed('/settings'),
-        ),
-      );
-    }
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      child: ListTile(
-        dense: true,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        leading: const Icon(Icons.settings_outlined, size: 20),
-        title: const Text('Ayarlar', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-        onTap: () => Navigator.of(context).pushNamed('/settings'),
-      ),
-    );
-  }
-
-  Widget _buildSidebarItem({
-    required IconData icon,
-    IconData? selectedIcon,
-    required String title,
-    int? count,
-    bool isSelected = false,
-    Color? iconColor,
-    required VoidCallback onTap,
-  }) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    final effectiveColor = isSelected
-        ? theme.primaryColor
-        : (iconColor ?? theme.colorScheme.onSurface.withValues(alpha: 0.75));
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 2),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? theme.primaryColor.withValues(alpha: isDark ? 0.16 : 0.08)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-          border: isSelected
-              ? Border.all(
-                  color: theme.primaryColor.withValues(alpha: isDark ? 0.3 : 0.2),
-                  width: 1,
-                )
-              : null,
-        ),
-        child: Row(
-          children: [
-            Icon(
-              isSelected && selectedIcon != null ? selectedIcon : icon,
-              size: 18,
-              color: effectiveColor,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                title,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                  color: isSelected
-                      ? theme.primaryColor
-                      : theme.colorScheme.onSurface.withValues(alpha: 0.85),
-                ),
-              ),
-            ),
-            if (count != null) ...[
-              const SizedBox(width: 6),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? theme.primaryColor.withValues(alpha: 0.18)
-                      : theme.dividerColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  count.toString(),
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                    color: isSelected
-                        ? theme.primaryColor
-                        : theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSectionHeader(String label) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 8, top: 4, bottom: 4),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.8,
-          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.45),
-        ),
-      ),
+    return NoteDesktopSidebar(
+      isCollapsed: _isSidebarCollapsed,
+      showFavoritesOnly: _showFavoritesOnly,
+      selectedFolder: _selectedFolder,
+      selectedTag: _selectedTag,
+      onToggleCollapse: () {
+        setState(() {
+          _isSidebarCollapsed = !_isSidebarCollapsed;
+        });
+      },
+      onSelectAllNotes: () {
+        setState(() {
+          _showFavoritesOnly = false;
+          _selectedFolder = '';
+          _selectedTag = '';
+        });
+      },
+      onSelectFavorites: () {
+        setState(() {
+          _showFavoritesOnly = true;
+          _selectedFolder = '';
+          _selectedTag = '';
+        });
+      },
+      onSelectFolder: (folder) {
+        setState(() {
+          _selectedFolder = folder;
+          _showFavoritesOnly = false;
+          _selectedTag = '';
+        });
+      },
+      onSelectTag: (tag) {
+        setState(() {
+          _selectedTag = tag;
+          _showFavoritesOnly = false;
+          _selectedFolder = '';
+        });
+      },
+      onCreateFolder: _showCreateFolderDialog,
     );
   }
 
@@ -1560,295 +1195,43 @@ class _NoteListScreenState extends State<NoteListScreen> {
   }
 
   Widget _buildDrawer() {
-    return Drawer(
-      child: Column(
-        children: [
-          UserAccountsDrawerHeader(
-            decoration: BoxDecoration(
-              color: Theme.of(context).primaryColor,
-              image: DecorationImage(
-                image: const AssetImage('assets/header_bg.png'), // Varsa
-                fit: BoxFit.cover,
-                colorFilter: ColorFilter.mode(
-                  Colors.black.withValues(alpha: 0.3),
-                  BlendMode.darken
-                ),
-                onError: (_, __) {}, // Hata olursa sadece renk kalsın
-              ),
-            ),
-            accountName: const Text(
-              'GümüşNot',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)
-            ),
-            accountEmail: Text(
-              '${Provider.of<NoteProvider>(context).notes.length} not • ${_countWords(Provider.of<NoteProvider>(context).notes)} kelime',
-              style: TextStyle(color: Colors.white.withValues(alpha: 0.9)),
-            ),
-            currentAccountPicture: CircleAvatar(
-              backgroundColor: Colors.white,
-              child: Text(
-                'GN',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).primaryColor
-                )
-              ),
-            ),
-          ),
-          Expanded(
-            child: ListView(
-              padding: EdgeInsets.zero,
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.push_pin_outlined, color: Colors.amber),
-                  title: const Text('Sabitlenen Notlar'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    setState(() {
-                      _showFavoritesOnly = true;
-                      _selectedFolder = '';
-                      _selectedTag = '';
-                    });
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.today),
-                  title: const Text('Bugünün Notu'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _openDailyNote();
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.shuffle),
-                  title: const Text('Rastgele Not'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _openRandomNote();
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.calendar_month_outlined, color: Colors.orangeAccent),
-                  title: const Text('Takvim & Günlük'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.of(context).pushNamed('/calendar');
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.hub, color: Colors.indigoAccent),
-                  title: const Text('Bağlantı Haritası'),
-                  subtitle: const Text('İlişkisel Görünüm'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const GraphViewScreen()));
-                  },
-                ),
-                const Divider(),
-                ExpansionTile(
-                  leading: const Icon(Icons.folder_open),
-                  title: const Text('Klasörler'),
-                  children: _buildFolderListForDrawer(),
-                ),
-                ExpansionTile(
-                  leading: const Icon(Icons.label_outline),
-                  title: const Text('Etiketler'),
-                  children: _buildTagListForDrawer(),
-                ),
-              ],
-            ),
-          ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.settings),
-            title: const Text('Ayarlar'),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const SettingsScreen()),
-              );
-            },
-          ),
-          const SizedBox(height: 16),
-        ],
-      ),
-    );
-  }
-
-  List<Widget> _buildTagListForDrawer() {
-    final notes = Provider.of<NoteProvider>(context, listen: false).notes;
-    final tags = <String>{};
-    for (var note in notes) {
-      tags.addAll(note.tags);
-    }
-
-    if (tags.isEmpty) {
-      return [const ListTile(title: Text('Henüz etiket yok', style: TextStyle(color: Colors.grey)))];
-    }
-
-    return tags.map((tag) => ListTile(
-      leading: const Icon(Icons.label, size: 18),
-      title: Text(tag),
-      onTap: () {
-        Navigator.pop(context);
+    return NoteNavigationDrawer(
+      onSelectFavorites: () {
+        setState(() {
+          _showFavoritesOnly = true;
+          _selectedFolder = '';
+          _selectedTag = '';
+        });
+      },
+      onOpenDailyNote: _openDailyNote,
+      onOpenRandomNote: _openRandomNote,
+      onSelectFolder: (folder) {
+        setState(() {
+          _selectedFolder = folder;
+          _selectedTag = '';
+          _showFavoritesOnly = false;
+          _searchController.clear();
+        });
+      },
+      onSelectTag: (tag) {
         setState(() {
           _selectedTag = tag;
           _showFavoritesOnly = false;
         });
       },
-      contentPadding: const EdgeInsets.only(left: 32, right: 16),
-      dense: true,
-    )).toList();
-  }
-
-  int _countWords(List<Note> notes) {
-    int count = 0;
-    for (var note in notes) {
-      count += RegExp(r'\w+').allMatches(note.content).length;
-    }
-    return count;
-  }
-
-  List<Widget> _buildFolderListForDrawer() {
-     final folderList = Provider.of<NoteProvider>(context).folders;
-
-     if (folderList.isEmpty) {
-        return [const ListTile(title: Text('Klasör bulunamadı', style: TextStyle(color: Colors.grey)), contentPadding: EdgeInsets.only(left: 32))];
-     }
-
-     return folderList.map((folder) {
-        final count = Provider.of<NoteProvider>(context).getNoteCountInFolder(folder);
-        return ListTile(
-           leading: const Icon(Icons.folder_outlined, size: 18),
-           title: Text(folder),
-           trailing: Text(count.toString(), style: TextStyle(color: Theme.of(context).disabledColor, fontSize: 12)),
-           onTap: () {
-              Navigator.pop(context);
-              setState(() {
-                 _selectedFolder = folder;
-                 _selectedTag = '';
-                 _showFavoritesOnly = false;
-                 _searchController.clear();
-              });
-           },
-           contentPadding: const EdgeInsets.only(left: 32, right: 32),
-           dense: true,
-        );
-     }).toList();
-  }
-
-  Widget _buildTimelineSliver(List<Note> notes) {
-    return SliverList(
-      delegate: SliverChildBuilderDelegate(
-        (context, index) {
-          final note = notes[index];
-          final date = DateTime.fromMillisecondsSinceEpoch(note.updatedAt);
-          final prevDate = index > 0 ? DateTime.fromMillisecondsSinceEpoch(notes[index - 1].updatedAt) : null;
-
-          bool isNewDay = prevDate == null ||
-                         date.day != prevDate.day ||
-                         date.month != prevDate.month ||
-                         date.year != prevDate.year;
-
-          return Column(
-             crossAxisAlignment: CrossAxisAlignment.start,
-             children: [
-                if (isNewDay)
-                   Padding(
-                      padding: const EdgeInsets.only(left: 16, top: 24, bottom: 8),
-                      child: Text(
-                         _formatTimelineHeader(date),
-                         style: TextStyle(
-                            color: Theme.of(context).primaryColor,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 18
-                         )
-                      ),
-                   ),
-                IntrinsicHeight(
-                   child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                         SizedBox(
-                            width: 60,
-                            child: Column(
-                               mainAxisAlignment: MainAxisAlignment.start,
-                               children: [
-                                  const SizedBox(height: 16),
-                                  Text(
-                                     "${date.hour}:${date.minute.toString().padLeft(2, '0')}",
-                                     style: TextStyle(
-                                        color: Theme.of(context).disabledColor,
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 12
-                                     )
-                                  ),
-                               ]
-                            ),
-                         ),
-                         Column(
-                            children: [
-                               const SizedBox(height: 16),
-                               Container(
-                                  width: 12, height: 12,
-                                  decoration: BoxDecoration(
-                                     color: Theme.of(context).primaryColor,
-                                     shape: BoxShape.circle,
-                                     border: Border.all(color: Theme.of(context).scaffoldBackgroundColor, width: 2)
-                                  ),
-                               ),
-                               Expanded(
-                                  child: Container(
-                                     width: 2,
-                                     color: Theme.of(context).dividerColor.withValues(alpha: 0.5),
-                                  )
-                               )
-                            ],
-                         ),
-                         Expanded(
-                             child: Padding(
-                                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                                child: SwipeableNoteCard(
-                                   note: note,
-                                   isPinned: note.tags.contains('sabit'),
-                                   onTogglePin: () => _togglePin(note),
-                                   onDelete: () => _deleteNoteWithUndo(note),
-                                   onArchive: () => _archiveNote(note),
-                                   child: NoteCard(
-                                      note: note,
-                                      isPinned: note.tags.contains('sabit'),
-                                      onTap: () => _selectNote(note),
-                                      onEdit: () => _selectNote(note),
-                                      onDelete: () => _deleteNote(note),
-                                      onTogglePin: () => _togglePin(note),
-                                      onExport: () => _showExportOptions(note),
-                                   ),
-                                ),
-                             ),
-                          )
-                      ],
-                   ),
-                )
-             ],
-          );
-        },
-        childCount: notes.length,
-      ),
     );
   }
 
-  String _formatTimelineHeader(DateTime date) {
-     final now = DateTime.now();
-     if (date.year == now.year && date.month == now.month && date.day == now.day) {
-        return 'Bugün';
-     }
-     if (date.year == now.year && date.month == now.month && date.day == now.day - 1) {
-        return 'Dün';
-     }
-     final months = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
-     return '${date.day} ${months[date.month - 1]} ${date.year}';
+  Widget _buildTimelineSliver(List<Note> notes) {
+    return NoteTimelineSliver(
+      notes: notes,
+      onSelectNote: _selectNote,
+      onDeleteNote: _deleteNote,
+      onDeleteNoteWithUndo: _deleteNoteWithUndo,
+      onArchiveNote: _archiveNote,
+      onTogglePin: _togglePin,
+      onExportNote: _showExportOptions,
+    );
   }
 }
 

@@ -12,8 +12,9 @@ import 'package:connected_notebook/features/notes/widgets/custom_widgets.dart';
 import 'package:connected_notebook/features/notes/widgets/math_markdown_renderer.dart';
 import 'package:connected_notebook/features/notes/widgets/markdown_live_controller.dart';
 import 'package:connected_notebook/features/notes/widgets/floating_accessory_bar.dart';
+import 'package:connected_notebook/features/notes/widgets/editor_backlink_section.dart';
+import 'package:connected_notebook/features/notes/widgets/editor_bottom_sheets.dart';
 import 'package:connected_notebook/features/tools/widgets/cross_reference_tracker.dart';
-import 'package:connected_notebook/features/tools/widgets/tag_manager_widget.dart';
 import 'package:connected_notebook/features/tools/widgets/pomodoro_timer.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:connected_notebook/features/export/services/pdf_export_service.dart';
@@ -715,74 +716,9 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (context) {
-        final theme = Theme.of(context);
-        final isDark = theme.brightness == Brightness.dark;
-
-        final mathItems = [
-          {'label': 'x²', 'syntax': r'x^2'},
-          {'label': 'a/b', 'syntax': r'\frac{a}{b}'},
-          {'label': '√x', 'syntax': r'\sqrt{x}'},
-          {'label': '∑', 'syntax': r'\sum_{i=1}^{n}'},
-          {'label': '∫', 'syntax': r'\int_{a}^{b} f(x) dx'},
-          {'label': 'π', 'syntax': r'\pi'},
-          {'label': 'θ', 'syntax': r'\theta'},
-          {'label': 'lim', 'syntax': r'\lim_{x \to \infty}'},
-          {'label': 'Mermaid', 'syntax': "```mermaid\ngraph TD\n  A[Başla] --> B[Devam]\n```\n"},
-          {'label': r'Blok $$', 'syntax': "\$\$\nE = mc^2\n\$\$\n"},
-        ];
-
-        return ClipRRect(
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-            color: isDark ? const Color(0xFF1E1F24) : Colors.white,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: theme.dividerColor,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    const Icon(Icons.functions_rounded, color: Colors.purple, size: 22),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Matematik & Diyagram Ekle',
-                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: mathItems.map((item) {
-                    return ActionChip(
-                      label: Text(item['label']!, style: const TextStyle(fontWeight: FontWeight.w600)),
-                      backgroundColor: theme.colorScheme.surface,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      onPressed: () {
-                        Navigator.pop(context);
-                        _insertTextAtCursor(item['syntax']!);
-                      },
-                    );
-                  }).toList(),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+      builder: (context) => EditorMathSymbolSheet(
+        onSelectSyntax: _insertTextAtCursor,
+      ),
     );
   }
 
@@ -791,114 +727,13 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            final theme = Theme.of(context);
-            final isDark = theme.brightness == Brightness.dark;
-
-            return ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-              child: Container(
-                height: MediaQuery.of(context).size.height * 0.55,
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-                color: isDark ? const Color(0xFF1E1F24) : Colors.white,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Colors.grey.withValues(alpha: 0.3),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Not Bilgileri & Etiketler',
-                      style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 16),
-                    _buildMoodSelector(),
-                    const SizedBox(height: 16),
-                    Expanded(
-                      child: TagManagerWidget(
-                        initialTags: _tags,
-                        onTagsChanged: (newTags) {
-                          setState(() => _tags = newTags);
-                          setSheetState(() {});
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildMoodSelector() {
-    final moods = ['😊', '😐', '😢', '😡', '🚀', '💡', '🔥'];
-    final selectedMood = _findCurrentMood();
-
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          Text(
-            'Mod:',
-            style: TextStyle(
-              color: Theme.of(context).disabledColor,
-              fontWeight: FontWeight.bold,
-              fontSize: 13,
-            ),
-          ),
-          const SizedBox(width: 10),
-          ...moods.map((mood) {
-            final isSelected = selectedMood == mood;
-            return GestureDetector(
-              onTap: () => _updateMood(mood),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                margin: const EdgeInsets.only(right: 8),
-                decoration: BoxDecoration(
-                  color: isSelected ? Theme.of(context).primaryColor.withValues(alpha: 0.18) : Colors.transparent,
-                  borderRadius: BorderRadius.circular(12),
-                  border: isSelected ? Border.all(color: Theme.of(context).primaryColor, width: 1.5) : null,
-                ),
-                child: Text(
-                  mood,
-                  style: TextStyle(fontSize: isSelected ? 22 : 18),
-                ),
-              ),
-            );
-          }),
-        ],
+      builder: (context) => EditorTagAndMoodSheet(
+        initialTags: _tags,
+        onTagsChanged: (newTags) {
+          setState(() => _tags = newTags);
+        },
       ),
     );
-  }
-
-  String? _findCurrentMood() {
-    for (var tag in _tags) {
-      if (tag.startsWith('mood:')) {
-        return tag.substring(5);
-      }
-    }
-    return null;
-  }
-
-  void _updateMood(String mood) {
-    setState(() {
-      _tags.removeWhere((tag) => tag.startsWith('mood:'));
-      _tags.add('mood:$mood');
-    });
   }
 
   @override
@@ -1233,7 +1068,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
   Widget _buildZenEditor(BuildContext context) {
     final theme = Theme.of(context);
 
-    final mood = _findCurrentMood();
+    final mood = EditorTagAndMoodSheet.findCurrentMood(_tags);
     final nonMoodTags = _tags.where((t) => !t.startsWith('mood:')).toList();
 
     return Column(
@@ -1416,91 +1251,14 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
         ),
 
         // Backlinks Section
-        _buildBacklinkSection(),
+        EditorBacklinkSection(
+          currentNoteId: widget.note?.id,
+          currentTitle: _titleController.text,
+        ),
 
         // Bottom spacer to ensure text is never covered by the floating bar
         const SizedBox(height: 72),
       ],
-    );
-  }
-
-  Widget _buildBacklinkSection() {
-    final theme = Theme.of(context);
-    final noteProvider = Provider.of<NoteProvider>(context, listen: false);
-    final currentTitle = _titleController.text.trim().toLowerCase();
-    
-    if (currentTitle.isEmpty) return const SizedBox.shrink();
-
-    // Find notes that link to this one
-    final backlinks = noteProvider.notes.where((n) {
-      if (n.id == widget.note?.id || n.isEncrypted) return false;
-      return n.content.toLowerCase().contains('[[$currentTitle]]');
-    }).toList();
-
-    if (backlinks.isEmpty) return const SizedBox.shrink();
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.dividerColor.withValues(alpha: 0.1)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.link, size: 18, color: theme.colorScheme.primary),
-              const SizedBox(width: 8),
-              Text(
-                'Geri Bağlantılar (${backlinks.length})',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 14,
-                  color: theme.colorScheme.primary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          ...backlinks.map((n) => Padding(
-                padding: const EdgeInsets.only(bottom: 8.0),
-                child: InkWell(
-                  onTap: () {
-                    Navigator.of(context).pushReplacementNamed('/note-editor', arguments: n);
-                  },
-                  borderRadius: BorderRadius.circular(8),
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.surface,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: theme.dividerColor.withValues(alpha: 0.2)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          n.title,
-                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          n.content.length > 60 ? '${n.content.substring(0, 60)}...' : n.content,
-                          style: TextStyle(fontSize: 12, color: theme.disabledColor),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              )),
-        ],
-      ),
     );
   }
 
