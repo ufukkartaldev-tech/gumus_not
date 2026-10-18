@@ -9,6 +9,7 @@ import 'package:connected_notebook/core/utils/shortcut_manager.dart';
 import 'package:connected_notebook/features/ai/presentation/ai_settings_screen.dart';
 import 'package:connected_notebook/features/settings/screens/theme_selection_screen.dart';
 import 'package:connected_notebook/features/security/services/biometric_service.dart';
+import 'package:connected_notebook/core/security/note_encryption_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -19,8 +20,10 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   final BiometricService _biometricService = BiometricService();
+  final NoteEncryptionService _encryptionService = NoteEncryptionService();
   bool _isAppLockEnabled = false;
   bool _isLoadingLockSetting = true;
+  bool _hasVaultEnvelope = false;
 
   @override
   void initState() {
@@ -30,9 +33,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _loadAppLockSetting() async {
     final enabled = await _biometricService.isAppLockEnabled();
+    final hasEnvelope = await _encryptionService.hasEnvelope();
     if (mounted) {
       setState(() {
         _isAppLockEnabled = enabled;
+        _hasVaultEnvelope = hasEnvelope;
         _isLoadingLockSetting = false;
       });
     }
@@ -146,6 +151,147 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         },
                       ),
               ],
+            ),
+            const Divider(height: 24),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(
+                _hasVaultEnvelope ? Icons.verified_user : Icons.key_outlined,
+                color: _hasVaultEnvelope ? Colors.green : null,
+              ),
+              title: const Text(
+                'Kasa Parolası (Envelope Encryption)',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              subtitle: Text(
+                _hasVaultEnvelope
+                    ? 'Etkin — .vault_key.json ile cihazlar arası kurtarılabilir'
+                    : 'Şifreli notları başka cihazlarda açabilmek için parola belirleyin',
+                style: const TextStyle(fontSize: 12),
+              ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: _showVaultPasswordDialog,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showVaultPasswordDialog() async {
+    final hasEnvelope = await _encryptionService.hasEnvelope();
+    if (!mounted) return;
+
+    final currentPassController = TextEditingController();
+    final newPassController = TextEditingController();
+    final confirmPassController = TextEditingController();
+    String? errorText;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(
+            hasEnvelope ? 'Kasa Parolasını Güncelle / Doğrula' : 'Kasa Parolası Belirle',
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                hasEnvelope
+                    ? 'Mevcut parolanızı girerek kasayı bu cihazda açabilir veya yeni parola belirleyebilirsiniz.'
+                    : 'Şifreli notların anahtarını (DEK) PBKDF2-HMAC-SHA256 ve AES-256-GCM ile .vault_key.json dosyasına sarmalar.',
+                style: const TextStyle(fontSize: 12),
+              ),
+              const SizedBox(height: 12),
+              if (hasEnvelope) ...[
+                TextField(
+                  controller: currentPassController,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Mevcut Kasa Parolası',
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
+              TextField(
+                controller: newPassController,
+                obscureText: true,
+                decoration: InputDecoration(
+                  labelText: hasEnvelope
+                      ? 'Yeni Parola (sadece açmak için boş bırakın)'
+                      : 'Yeni Kasa Parolası (en az 6 karakter)',
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: confirmPassController,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: 'Yeni Parola Tekrar',
+                ),
+              ),
+              if (errorText != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  errorText!,
+                  style: const TextStyle(color: Colors.red, fontSize: 12),
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('İptal'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final currentPass = currentPassController.text;
+                final newPass = newPassController.text;
+                final confirmPass = confirmPassController.text;
+
+                try {
+                  if (hasEnvelope && newPass.isEmpty) {
+                    await _encryptionService.unlockWithMasterPassword(currentPass);
+                    if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+                    _showSuccess('Kasa anahtarı bu cihazda başarıyla açıldı');
+                    return;
+                  }
+
+                  if (newPass.length < 6) {
+                    setDialogState(
+                      () => errorText = 'Yeni parola en az 6 karakter olmalıdır.',
+                    );
+                    return;
+                  }
+                  if (newPass != confirmPass) {
+                    setDialogState(
+                      () => errorText = 'Yeni parolalar eşleşmiyor.',
+                    );
+                    return;
+                  }
+
+                  if (hasEnvelope) {
+                    await _encryptionService.changeMasterPassword(
+                      currentPassword: currentPass,
+                      newPassword: newPass,
+                    );
+                  } else {
+                    await _encryptionService.setupMasterPassword(newPass);
+                  }
+
+                  if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+                  await _loadAppLockSetting();
+                  _showSuccess('Kasa parolası (.vault_key.json) kaydedildi');
+                } on InvalidVaultPasswordException {
+                  setDialogState(() => errorText = 'Mevcut parola hatalı.');
+                } catch (e) {
+                  setDialogState(() => errorText = 'Hata: $e');
+                }
+              },
+              child: const Text('Kaydet'),
             ),
           ],
         ),
