@@ -11,11 +11,10 @@ class NoteService {
   final NoteRepository _repository;
   final BacklinkService _backlinkService;
 
-  /// Create a new note with optional vault encryption.
+  /// Create a new note.
   ///
-  /// Backlinks are extracted from plaintext content before encryption so the
-  /// relational graph remains usable even when the stored note body is
-  /// encrypted at rest.
+  /// At-rest AES-256-GCM encryption is handled transparently by the underlying
+  /// [NoteRepository] when [isEncrypted] is true.
   Future<Note> createNote({
     required String title,
     required String content,
@@ -26,16 +25,9 @@ class NoteService {
   }) async {
     final now = DateTime.now().millisecondsSinceEpoch;
 
-    // Backlink extraction must happen before encryption.
-    final plainTextContent = content;
-    final persistedContent = await _prepareContentForPersistence(
-      content: plainTextContent,
-      isEncrypted: isEncrypted,
-    );
-
     final note = Note(
       title: title,
-      content: persistedContent,
+      content: content,
       tags: tags,
       folderName: folderName,
       color: color,
@@ -45,36 +37,16 @@ class NoteService {
     );
 
     final id = await _repository.addNote(note);
-    final createdNote = note.copyWith(id: id);
-
-    // Preserve backlink graph using plaintext content.
-    await _backlinkService.updateBacklinks(id, plainTextContent);
-
-    return createdNote;
+    return note.copyWith(id: id);
   }
 
-  /// Update an existing note with optional re-encryption.
-  ///
-  /// The incoming [note] is treated as the UI/domain representation. If the
-  /// note is marked encrypted, plaintext content is encrypted only at the final
-  /// persistence stage and backlinks are still derived from plaintext.
+  /// Update an existing note.
   Future<Note> updateNote(Note note) async {
-    final plainTextContent = note.content;
-    final persistedContent = await _prepareContentForPersistence(
-      content: plainTextContent,
-      isEncrypted: note.isEncrypted,
-    );
-
     final updatedNote = note.copyWith(
-      content: persistedContent,
       updatedAt: DateTime.now().millisecondsSinceEpoch,
     );
 
     await _repository.updateNote(updatedNote);
-
-    // Backlinks are recalculated from plaintext content before-at-rest encryption.
-    await _backlinkService.updateBacklinks(note.id, plainTextContent);
-
     return updatedNote;
   }
 
@@ -239,15 +211,5 @@ class NoteService {
 
     return suggestions.toList();
   }
-
-  Future<String> resolveReadableContent(Note note) async {
-    return note.content;
-  }
-
-  Future<String> _prepareContentForPersistence({
-    required String content,
-    required bool isEncrypted,
-  }) async {
-    return content;
-  }
 }
+

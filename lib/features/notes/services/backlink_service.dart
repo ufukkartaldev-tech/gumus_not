@@ -8,14 +8,6 @@ class BacklinkService {
 
   BacklinkService(this._repository);
 
-  /// Update all backlinks for a note when its content changes
-  Future<void> updateBacklinks(int? noteId, String content) async {
-    if (noteId == null) return;
-
-    final allNotes = await _repository.getAllNotes();
-    await _updateBacklinksInternal(noteId, content, allNotes);
-  }
-
   /// Get all notes that link to the specified note (`O(N)` single pass)
   Future<List<Note>> getReferringNotes(int noteId) async {
     final allNotes = await _repository.getAllNotes();
@@ -126,34 +118,6 @@ class BacklinkService {
       'linkedNotes': linkedNotes,
       'referringNotes': referringNotes,
     };
-  }
-
-  /// Internal method to update backlinks (mirrors DatabaseService.updateBacklinks)
-  Future<void> _updateBacklinksInternal(int noteId, String content, List<Note> allNotes) async {
-    // This would typically involve database operations
-    // For now, we'll simulate the backlink update logic
-    final RegExp linkRegex = RegExp(r'\[\[([^\]]+)\]\]');
-    final matches = linkRegex.allMatches(content);
-
-    for (final match in matches) {
-      final linkText = match.group(1);
-      if (linkText == null) continue;
-
-      final targetNote = allNotes.firstWhere(
-        (note) => note.title.toLowerCase() == linkText.toLowerCase(),
-        orElse: () => Note(
-          id: -1,
-          title: linkText,
-          content: '',
-          createdAt: DateTime.now().millisecondsSinceEpoch,
-          updatedAt: DateTime.now().millisecondsSinceEpoch,
-        ),
-      );
-
-      // In a real implementation, this would update the backlinks table
-      // For now, we'll just log the operation
-      print('Backlink: $noteId -> ${targetNote.id} ($linkText)');
-    }
   }
 
   /// Suggest related notes based on link patterns

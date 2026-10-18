@@ -54,19 +54,22 @@ class _CrossReferenceTrackerState extends State<CrossReferenceTracker> {
 
   void _buildInvertedIndex() async {
     final noteProvider = Provider.of<NoteProvider>(context, listen: false);
-    await noteProvider.loadNotes();
-    
+    if (noteProvider.notes.isEmpty) {
+      await noteProvider.loadNotes();
+    }
+    if (!mounted) return;
+
     final allNotes = noteProvider.notes;
     final invertedIndex = <String, List<int>>{};
     final documentFrequencies = <String, int>{};
-    
+
     // Build inverted index and document frequencies
     for (int i = 0; i < allNotes.length; i++) {
       final note = allNotes[i];
       final noteId = note.id;
       if (noteId == null || note.isEncrypted) continue;
       final concepts = _extractConcepts(note.content);
-      
+
       for (final concept in concepts) {
         if (!invertedIndex.containsKey(concept)) {
           invertedIndex[concept] = [];
@@ -76,42 +79,43 @@ class _CrossReferenceTrackerState extends State<CrossReferenceTracker> {
         documentFrequencies[concept] = (documentFrequencies[concept] ?? 0) + 1;
       }
     }
-    
+
     // Calculate TF-IDF scores
     final totalDocuments = allNotes.length;
     final tfidfScores = <String, double>{};
-    
+
     for (final concept in invertedIndex.keys) {
       final df = documentFrequencies[concept] ?? 0;
-      final idf = totalDocuments > 0 ? (totalDocuments / df) : 1.0;
+      final idf = (totalDocuments > 0 && df > 0) ? (totalDocuments / df) : 1.0;
       tfidfScores[concept] = idf; // IDF score (higher = more important)
     }
-    
+
+    if (!mounted) return;
     setState(() {
       _invertedIndex = invertedIndex;
       _tfidfScores = tfidfScores;
       _isLoading = false;
     });
-    
+
     _findRelatedNotes();
     _generateSmartTags();
   }
 
   List<String> _extractConcepts(String text) {
     final concepts = <String>{};
-    
+
     // Extract [[wiki-style links]]
     final wikiLinks = RegExp(r'\[\[([^\]]+)\]\]').allMatches(text);
     for (final match in wikiLinks) {
       concepts.add(match.group(1)!.toLowerCase());
     }
-    
+
     // Extract hashtags
     final hashtags = RegExp(r'#(\w+)').allMatches(text);
     for (final match in hashtags) {
       concepts.add(match.group(1)!.toLowerCase());
     }
-    
+
     // Extract capitalized words (excluding stopwords)
     final capitalizedWords = RegExp(r'\b[A-Z][a-zA-Z]+\b').allMatches(text);
     for (final match in capitalizedWords) {
@@ -120,85 +124,114 @@ class _CrossReferenceTrackerState extends State<CrossReferenceTracker> {
         concepts.add(word.toLowerCase());
       }
     }
-    
+
     return concepts.toList();
   }
 
-  void _findRelatedNotes() async {
-    if (_invertedIndex.isEmpty) return;
-    
+  Future<void> _findRelatedNotes() async {
+    if (_invertedIndex.isEmpty || !mounted) return;
+
     setState(() {
       _isCalculatingSimilarity = true;
     });
 
-    // Use isolate for heavy calculations
-    final receivePort = ReceivePort();
-    await Isolate.spawn(_calculateSimilarityIsolate, {
-      'currentNote': widget.currentNote,
-      'invertedIndex': _invertedIndex,
-      'tfidfScores': _tfidfScores,
-      'sendPort': receivePort.sendPort,
-    });
+    final noteProvider = Provider.of<NoteProvider>(context, listen: false);
+    final notesById = <int, Note>{
+      for (final n in noteProvider.notes)
+        if (n.id != null) n.id!: n,
+    };
 
-    final result = await receivePort.first as List<RelatedNote>;
-    
-    setState(() {
-      _relatedNotes = result.take(10).toList();
-      _isCalculatingSimilarity = false;
-    });
+    // Use isolate for heavy TF-IDF cosine similarity calculations
+    final receivePort = ReceivePort();
+    try {
+      await Isolate.spawn(_calculateSimilarityIsolate, {
+        'currentNoteId': widget.currentNote.id,
+        'currentContent': widget.currentNote.content,
+        'invertedIndex': _invertedIndex,
+        'tfidfScores': _tfidfScores,
+        'sendPort': receivePort.sendPort,
+      });
+
+      final rawResults =
+          await receivePort.first as List<Map<String, dynamic>>;
+      if (!mounted) return;
+
+      final resolvedNotes = <RelatedNote>[];
+      for (final item in rawResults) {
+        final noteId = item['noteId'] as int;
+        final realNote = notesById[noteId];
+        if (realNote == null) continue;
+        resolvedNotes.add(
+          RelatedNote(
+            note: realNote,
+            sharedConcepts: Map<String, double>.from(
+              item['sharedConcepts'] as Map,
+            ),
+            relevanceScore: (item['relevanceScore'] as num).toDouble(),
+          ),
+        );
+        if (resolvedNotes.length >= 10) break;
+      }
+
+      setState(() {
+        _relatedNotes = resolvedNotes;
+        _isCalculatingSimilarity = false;
+      });
+    } finally {
+      receivePort.close();
+    }
   }
 
-  static void _calculateSimilarityIsolate(Map<String, dynamic> data) async {
-    final currentNote = data['currentNote'] as Note;
+  static void _calculateSimilarityIsolate(Map<String, dynamic> data) {
+    final currentNoteId = data['currentNoteId'] as int?;
+    final currentContent = data['currentContent'] as String;
     final invertedIndex = data['invertedIndex'] as Map<String, List<int>>;
     final tfidfScores = data['tfidfScores'] as Map<String, double>;
     final sendPort = data['sendPort'] as SendPort;
 
-    final currentConcepts = _extractConceptsStatic(currentNote.content);
-    final relatedNotes = <RelatedNote>[];
-    
+    final currentConcepts = _extractConceptsStatic(currentContent);
+    final rawRelated = <Map<String, dynamic>>[];
+
     // Get all notes that share concepts
     final sharedConcepts = <int, Map<String, double>>{};
-    
+
     for (final concept in currentConcepts) {
       final noteIds = invertedIndex[concept] ?? [];
       final conceptWeight = tfidfScores[concept] ?? 1.0;
-      
+
       for (final noteId in noteIds) {
-        if (noteId != currentNote.id) {
+        if (noteId != currentNoteId) {
           sharedConcepts.putIfAbsent(noteId, () => {});
           sharedConcepts[noteId]![concept] = conceptWeight;
         }
       }
     }
-    
+
     // Calculate cosine similarity scores and sort
     for (final entry in sharedConcepts.entries) {
       final noteId = entry.key;
       final concepts = entry.value;
-      
-      // Calculate cosine similarity
-      final similarity = _calculateCosineSimilarityStatic(currentConcepts, concepts, tfidfScores);
-      
-      relatedNotes.add(RelatedNote(
-        note: Note(
-          id: noteId,
-          title: 'Note $noteId',
-          content: '',
-          createdAt: 0,
-          updatedAt: 0,
-          isEncrypted: false,
-          tags: [],
-        ),
-        sharedConcepts: concepts,
-        relevanceScore: similarity,
-      ));
+
+      final similarity = _calculateCosineSimilarityStatic(
+        currentConcepts,
+        concepts,
+        tfidfScores,
+      );
+
+      rawRelated.add({
+        'noteId': noteId,
+        'sharedConcepts': concepts,
+        'relevanceScore': similarity,
+      });
     }
-    
-    // Sort by cosine similarity (highest first)
-    relatedNotes.sort((a, b) => b.relevanceScore.compareTo(a.relevanceScore));
-    
-    sendPort.send(relatedNotes);
+
+    rawRelated.sort(
+      (a, b) => (b['relevanceScore'] as double).compareTo(
+        a['relevanceScore'] as double,
+      ),
+    );
+
+    sendPort.send(rawRelated);
   }
 
   static List<String> _extractConceptsStatic(String text) {
