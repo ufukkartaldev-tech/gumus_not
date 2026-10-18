@@ -86,5 +86,21 @@ void main() {
       expect(result.length, 2);
       expect(result.first.id, 2); // Note 2 has higher score
     });
+
+    test('Should boost Zettelkasten neighbors and handle null note IDs safely', () async {
+      final notes = [
+        Note(id: 1, title: 'Zettelkasten', content: 'Temel kavram ve [[Bilgi Ağı]]', createdAt: 1, updatedAt: 1),
+        Note(id: 2, title: 'Bilgi Ağı', content: 'Bağlantılı düşünceler', createdAt: 1, updatedAt: 1),
+        Note(id: null, title: 'Kaydedilmemiş Not', content: 'Zettelkasten deneme', createdAt: 1, updatedAt: 1),
+      ];
+
+      final result = await SearchService.searchNotes('Zettelkasten', notes);
+
+      // Should include exact match (1), semantic neighbor (2), and null-id note without crashing
+      expect(result.length, 3);
+      expect(result.first.id, 1);
+      expect(result.any((n) => n.id == 2), isTrue);
+    });
   });
 }
+

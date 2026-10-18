@@ -1,20 +1,23 @@
 import 'package:connected_notebook/features/notes/models/note_model.dart';
 import 'package:connected_notebook/features/notes/services/search_service_interface.dart';
 import 'package:connected_notebook/features/notes/repositories/note_repository.dart';
+import 'package:connected_notebook/features/search/services/search_service.dart'
+    as semantic_engine;
 
-/// Advanced search service using FTS5 for high performance
-/// Implements the SearchService interface
+/// Advanced search service combining fuzzy (Levenshtein) matching, tag scoring,
+/// and Zettelkasten graph neighbor boosting while excluding encrypted bodies.
 class AdvancedSearchService implements SearchService {
   final NoteRepository _repository;
 
   AdvancedSearchService(this._repository);
-  
+
   @override
   Future<List<Note>> searchNotes(String query, [List<Note>? allNotes]) async {
+    final notes = allNotes ?? await _repository.getAllNotes();
     final cleanQuery = query.trim();
-    if (cleanQuery.isEmpty) return allNotes ?? [];
-    
-    return await _repository.searchNotes(cleanQuery);
+    if (cleanQuery.isEmpty) return notes;
+
+    return semantic_engine.SearchService.searchNotes(cleanQuery, notes);
   }
   
   @override

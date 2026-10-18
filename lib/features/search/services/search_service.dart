@@ -101,32 +101,49 @@ class SearchService {
     // Her notun bağlantılarını hızlıca haritalayalım (Regex ile)
     final linkRegex = RegExp(r'\[\[(.*?)\]\]');
     final Map<int, List<String>> noteOutgoingLinks = {};
-    final Map<String, int> titleToId = {for (var n in allNotes) n.title.toLowerCase(): n.id ?? -1};
+    final Map<String, int> titleToId = {
+      for (var n in allNotes)
+        if (n.id != null) n.title.toLowerCase(): n.id!,
+    };
 
     for (var note in allNotes) {
+      final id = note.id;
+      if (id == null) continue;
+      if (note.isEncrypted) {
+        noteOutgoingLinks[id] = const [];
+        continue;
+      }
       final matches = linkRegex.allMatches(note.content);
-      noteOutgoingLinks[note.id!] = matches.map((m) => m.group(1)!.toLowerCase()).toList();
+      noteOutgoingLinks[id] =
+          matches.map((m) => m.group(1)!.toLowerCase()).toList();
     }
 
     // A) Komşu Desteği (Direct Neighbors)
     // Eğer bir not "Bilgisayar Mimarisi" ise, ona link veren veya ondan link alan tüm notlara puan ver.
     for (var item in scoredNotes) {
       final seedNote = item['note'] as Note;
-      final seedScore = item['score'] as int;
+      final seedId = seedNote.id;
+      if (seedId == null) continue;
 
       // Bu notun bağlandığı (target) notlara puan ekle
-      final targets = noteOutgoingLinks[seedNote.id!] ?? [];
+      final targets = noteOutgoingLinks[seedId] ?? const [];
       for (var targetTitle in targets) {
         final targetId = titleToId[targetTitle];
-        if (targetId != null && targetId != seedNote.id) {
-          semanticScores[targetId] = (semanticScores[targetId] ?? 0) + SCORE_SEMANTIC_BOOST;
+        if (targetId != null && targetId != seedId) {
+          semanticScores[targetId] =
+              (semanticScores[targetId] ?? 0) + SCORE_SEMANTIC_BOOST;
         }
       }
 
       // Bu nota bağlanan (source) notları bul ve onlara puan ekle
       for (var otherNote in allNotes) {
-        if (noteOutgoingLinks[otherNote.id!]?.contains(seedNote.title.toLowerCase()) ?? false) {
-           semanticScores[otherNote.id!] = (semanticScores[otherNote.id!] ?? 0) + SCORE_SEMANTIC_BOOST;
+        final otherId = otherNote.id;
+        if (otherId == null || otherId == seedId) continue;
+        if (noteOutgoingLinks[otherId]
+                ?.contains(seedNote.title.toLowerCase()) ??
+            false) {
+          semanticScores[otherId] =
+              (semanticScores[otherId] ?? 0) + SCORE_SEMANTIC_BOOST;
         }
       }
     }
@@ -137,32 +154,44 @@ class SearchService {
     // (Karmaşıklık nedeniyle sadece yüksek puanlı çekirdekler üzerinden hesaplanacaktır)
 
     // 5. TÜM PUANLARI BİRLEŞTİR
-    final Map<int, Note> resultNodes = {for (var n in allNotes) n.id!: n};
+    final Map<int, Note> resultNodes = {
+      for (var n in allNotes)
+        if (n.id != null) n.id!: n,
+    };
     final Map<int, int> finalScores = {};
+    final List<Map<String, dynamic>> finalResultList = [];
 
     // Önce keyword puanlarını ekle
     for (var item in scoredNotes) {
       final n = item['note'] as Note;
-      finalScores[n.id!] = item['score'] as int;
+      final id = n.id;
+      if (id != null) {
+        finalScores[id] = item['score'] as int;
+      } else {
+        finalResultList.add(item);
+      }
     }
 
     // Sonra semantik puanları ekle (Tüm notlar üzerinden, çünkü hiç keyword eşleşmesi olmayıp sadece bağlı olanlar da gelebilir)
     semanticScores.forEach((id, sScore) {
-      finalScores[id] = (finalScores[id] ?? 0) + sScore;
+      if (resultNodes.containsKey(id)) {
+        finalScores[id] = (finalScores[id] ?? 0) + sScore;
+      }
     });
 
-    final List<Map<String, dynamic>> finalResultList = [];
     finalScores.forEach((id, totalScore) {
-      if (totalScore > 0) {
+      final node = resultNodes[id];
+      if (totalScore > 0 && node != null) {
         finalResultList.add({
-          'note': resultNodes[id],
+          'note': node,
           'score': totalScore,
         });
       }
     });
 
     // Sonuçları sırala
-    finalResultList.sort((a, b) => (b['score'] as int).compareTo(a['score'] as int));
+    finalResultList
+        .sort((a, b) => (b['score'] as int).compareTo(a['score'] as int));
 
     return finalResultList.map((item) => item['note'] as Note).toList();
   }

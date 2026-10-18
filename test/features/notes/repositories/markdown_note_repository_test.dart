@@ -193,6 +193,24 @@ eski düz metin''');
       expect(all.length, 3);
       expect(repository.debugDiskReadCount, readsAfterWrites + 1);
     });
+
+    test('searchNotes never matches encrypted payload prefix or ciphertext body', () async {
+      await repository.addNote(
+        note(title: 'Gizli Kasa', content: 'çok gizli bilgi', isEncrypted: true),
+      );
+      await repository.addNote(
+        note(title: 'Normal Not', content: 'açık içerik', isEncrypted: false),
+      );
+
+      // Searching for "enc" or "v1" (present in enc:v1:... payload) must not match the encrypted note.
+      expect(await repository.searchNotes('enc:v1'), isEmpty);
+      expect(await repository.searchNotes('çok gizli'), isEmpty);
+
+      // Title search still finds the encrypted note.
+      final byTitle = await repository.searchNotes('Gizli Kasa');
+      expect(byTitle.length, 1);
+      expect(byTitle.first.title, 'Gizli Kasa');
+    });
   });
 }
 

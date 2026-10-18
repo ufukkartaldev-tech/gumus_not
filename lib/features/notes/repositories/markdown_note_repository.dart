@@ -380,11 +380,13 @@ class MarkdownNoteRepository implements NoteRepository {
   @override
   Future<List<Note>> searchNotes(String query) async {
     final allNotes = await getAllNotes();
-    final q = query.toLowerCase();
+    final q = query.trim().toLowerCase();
+    if (q.isEmpty) return allNotes;
     return allNotes
         .where((note) =>
             note.title.toLowerCase().contains(q) ||
-            note.content.toLowerCase().contains(q))
+            note.tags.any((tag) => tag.toLowerCase().contains(q)) ||
+            (!note.isEncrypted && note.content.toLowerCase().contains(q)))
         .toList();
   }
 
