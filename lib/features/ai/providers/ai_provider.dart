@@ -50,6 +50,7 @@ class AiProvider extends ChangeNotifier {
   }
 
   void _initializeService() {
+    _activeService?.dispose();
     if (_config.providerType == AiProviderType.none ||
         _config.apiKey == null ||
         _config.apiKey!.trim().isEmpty) {
@@ -70,6 +71,12 @@ class AiProvider extends ChangeNotifier {
     }
   }
 
+  @override
+  void dispose() {
+    _activeService?.dispose();
+    super.dispose();
+  }
+
   /// Belirtilen veya mevcut yapılandırma ile bağlantıyı test eder.
   /// Başarılıysa `null`, hata varsa kullanıcı dostu hata mesajı döner.
   Future<String?> testConnection([AiConfig? customConfig]) async {
@@ -81,8 +88,8 @@ class AiProvider extends ChangeNotifier {
       return 'Lütfen bir API anahtarı girin.';
     }
 
+    IAiService? testService;
     try {
-      IAiService testService;
       if (targetConfig.providerType == AiProviderType.gemini) {
         testService = GeminiAiService(targetConfig);
       } else {
@@ -95,10 +102,71 @@ class AiProvider extends ChangeNotifier {
       return e.message;
     } catch (e) {
       return 'Bağlantı testi başarısız oldu: $e';
+    } finally {
+      testService?.dispose();
     }
   }
 
   // --- Caching Proxy Methods (SimHash LSH + SHA-256) ---
+
+  /// Streams the summary token-by-token while transparently checking and
+  /// populating the privacy-preserving SimHash LSH cache.
+  Stream<String> streamSummary(
+    String text, {
+    required String noteId,
+    bool isEncrypted = false,
+  }) async* {
+    if (!isAiEnabled) {
+      throw AiException.unconfigured(
+        'AI servisi kapalı veya yapılandırılmamış. Lütfen Ayarlar > Yapay Zeka ekranından yapılandırın.',
+      );
+    }
+
+    _isLoading = true;
+    _lastError = null;
+    notifyListeners();
+
+    try {
+      final cached = await _cacheService.getCached(
+        'summary',
+        noteId,
+        text,
+        allowDiskRead: !isEncrypted,
+      );
+      if (cached != null) {
+        debugPrint("AI Cache Hit (SimHash LSH): Özet önbellekten getirildi.");
+        yield cached;
+        return;
+      }
+
+      final buffer = StringBuffer();
+      await for (final chunk in _activeService!.streamSummary(text)) {
+        buffer.write(chunk);
+        yield chunk;
+      }
+
+      final fullResult = buffer.toString().trim();
+      if (fullResult.isNotEmpty) {
+        await _cacheService.setCached(
+          'summary',
+          noteId,
+          text,
+          fullResult,
+          persistToDisk: !isEncrypted,
+        );
+      }
+    } on AiException catch (e) {
+      _lastError = e.message;
+      rethrow;
+    } catch (e) {
+      final message = 'Özet oluşturulurken beklenmeyen bir hata oluştu: $e';
+      _lastError = message;
+      throw AiException(message);
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
 
   Future<String> getSummary(
     String text, {

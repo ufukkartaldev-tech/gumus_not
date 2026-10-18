@@ -7,6 +7,7 @@ import 'package:connected_notebook/features/ai/models/ai_exception.dart';
 import 'package:connected_notebook/features/ai/models/ai_provider_type.dart';
 import 'package:connected_notebook/features/ai/providers/ai_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:connected_notebook/features/ai/services/iai_service.dart';
 import 'package:connected_notebook/features/ai/services/ai_cache_service.dart';
 import 'package:connected_notebook/features/ai/services/openai_compatible_service.dart';
 
@@ -198,6 +199,52 @@ void main() {
         () => service.generateSummary('Test metni'),
         throwsA(isA<AiException>()),
       );
+    });
+
+    test('Should stream SSE chunks in real time from streamSummary', () async {
+      final mockClient = MockClient.streaming((request, bodyStream) async {
+        final sseEvents = [
+          'data: ${jsonEncode({'choices': [{'delta': {'content': 'Birinci '}}]})}\n\n',
+          'data: ${jsonEncode({'choices': [{'delta': {'content': 'parça.'}}]})}\n\n',
+          'data: [DONE]\n\n',
+        ];
+        final stream = Stream<List<int>>.fromIterable(
+          sseEvents.map((e) => utf8.encode(e)),
+        );
+        return http.StreamedResponse(stream, 200);
+      });
+
+      final service = OpenAiCompatibleService(
+        AiConfig(providerType: AiProviderType.openAiCompatible, apiKey: 'valid-key'),
+        client: mockClient,
+      );
+
+      final chunks = await service.streamSummary('Uzun teknik doküman').toList();
+      expect(chunks, equals(['Birinci ', 'parça.']));
+    });
+
+    test('Should block insecure cleartext HTTP baseUrl for remote hosts while allowing localhost', () async {
+      final remoteHttpService = OpenAiCompatibleService(
+        AiConfig(
+          providerType: AiProviderType.openAiCompatible,
+          apiKey: 'secret-key',
+          baseUrl: 'http://insecure.example.com/v1',
+        ),
+      );
+
+      expect(
+        () => remoteHttpService.generateSummary('Not'),
+        throwsA(isA<AiException>().having((e) => e.message, 'message', contains('HTTPS'))),
+      );
+    });
+
+    test('IAiService.compactContextWindow should preserve head (70%) and tail (30%) when exceeding budget', () {
+      final longText = 'A' * 700 + 'M' * 500 + 'Z' * 300;
+      final compacted = IAiService.compactContextWindow(longText, maxChars: 1000);
+
+      expect(compacted.startsWith('A' * 700), isTrue);
+      expect(compacted.endsWith('Z' * 300), isTrue);
+      expect(compacted, contains('500 karakter bağlam sınırı nedeniyle kırpıldı'));
     });
   });
 

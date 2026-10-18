@@ -703,13 +703,33 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
       final String noteId = widget.note?.id?.toString() ?? _titleController.text.trim();
       
       if (action == 'summary') {
-        final summary = await aiProvider.getSummary(
+        const header = '\n\n> **✨ AI Özeti:**\n> ';
+        final baseText = _contentController.text;
+        final insertPos = _contentController.selection.isValid
+            ? _contentController.selection.start
+            : baseText.length;
+        final before = baseText.substring(0, insertPos);
+        final after = baseText.substring(insertPos);
+
+        final streamedBuffer = StringBuffer();
+        await for (final chunk in aiProvider.streamSummary(
           text,
           noteId: noteId,
           isEncrypted: _isEncrypted,
-        );
-        final formattedSummary = '\n\n> **✨ AI Özeti:**\n> ${summary.replaceAll('\n', '\n> ')}\n\n';
-        _insertTextAtCursor(formattedSummary);
+        )) {
+          if (!mounted) break;
+          streamedBuffer.write(chunk);
+          final formattedBody =
+              streamedBuffer.toString().replaceAll('\n', '\n> ');
+          final liveBlock = '$header$formattedBody\n\n';
+          final updatedText = '$before$liveBlock$after';
+          _contentController.value = TextEditingValue(
+            text: updatedText,
+            selection: TextSelection.collapsed(
+              offset: before.length + liveBlock.length,
+            ),
+          );
+        }
         _showSuccess('Özet eklendi!');
       } else if (action == 'tags') {
         final suggestedTags = await aiProvider.getTags(
