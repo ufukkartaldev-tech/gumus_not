@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:googleapis/drive/v3.dart' as drive;
@@ -7,6 +8,7 @@ import 'package:archive/archive_io.dart';
 import 'package:encrypt/encrypt.dart' as enc;
 import 'package:crypto/crypto.dart';
 
+import 'package:connected_notebook/core/security/note_encryption_service.dart';
 import 'package:connected_notebook/features/backup/services/markdown_backup_utils.dart';
 
 class GoogleAuthClient extends http.BaseClient {
@@ -19,22 +21,157 @@ class GoogleAuthClient extends http.BaseClient {
   Future<http.StreamedResponse> send(http.BaseRequest request) {
     return _client.send(request..headers.addAll(_headers));
   }
+
+  @override
+  void close() {
+    _client.close();
+    super.close();
+  }
 }
 
+/// Manages encrypted cloud backups on Google Drive (`appDataFolder`).
+///
+/// ### Binary Payload Format v2 (`GNCB\x02`):
+/// - Bytes `0..4`: Magic header `[0x47, 0x4E, 0x43, 0x42, 0x02]` (`"GNCB\x02"`)
+/// - Bytes `5..8`: Big-endian `uint32` PBKDF2 iteration count (default `120,000`)
+/// - Bytes `9..24`: 16-byte cryptographically random PBKDF2 salt
+/// - Bytes `25..40`: 16-byte cryptographically random AES-GCM IV (nonce)
+/// - Bytes `41..N`: AES-256-GCM ciphertext + 128-bit authentication tag (MAC)
+///
+/// ### Legacy Compatibility (v1):
+/// Payloads without the `GNCB\x02` header fall back to the legacy v1 format
+/// (`[16-byte IV][AES-256-SIC ciphertext]` keyed by single-pass `SHA-256(password)`)
+/// so existing user backups on Google Drive remain restorable.
 class CloudSyncService {
   static const String _backupFileName = 'gumusnot_secure_backup.enc';
+  static const List<int> _v2MagicHeader = [0x47, 0x4E, 0x43, 0x42, 0x02]; // "GNCB\x02"
+  static const int _saltLength = 16;
+  static const int _ivLength = 16;
+  static const int _v2HeaderTotalLength = 5 + 4 + _saltLength + _ivLength; // 41 bytes
 
   final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
+  final int pbkdf2Iterations;
 
-  /// Kullanıcının parolasıyla 32-byte (256-bit) AES anahtarı oluşturur
-  enc.Key _generateKey(String password) {
+  CloudSyncService({
+    this.pbkdf2Iterations = NoteEncryptionService.defaultPbkdf2Iterations,
+  });
+
+  /// Legacy v1 key derivation (single-pass SHA-256 without salt) kept strictly
+  /// for backward-compatible restoration of older v1 backups.
+  static enc.Key _generateLegacyV1Key(String password) {
     final bytes = utf8.encode(password);
     final digest = sha256.convert(bytes);
     return enc.Key(Uint8List.fromList(digest.bytes));
   }
 
+  /// Encrypts [zipBytes] using **PBKDF2-HMAC-SHA256** key derivation with a
+  /// fresh 128-bit random salt and **AES-256-GCM** authenticated encryption.
+  @visibleForTesting
+  Uint8List encryptBackupPayload(List<int> zipBytes, String password) {
+    if (password.isEmpty) {
+      throw ArgumentError('Yedekleme parolası boş olamaz.');
+    }
+
+    final salt = enc.IV.fromSecureRandom(_saltLength).bytes;
+    final iv = enc.IV.fromSecureRandom(_ivLength);
+    final keyBytes = NoteEncryptionService.pbkdf2Sha256(
+      password: password,
+      salt: salt,
+      iterations: pbkdf2Iterations,
+      keyLength: 32,
+    );
+
+    final encrypter = enc.Encrypter(
+      enc.AES(enc.Key(keyBytes), mode: enc.AESMode.gcm),
+    );
+    final encrypted = encrypter.encryptBytes(zipBytes, iv: iv);
+
+    final iterBytes = ByteData(4)..setUint32(0, pbkdf2Iterations, Endian.big);
+
+    final builder = BytesBuilder(copy: false)
+      ..add(_v2MagicHeader)
+      ..add(iterBytes.buffer.asUint8List())
+      ..add(salt)
+      ..add(iv.bytes)
+      ..add(encrypted.bytes);
+
+    return builder.toBytes();
+  }
+
+  /// Decrypts [payloadBytes] produced by [encryptBackupPayload] (v2 AES-256-GCM
+  /// + PBKDF2-HMAC-SHA256), or transparently falls back to legacy v1 decryption
+  /// if the payload does not start with the v2 magic header.
+  @visibleForTesting
+  List<int> decryptBackupPayload(List<int> payloadBytes, String password) {
+    if (_hasV2Header(payloadBytes)) {
+      if (payloadBytes.length <= _v2HeaderTotalLength + 16) {
+        throw const FormatException('Yedek dosyası bozuk veya eksik (v2).');
+      }
+
+      final data = Uint8List.fromList(payloadBytes);
+      final iterations = ByteData.sublistView(data, 5, 9).getUint32(0, Endian.big);
+      if (iterations < 1000 || iterations > 5000000) {
+        throw const FormatException('Geçersiz PBKDF2 iterasyon sayısı.');
+      }
+
+      final salt = Uint8List.sublistView(data, 9, 9 + _saltLength);
+      final ivBytes = Uint8List.sublistView(
+        data,
+        9 + _saltLength,
+        9 + _saltLength + _ivLength,
+      );
+      final ciphertext = Uint8List.sublistView(data, _v2HeaderTotalLength);
+
+      final keyBytes = NoteEncryptionService.pbkdf2Sha256(
+        password: password,
+        salt: salt,
+        iterations: iterations,
+        keyLength: 32,
+      );
+
+      final encrypter = enc.Encrypter(
+        enc.AES(enc.Key(keyBytes), mode: enc.AESMode.gcm),
+      );
+      return encrypter.decryptBytes(
+        enc.Encrypted(ciphertext),
+        iv: enc.IV(ivBytes),
+      );
+    }
+
+    // Legacy v1 fallback: [16-byte IV][AES-256 default SIC/CTR ciphertext]
+    if (payloadBytes.length <= _ivLength) {
+      throw const FormatException('Yedek dosyası bozuk.');
+    }
+
+    final key = _generateLegacyV1Key(password);
+    final ivBytes = Uint8List.fromList(payloadBytes.sublist(0, _ivLength));
+    final encryptedBytes = Uint8List.fromList(payloadBytes.sublist(_ivLength));
+
+    final iv = enc.IV(ivBytes);
+    final encrypter = enc.Encrypter(enc.AES(key));
+    return encrypter.decryptBytes(enc.Encrypted(encryptedBytes), iv: iv);
+  }
+
+  /// Helper for testing legacy v1 payload creation.
+  @visibleForTesting
+  static Uint8List createLegacyV1PayloadForTest(List<int> zipBytes, String password) {
+    final key = _generateLegacyV1Key(password);
+    final iv = enc.IV.fromSecureRandom(_ivLength);
+    final encrypter = enc.Encrypter(enc.AES(key));
+    final encrypted = encrypter.encryptBytes(zipBytes, iv: iv);
+    return Uint8List.fromList(<int>[...iv.bytes, ...encrypted.bytes]);
+  }
+
+  static bool _hasV2Header(List<int> bytes) {
+    if (bytes.length < _v2MagicHeader.length) return false;
+    for (var i = 0; i < _v2MagicHeader.length; i++) {
+      if (bytes[i] != _v2MagicHeader[i]) return false;
+    }
+    return true;
+  }
+
   /// Google ile giriş yapıp yetkilendirilmiş Drive API istemcisi döner
-  Future<drive.DriveApi?> _getDriveApi() async {
+  Future<(drive.DriveApi, GoogleAuthClient)?> _getDriveApi() async {
     const scopes = <String>[drive.DriveApi.driveAppdataScope];
     try {
       await _googleSignIn.initialize();
@@ -48,20 +185,25 @@ class CloudSyncService {
       if (authHeaders == null) return null;
 
       final authenticateClient = GoogleAuthClient(authHeaders);
-      return drive.DriveApi(authenticateClient);
+      return (drive.DriveApi(authenticateClient), authenticateClient);
     } catch (e) {
       debugPrint('Google Sign-In Hatası: $e');
       return null;
     }
   }
 
-  /// Veritabanını kilitli ZIP'e çevirir ve Drive'a yükler
+  /// Çalışma alanını kilitli ZIP'e çevirir (PBKDF2-HMAC-SHA256 + AES-256-GCM) ve Drive'a yükler
   Future<Map<String, dynamic>> backupToDrive(String password) async {
     if (kIsWeb) return {'success': false, 'message': 'Web sürümü desteklenmiyor.'};
 
+    GoogleAuthClient? authClient;
     try {
-      final driveApi = await _getDriveApi();
-      if (driveApi == null) return {'success': false, 'message': 'Google girişi yapılamadı veya iptal edildi.'};
+      final apiBundle = await _getDriveApi();
+      if (apiBundle == null) {
+        return {'success': false, 'message': 'Google girişi yapılamadı veya iptal edildi.'};
+      }
+      final (driveApi, client) = apiBundle;
+      authClient = client;
 
       // 1. Markdown çalışma alanını (notlar + şablonlar) zip'le
       final zipBytes = await MarkdownBackupUtils.zipWorkspace();
@@ -69,15 +211,8 @@ class CloudSyncService {
         return {'success': false, 'message': 'Yedeklenecek markdown dosyası bulunamadı.'};
       }
 
-      // 2. Şifrele (AES-256)
-      final key = _generateKey(password);
-      final iv = enc.IV.fromSecureRandom(16);
-      final encrypter = enc.Encrypter(enc.AES(key));
-      
-      final encrypted = encrypter.encryptBytes(zipBytes, iv: iv);
-      
-      // IV'yi (16 byte) dosyanın başına ekleyelim ki çözerken doğru vektörü bilelim
-      final finalBytes = <int>[...iv.bytes, ...encrypted.bytes];
+      // 2. Şifrele (v2: PBKDF2-HMAC-SHA256 + 16B Salt + 16B IV + AES-256-GCM)
+      final finalBytes = encryptBackupPayload(zipBytes, password);
 
       // 3. Drive'a Yükle (appDataFolder -> Kullanıcı bu klasörü göremez, çok güvenlidir)
       final media = drive.Media(Stream.value(finalBytes), finalBytes.length);
@@ -86,7 +221,10 @@ class CloudSyncService {
         ..parents = ['appDataFolder'];
 
       // Eski yedeği bul ve güncelle (Eğer yoksa yeni oluştur)
-      final fileList = await driveApi.files.list(spaces: 'appDataFolder', q: "name='$_backupFileName'");
+      final fileList = await driveApi.files.list(
+        spaces: 'appDataFolder',
+        q: "name='$_backupFileName'",
+      );
       if (fileList.files != null && fileList.files!.isNotEmpty) {
         final existingFileId = fileList.files!.first.id!;
         await driveApi.files.update(drive.File(), existingFileId, uploadMedia: media);
@@ -98,52 +236,68 @@ class CloudSyncService {
     } catch (e) {
       debugPrint('Bulut yedekleme hatası: $e');
       return {'success': false, 'message': 'Yedekleme başarısız: $e'};
+    } finally {
+      authClient?.close();
     }
   }
 
-  /// Drive'dan şifreli yedeği indirir, parolayı çözer ve geri yükler
+  /// Drive'dan şifreli yedeği indirir, parolayı çözer (v2 GCM veya v1 Legacy) ve geri yükler
   Future<Map<String, dynamic>> restoreFromDrive(String password) async {
     if (kIsWeb) return {'success': false, 'message': 'Web sürümü desteklenmiyor.'};
 
+    GoogleAuthClient? authClient;
     try {
-      final driveApi = await _getDriveApi();
-      if (driveApi == null) return {'success': false, 'message': 'Google girişi yapılamadı.'};
+      final apiBundle = await _getDriveApi();
+      if (apiBundle == null) {
+        return {'success': false, 'message': 'Google girişi yapılamadı.'};
+      }
+      final (driveApi, client) = apiBundle;
+      authClient = client;
 
       // 1. Dosyayı Bul
-      final fileList = await driveApi.files.list(spaces: 'appDataFolder', q: "name='$_backupFileName'");
+      final fileList = await driveApi.files.list(
+        spaces: 'appDataFolder',
+        q: "name='$_backupFileName'",
+      );
       if (fileList.files == null || fileList.files!.isEmpty) {
         return {'success': false, 'message': 'Bulutta size ait bir yedek bulunamadı.'};
       }
-      
+
       final fileId = fileList.files!.first.id!;
 
       // 2. Dosyayı İndir
-      final media = await driveApi.files.get(fileId, downloadOptions: drive.DownloadOptions.fullMedia) as drive.Media;
+      final media = await driveApi.files.get(
+        fileId,
+        downloadOptions: drive.DownloadOptions.fullMedia,
+      ) as drive.Media;
       final bytes = <int>[];
       await for (final chunk in media.stream) {
         bytes.addAll(chunk);
       }
 
-      if (bytes.length <= 16) return {'success': false, 'message': 'Yedek dosyası bozuk.'};
+      if (bytes.length <= _ivLength) {
+        return {'success': false, 'message': 'Yedek dosyası bozuk.'};
+      }
 
-      // 3. Şifreyi Çöz
-      final key = _generateKey(password);
-      final ivBytes = Uint8List.fromList(bytes.sublist(0, 16));
-      final encryptedBytes = Uint8List.fromList(bytes.sublist(16));
-      
-      final iv = enc.IV(ivBytes);
-      final encrypter = enc.Encrypter(enc.AES(key));
-      
+      // 3. Şifreyi Çöz (v2 AES-256-GCM + PBKDF2 veya v1 Legacy fallback)
       List<int> decryptedZipBytes;
       try {
-        decryptedZipBytes = encrypter.decryptBytes(enc.Encrypted(encryptedBytes), iv: iv);
+        decryptedZipBytes = decryptBackupPayload(bytes, password);
+      } on FormatException catch (e) {
+        return {'success': false, 'message': e.message};
       } catch (e) {
-        // Parola yanlışsa çözme işleminde hata fırlatır
+        // Parola yanlışsa (GCM MAC hatası) veya bozuksa hata fırlatır
         return {'success': false, 'message': 'Parola yanlış! Yedeğiniz açılamadı. ❌'};
       }
 
       // 4. Zip'i aç ve markdown dosyalarını yedekteki haliyle değiştir
-      final archive = ZipDecoder().decodeBytes(decryptedZipBytes);
+      final Archive archive;
+      try {
+        archive = ZipDecoder().decodeBytes(decryptedZipBytes);
+      } catch (_) {
+        return {'success': false, 'message': 'Parola yanlış veya yedek arşivi bozuk! ❌'};
+      }
+
       final restoredCount = await MarkdownBackupUtils.extractWorkspace(
         archive,
         replaceExisting: true,
@@ -157,6 +311,8 @@ class CloudSyncService {
     } catch (e) {
       debugPrint('Bulut geri yükleme hatası: $e');
       return {'success': false, 'message': 'Geri yükleme başarısız: $e'};
+    } finally {
+      authClient?.close();
     }
   }
 }
