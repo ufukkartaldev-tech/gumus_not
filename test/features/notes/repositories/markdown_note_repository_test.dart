@@ -226,6 +226,42 @@ eski düz metin''');
       expect(leftovers, isEmpty);
       expect((await repository.getNoteById(id))?.content, 'v2 içerik');
     });
+
+    test('renaming a note automatically updates [[Wikilinks]] across referring notes', () async {
+      final targetId = await repository.addNote(
+        note(title: 'Mimari Tasarım', content: 'hedef içerik'),
+      );
+      final refId = await repository.addNote(
+        note(
+          title: 'Proje Özeti',
+          content: 'Detaylar için [[Mimari Tasarım]] ve [[mimari tasarım]] notlarına bakın.',
+        ),
+      );
+      final encId = await repository.addNote(
+        note(
+          title: 'Şifreli Referans',
+          content: 'Gizli [[Mimari Tasarım]] bağlantısı',
+          isEncrypted: true,
+        ),
+      );
+
+      final target = await repository.getNoteById(targetId);
+      await repository.updateNote(target!.copyWith(title: 'Sistem Mimarisi'));
+
+      final updatedRef = await repository.getNoteById(refId);
+      expect(
+        updatedRef?.content,
+        'Detaylar için [[Sistem Mimarisi]] ve [[Sistem Mimarisi]] notlarına bakın.',
+      );
+      expect(
+        storedFileByTitle('Proje Özeti.md'),
+        contains('[[Sistem Mimarisi]]'),
+      );
+
+      // Encrypted notes remain untouched in ciphertext.
+      final encNote = await repository.getNoteById(encId);
+      expect(NoteEncryptionService.isEncryptedPayload(encNote!.content), isTrue);
+    });
   });
 }
 

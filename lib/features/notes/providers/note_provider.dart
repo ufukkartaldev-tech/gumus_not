@@ -134,7 +134,7 @@ class NoteProvider with ChangeNotifier {
     }
   }
 
-  /// Update an existing note
+  /// Update an existing note (and refresh in-memory list in case title rename propagated wikilinks)
   Future<void> updateNote(Note note) async {
     try {
       await _repository.updateNote(note);
@@ -142,10 +142,16 @@ class NoteProvider with ChangeNotifier {
       // Update backlinks
       await _repository.updateBacklinks(note, _notes);
 
-      // Update local state
-      final index = _notes.indexWhere((n) => n.id == note.id);
-      if (index != -1) {
-        _notes[index] = note;
+      // Refresh from repository cache (zero disk I/O) so any automatic
+      // [[wikilink]] rewrites across referring notes are reflected in UI.
+      final refreshed = await _repository.getAllNotes();
+      if (refreshed.isNotEmpty) {
+        _notes = refreshed;
+      } else {
+        final index = _notes.indexWhere((n) => n.id == note.id);
+        if (index != -1) {
+          _notes[index] = note;
+        }
       }
       _invalidateDerivedCaches();
 

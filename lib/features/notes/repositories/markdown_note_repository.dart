@@ -345,6 +345,56 @@ class MarkdownNoteRepository implements NoteRepository {
     return id;
   }
 
+  /// Rewrites `[[oldTitle]]` wikilinks to `[[newTitle]]` (case-insensitive)
+  /// across all unencrypted notes in the workspace so renaming a note never
+  /// leaves broken links behind.
+  Future<void> _propagateTitleRename({
+    required Directory dir,
+    required int renamedNoteId,
+    required String oldTitle,
+    required String newTitle,
+  }) async {
+    final oldTrimmed = oldTitle.trim();
+    final newTrimmed = newTitle.trim();
+    if (oldTrimmed.isEmpty ||
+        newTrimmed.isEmpty ||
+        oldTrimmed.toLowerCase() == newTrimmed.toLowerCase()) {
+      return;
+    }
+
+    await _syncCacheWithDisk(dir);
+    final linkPattern = RegExp(
+      r'\[\[\s*' + RegExp.escape(oldTrimmed) + r'\s*\]\]',
+      caseSensitive: false,
+    );
+
+    final entries = _fileCache.entries.toList();
+    for (final entry in entries) {
+      final candidate = entry.value.note;
+      if (candidate.id == renamedNoteId || candidate.isEncrypted) continue;
+      if (!linkPattern.hasMatch(candidate.content)) continue;
+
+      final updatedContent = candidate.content.replaceAll(
+        linkPattern,
+        '[[$newTrimmed]]',
+      );
+      if (updatedContent == candidate.content) continue;
+
+      final updatedNote = candidate.copyWith(
+        content: updatedContent,
+        updatedAt: DateTime.now().millisecondsSinceEpoch,
+      );
+      final candidateFile = File(
+        _idToFilePath[candidate.id!] ?? entry.key,
+      );
+      await _writeAndReplaceOldFile(
+        dir: dir,
+        noteToSave: updatedNote,
+        existingFile: await candidateFile.exists() ? candidateFile : null,
+      );
+    }
+  }
+
   @override
   Future<void> updateNote(Note note) async {
     if (!_isAvailable) {
@@ -358,17 +408,20 @@ class MarkdownNoteRepository implements NoteRepository {
     final dir = await _notesDir();
     final existingFile = await _findFileById(dir, id);
 
+    Note? previousNote;
+    if (existingFile != null && await existingFile.exists()) {
+      final existingKey = _normPath(existingFile.path);
+      previousNote = _fileCache[existingKey]?.note ??
+          await _readAndCacheFile(existingFile);
+    }
+
     // A locked note re-saved without unlocking carries only the placeholder
     // in its content; persisting it would destroy the stored ciphertext.
     if (note.isEncrypted &&
         note.content == NoteEncryptionService.lockedNotePlaceholder &&
-        existingFile != null &&
-        await existingFile.exists()) {
-      final existingKey = _normPath(existingFile.path);
-      final existingNote = _fileCache[existingKey]?.note ??
-          await _readAndCacheFile(existingFile);
+        previousNote != null) {
       final toSave = note.copyWith(
-        content: existingNote.content,
+        content: previousNote.content,
         updatedAt: DateTime.now().millisecondsSinceEpoch,
       );
       await _writeAndReplaceOldFile(
@@ -376,6 +429,14 @@ class MarkdownNoteRepository implements NoteRepository {
         noteToSave: toSave,
         existingFile: existingFile,
       );
+      if (previousNote.title != note.title) {
+        await _propagateTitleRename(
+          dir: dir,
+          renamedNoteId: id,
+          oldTitle: previousNote.title,
+          newTitle: note.title,
+        );
+      }
       await _commit('Update note metadata: ${note.title}');
       return;
     }
@@ -390,6 +451,14 @@ class MarkdownNoteRepository implements NoteRepository {
       noteToSave: toSave,
       existingFile: existingFile,
     );
+    if (previousNote != null && previousNote.title != note.title) {
+      await _propagateTitleRename(
+        dir: dir,
+        renamedNoteId: id,
+        oldTitle: previousNote.title,
+        newTitle: note.title,
+      );
+    }
     await _commit('Update note: ${note.title}');
   }
 
