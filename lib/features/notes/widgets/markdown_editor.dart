@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
@@ -63,9 +64,21 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
   bool _isVimInsertMode = false; // Start in Normal mode if Vim is enabled
   bool _hasSelection = false;
 
+  // Auto-save & dirty state tracking
+  static const Duration _autoSaveDelay = Duration(milliseconds: 1500);
+  Timer? _autoSaveTimer;
+  int? _persistedNoteId;
+  int _createdAt = 0;
+  String _lastSavedTitle = '';
+  String _lastSavedContent = '';
+  bool _isDirty = false;
+  bool _isAutoSaving = false;
+  bool _allowPop = false;
+
   final VoiceNoteService _voiceNoteService = VoiceNoteService();
   bool _isRecording = false;
   bool _isAiLoading = false;
+  StreamSubscription<String>? _aiStreamSubscription;
 
   final FocusNode _titleFocusNode = FocusNode();
   final FocusNode _contentFocusNode = FocusNode();
@@ -95,6 +108,8 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
   @override
   void initState() {
     super.initState();
+    _persistedNoteId = widget.note?.id;
+    _createdAt = widget.note?.createdAt ?? DateTime.now().millisecondsSinceEpoch;
     _titleController = TextEditingController(text: widget.note?.title ?? '');
     _tags = List<String>.from(widget.note?.tags ?? []);
 
@@ -117,12 +132,16 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
     _selectedColor = widget.note?.color;
     _emojiIcon = widget.note?.emojiIcon;
 
+    _lastSavedTitle = _titleController.text.trim();
+    _lastSavedContent = _contentController.text;
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         context.read<NoteEditorProvider>().initialize(widget.note);
       }
     });
 
+    _titleController.addListener(_onEditorFieldChanged);
     _contentController.addListener(_onContentChanged);
     _setupVimMode();
   }
@@ -219,7 +238,6 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
     final prevNewline = clamped == 0 ? -1 : text.lastIndexOf('\n', clamped - 1);
     final currentLineStart = prevNewline + 1;
     final nextNewline = text.indexOf('\n', clamped);
-    final currentLineEnd = nextNewline == -1 ? text.length : nextNewline;
     final column = clamped - currentLineStart;
 
     if (moveDown) {
@@ -240,6 +258,11 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
   }
 
 
+  void _onEditorFieldChanged() {
+    if (!mounted) return;
+    _checkDirtyAndScheduleAutoSave();
+  }
+
   void _onContentChanged() {
     if (!mounted) return;
     final hasSelection = _contentController.selection.isValid &&
@@ -249,10 +272,161 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
         _hasSelection = hasSelection;
       });
     }
+    _checkDirtyAndScheduleAutoSave();
+  }
+
+  void _checkDirtyAndScheduleAutoSave() {
+    final currentTitle = _titleController.text.trim();
+    final currentContent = _contentController.text;
+    final dirty =
+        currentTitle != _lastSavedTitle || currentContent != _lastSavedContent;
+
+    if (dirty != _isDirty) {
+      setState(() {
+        _isDirty = dirty;
+      });
+    }
+
+    if (dirty && currentTitle.isNotEmpty && !_isAiLoading) {
+      _scheduleAutoSave();
+    } else if (!dirty) {
+      _autoSaveTimer?.cancel();
+    }
+  }
+
+  void _scheduleAutoSave() {
+    _autoSaveTimer?.cancel();
+    _autoSaveTimer = Timer(_autoSaveDelay, _performAutoSave);
+  }
+
+  Future<void> _performAutoSave() async {
+    if (!mounted || !_isDirty || _isLoading || _isAutoSaving) return;
+    final currentTitle = _titleController.text.trim();
+    if (currentTitle.isEmpty) return;
+
+    setState(() => _isAutoSaving = true);
+    try {
+      await _persistNoteInternal(closeAfterSave: false);
+    } catch (e) {
+      debugPrint('Auto-save error: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isAutoSaving = false);
+      }
+    }
+  }
+
+  Note _buildCurrentNoteSnapshot() {
+    final wasEncrypted = widget.note?.isEncrypted ?? false;
+    final content = (wasEncrypted && !_isUnlocked)
+        ? _storedEncryptedContent
+        : _contentController.text;
+
+    return Note(
+      id: _persistedNoteId,
+      title: _titleController.text.trim(),
+      content: content,
+      createdAt: _createdAt,
+      updatedAt: DateTime.now().millisecondsSinceEpoch,
+      isEncrypted: _isEncrypted,
+      tags: _tags,
+      color: _selectedColor,
+      folderName: widget.note?.folderName ?? 'Genel',
+      emojiIcon: _emojiIcon,
+    );
+  }
+
+  Future<Note> _persistNoteInternal({required bool closeAfterSave}) async {
+    final note = _buildCurrentNoteSnapshot();
+    final noteProvider = Provider.of<NoteProvider>(context, listen: false);
+    final Note persistedNote;
+    if (note.id == null) {
+      persistedNote = await noteProvider.addNote(note);
+      _persistedNoteId = persistedNote.id;
+    } else {
+      await noteProvider.updateNote(note);
+      persistedNote = note;
+    }
+
+    _lastSavedTitle = _titleController.text.trim();
+    _lastSavedContent = _contentController.text;
+    _isDirty = false;
+
+    if (closeAfterSave) {
+      _allowPop = true;
+      widget.onSave(persistedNote);
+    }
+    return persistedNote;
+  }
+
+  Future<void> _handleBackOrCancel() async {
+    _autoSaveTimer?.cancel();
+    if (!_isDirty) {
+      _allowPop = true;
+      if (widget.onCancel != null) {
+        widget.onCancel!();
+      } else if (mounted) {
+        Navigator.of(context).maybePop();
+      }
+      return;
+    }
+
+    // If title is non-empty, offer to save or discard; if title is empty, warn before discarding.
+    final canSave = _titleController.text.trim().isNotEmpty;
+    final decision = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Kaydedilmemiş Değişiklikler Var'),
+        content: Text(
+          canSave
+              ? 'Notunuzda henüz kaydedilmemiş değişiklikler bulunuyor. Çıkmadan önce kaydetmek ister misiniz?'
+              : 'Başlık girilmediği için not henüz kaydedilemedi. Çıkarsanız yazdığınız içerik kaybolacak.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop('cancel'),
+            child: const Text('Düzenlemeye Dön'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop('discard'),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Kaydetmeden Çık'),
+          ),
+          if (canSave)
+            ElevatedButton(
+              onPressed: () => Navigator.of(dialogContext).pop('save'),
+              child: const Text('Kaydet ve Çık'),
+            ),
+        ],
+      ),
+    );
+
+    if (!mounted || decision == null || decision == 'cancel') return;
+
+    if (decision == 'save' && canSave) {
+      await _saveNote();
+      return;
+    }
+
+    if (decision == 'discard') {
+      setState(() {
+        _isDirty = false;
+        _allowPop = true;
+      });
+      if (widget.onCancel != null) {
+        widget.onCancel!();
+      } else if (mounted) {
+        Navigator.of(context).pop();
+      }
+    }
   }
 
   @override
   void dispose() {
+    _autoSaveTimer?.cancel();
+    _aiStreamSubscription?.cancel();
+    _titleController.removeListener(_onEditorFieldChanged);
     _contentController.removeListener(_onContentChanged);
     _titleController.dispose();
     _contentController.dispose();
@@ -357,42 +531,14 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
   }
 
   Future<void> _saveNote() async {
+    _autoSaveTimer?.cancel();
     if (_titleController.text.trim().isEmpty) {
       _showError('Başlık gerekli');
       return;
     }
     setState(() => _isLoading = true);
     try {
-      // A locked note that was never unlocked must keep its stored body:
-      // the controller only holds the placeholder, which would destroy the
-      // ciphertext (or legacy text) if persisted.
-      final wasEncrypted = widget.note?.isEncrypted ?? false;
-      final content = (wasEncrypted && !_isUnlocked)
-          ? _storedEncryptedContent
-          : _contentController.text;
-
-      final note = Note(
-        id: widget.note?.id,
-        title: _titleController.text.trim(),
-        content: content,
-        createdAt: widget.note?.createdAt ?? DateTime.now().millisecondsSinceEpoch,
-        updatedAt: DateTime.now().millisecondsSinceEpoch,
-        isEncrypted: _isEncrypted,
-        tags: _tags,
-        color: _selectedColor,
-        folderName: widget.note?.folderName ?? 'Genel',
-        emojiIcon: _emojiIcon,
-      );
-
-      final noteProvider = Provider.of<NoteProvider>(context, listen: false);
-      final Note persistedNote;
-      if (note.id == null) {
-        persistedNote = await noteProvider.addNote(note);
-      } else {
-        await noteProvider.updateNote(note);
-        persistedNote = note;
-      }
-      widget.onSave(persistedNote);
+      await _persistNoteInternal(closeAfterSave: true);
     } catch (e) {
       _showError('Kayıt hatası: $e');
     } finally {
@@ -424,7 +570,9 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
       setState(() {
         _isEncrypted = true;
         _isUnlocked = true;
+        _isDirty = true;
       });
+      _scheduleAutoSave();
       _showSuccess('Not kaydedilirken şifrelenecek 🔒');
       return;
     }
@@ -453,7 +601,11 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
     );
     if (confirmed != true) return;
 
-    setState(() => _isEncrypted = false);
+    setState(() {
+      _isEncrypted = false;
+      _isDirty = true;
+    });
+    _scheduleAutoSave();
     _showSuccess('Şifreleme kaldırıldı');
   }
 
@@ -633,9 +785,12 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
       }
 
       if (!mounted) return;
+      _autoSaveTimer?.cancel();
+      _lastSavedContent = decrypted;
       setState(() {
         _contentController.text = decrypted;
         _isUnlocked = true;
+        _isDirty = false;
       });
     } on NoteDecryptionException {
       _showError('Kasa anahtarı okunamadı; veri bozuk veya anahtar kayıpsa not açılamaz');
@@ -705,32 +860,84 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
     required String successMessage,
     bool useBlockquote = false,
   }) async {
-    final baseText = _contentController.text;
-    final safePos = insertPos.clamp(0, baseText.length);
-    final before = baseText.substring(0, safePos);
-    final after = baseText.substring(safePos);
+    _autoSaveTimer?.cancel();
 
+    final initialText = _contentController.text;
+    final blockStart = insertPos.clamp(0, initialText.length);
     final header = useBlockquote
         ? '\n\n> **$blockTitle**\n> '
         : '\n\n### $blockTitle\n\n';
+    const footer = '\n\n';
 
-    final streamedBuffer = StringBuffer();
-    await for (final chunk in stream) {
-      if (!mounted) break;
-      streamedBuffer.write(chunk);
-      final rawBody = streamedBuffer.toString();
-      final formattedBody = useBlockquote
-          ? rawBody.replaceAll('\n', '\n> ')
-          : rawBody;
-      final liveBlock = '$header$formattedBody\n\n';
-      final updatedText = '$before$liveBlock$after';
+    // Insert the initial empty block header once at [blockStart]
+    final initialBlock = '$header$footer';
+    final textWithHeader = initialText.replaceRange(
+      blockStart,
+      blockStart,
+      initialBlock,
+    );
+    var currentBlockLength = initialBlock.length;
+
+    _contentController.value = TextEditingValue(
+      text: textWithHeader,
+      selection: TextSelection.collapsed(
+        offset: blockStart + header.length,
+      ),
+    );
+
+    final pendingChunkBuffer = StringBuffer();
+    var formattedBody = '';
+    var lastFlushTime = DateTime.now();
+    const flushInterval = Duration(milliseconds: 85);
+
+    void flushPendingChunks({bool force = false}) {
+      if (!mounted || pendingChunkBuffer.isEmpty) return;
+      final now = DateTime.now();
+      if (!force && now.difference(lastFlushTime) < flushInterval) {
+        return;
+      }
+      lastFlushTime = now;
+
+      final rawDelta = pendingChunkBuffer.toString();
+      pendingChunkBuffer.clear();
+
+      final formattedDelta = useBlockquote
+          ? rawDelta.replaceAll('\n', '\n> ')
+          : rawDelta;
+      formattedBody += formattedDelta;
+
+      final newBlock = '$header$formattedBody$footer';
+      final currentText = _contentController.text;
+      final safeStart = blockStart.clamp(0, currentText.length);
+      final safeEnd = (blockStart + currentBlockLength).clamp(
+        safeStart,
+        currentText.length,
+      );
+
+      final updatedText = currentText.replaceRange(
+        safeStart,
+        safeEnd,
+        newBlock,
+      );
+      currentBlockLength = newBlock.length;
+
       _contentController.value = TextEditingValue(
         text: updatedText,
         selection: TextSelection.collapsed(
-          offset: before.length + liveBlock.length,
+          offset: (safeStart + newBlock.length).clamp(0, updatedText.length),
         ),
       );
     }
+
+    await for (final chunk in stream) {
+      if (!mounted) break;
+      pendingChunkBuffer.write(chunk);
+      flushPendingChunks(force: false);
+    }
+
+    // Final flush for any remaining tokens in the buffer
+    flushPendingChunks(force: true);
+    _checkDirtyAndScheduleAutoSave();
     _showSuccess(successMessage);
   }
 
@@ -853,7 +1060,8 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
     setState(() => _isAiLoading = true);
 
     try {
-      final String noteId = widget.note?.id?.toString() ?? _titleController.text.trim();
+      final String noteId = (_persistedNoteId ?? widget.note?.id)?.toString() ??
+          _titleController.text.trim();
 
       if (action == 'summary') {
         await _streamBlockIntoEditor(
@@ -924,6 +1132,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
             if (!_tags.contains(tag)) _tags.add(tag);
           }
         });
+        _checkDirtyAndScheduleAutoSave();
         _showSuccess('${suggestedTags.length} etiket eklendi!');
       }
     } on AiException catch (e) {
@@ -931,7 +1140,10 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
     } catch (e) {
       _showError('AI işlemi gerçekleştirilemedi: $e');
     } finally {
-      if (mounted) setState(() => _isAiLoading = false);
+      if (mounted) {
+        setState(() => _isAiLoading = false);
+        _checkDirtyAndScheduleAutoSave();
+      }
     }
   }
 
@@ -947,7 +1159,11 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
             pickerColor: _selectedColor != null ? Color(_selectedColor!) : Colors.white,
             availableColors: _noteColors,
             onColorChanged: (c) {
-              setState(() => _selectedColor = c.toARGB32());
+              setState(() {
+                _selectedColor = c.toARGB32();
+                _isDirty = true;
+              });
+              _scheduleAutoSave();
               Navigator.pop(context);
             },
           ),
@@ -957,7 +1173,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
   }
 
   Future<void> _exportToPdf() async {
-    if (widget.note == null) {
+    if (widget.note == null && _persistedNoteId == null) {
       _showError('Önce notu kaydetmelisiniz');
       return;
     }
@@ -967,11 +1183,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
     }
 
     try {
-      final currentNote = widget.note!.copyWith(
-        content: _contentController.text,
-        title: _titleController.text,
-      );
-
+      final currentNote = _buildCurrentNoteSnapshot();
       await PdfExportService.exportToPdf(currentNote);
     } catch (e) {
       _showError('PDF oluşturulurken hata: $e');
@@ -996,7 +1208,11 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
       builder: (context) => EditorTagAndMoodSheet(
         initialTags: _tags,
         onTagsChanged: (newTags) {
-          setState(() => _tags = newTags);
+          setState(() {
+            _tags = newTags;
+            _isDirty = true;
+          });
+          _scheduleAutoSave();
         },
       ),
     );
@@ -1014,114 +1230,123 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
     final isDesktop = width >= 800;
     final hasSelection = _contentController.selection.isValid && !_contentController.selection.isCollapsed;
 
-    return Scaffold(
-      backgroundColor: bgColor,
-      appBar: _isFocusMode ? null : _buildMinimalAppBar(context),
-      body: SafeArea(
-        child: Stack(
-          children: [
-            // Zen Mode Paper Canvas
-            Positioned.fill(
-              child: Hero(
-                tag: 'note_${widget.note?.id ?? 'new_${widget.note?.createdAt}'}',
-                child: Material(
-                  color: Colors.transparent,
-                  child: _isPreviewMode ? _buildPreview() : _buildZenEditor(context),
+    return PopScope(
+      canPop: _allowPop || !_isDirty,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        await _handleBackOrCancel();
+      },
+      child: Scaffold(
+        backgroundColor: bgColor,
+        appBar: _isFocusMode ? null : _buildMinimalAppBar(context),
+        body: SafeArea(
+          child: Stack(
+            children: [
+              // Zen Mode Paper Canvas
+              Positioned.fill(
+                child: Hero(
+                  tag: 'note_${_persistedNoteId ?? widget.note?.id ?? 'new_$_createdAt'}',
+                  child: Material(
+                    color: Colors.transparent,
+                    child: _isPreviewMode ? _buildPreview() : _buildZenEditor(context),
+                  ),
                 ),
               ),
-            ),
 
+              // Mobile Floating Accessory Bar (Docked right above keyboard)
+              if (!_isFocusMode && !_isPreviewMode && (!isDesktop || keyboardHeight > 0))
+                Positioned(
+                  bottom: keyboardHeight > 0 ? keyboardHeight + 8 : 16,
+                  left: 16,
+                  right: 16,
+                  child: Center(
+                    child: Container(
+                      constraints: const BoxConstraints(maxWidth: 600),
+                      child: FloatingAccessoryBar(
+                        controller: _contentController,
+                        focusNode: _contentFocusNode,
+                        onPickImage: _pickImage,
+                        onToggleMathSheet: _showMathSymbolSheet,
+                      ),
+                    ),
+                  ),
+                ),
 
-
-            // Mobile Floating Accessory Bar (Docked right above keyboard)
-            if (!_isFocusMode && !_isPreviewMode && (!isDesktop || keyboardHeight > 0))
-              Positioned(
-                bottom: keyboardHeight > 0 ? keyboardHeight + 8 : 16,
-                left: 16,
-                right: 16,
-                child: Center(
-                  child: Container(
-                    constraints: const BoxConstraints(maxWidth: 600),
-                    child: FloatingAccessoryBar(
+              // Desktop Floating Selection Bubble Menu
+              if (!_isFocusMode && !_isPreviewMode && isDesktop && hasSelection)
+                Positioned(
+                  top: 20,
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: DesktopSelectionBubbleMenu(
                       controller: _contentController,
                       focusNode: _contentFocusNode,
-                      onPickImage: _pickImage,
-                      onToggleMathSheet: _showMathSymbolSheet,
                     ),
                   ),
                 ),
-              ),
 
-            // Desktop Floating Selection Bubble Menu
-            if (!_isFocusMode && !_isPreviewMode && isDesktop && hasSelection)
-              Positioned(
-                top: 20,
-                left: 0,
-                right: 0,
-                child: Center(
-                  child: DesktopSelectionBubbleMenu(
-                    controller: _contentController,
-                    focusNode: _contentFocusNode,
-                  ),
-                ),
-              ),
-
-            // Focus Mode (Zen) Exit Button
-            if (_isFocusMode)
-              Positioned(
-                top: 16,
-                right: 16,
-                child: Material(
-                  color: Colors.black.withValues(alpha: 0.4),
-                  borderRadius: BorderRadius.circular(20),
-                  child: IconButton(
-                    icon: const Icon(Icons.fullscreen_exit_rounded, color: Colors.white),
-                    tooltip: 'Odak Modundan Çık',
-                    onPressed: () => setState(() => _isFocusMode = false),
-                  ),
-                ),
-              ),
-
-            // Floating Pomodoro Timer
-            if (_isFocusMode || _isPomodoroVisible)
-              Positioned(
-                top: _isFocusMode ? 60 : 16,
-                right: 16,
-                child: const PomodoroTimer(),
-              ),
-
-            // Cross-Reference Side Panel (Optional toggle)
-            if (widget.note != null && _isCrossReferenceVisible && !_isFocusMode)
-              Positioned(
-                top: 16,
-                right: 16,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 300, maxHeight: 350),
+              // Focus Mode (Zen) Exit Button
+              if (_isFocusMode)
+                Positioned(
+                  top: 16,
+                  right: 16,
                   child: Material(
-                    elevation: 6,
-                    borderRadius: BorderRadius.circular(16),
-                    child: Stack(
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(16),
-                          child: SingleChildScrollView(
-                            child: CrossReferenceTracker(currentNote: widget.note!),
-                          ),
-                        ),
-                        Positioned(
-                          top: 6,
-                          right: 6,
-                          child: IconButton(
-                            icon: const Icon(Icons.close_rounded, size: 18),
-                            onPressed: () => setState(() => _isCrossReferenceVisible = false),
-                          ),
-                        ),
-                      ],
+                    color: Colors.black.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(20),
+                    child: IconButton(
+                      icon: const Icon(Icons.fullscreen_exit_rounded, color: Colors.white),
+                      tooltip: 'Odak Modundan Çık',
+                      onPressed: () => setState(() => _isFocusMode = false),
                     ),
                   ),
                 ),
-              ),
-          ],
+
+              // Floating Pomodoro Timer
+              if (_isFocusMode || _isPomodoroVisible)
+                Positioned(
+                  top: _isFocusMode ? 60 : 16,
+                  right: 16,
+                  child: const PomodoroTimer(),
+                ),
+
+              // Cross-Reference Side Panel (Optional toggle)
+              if ((widget.note != null || _persistedNoteId != null) &&
+                  _isCrossReferenceVisible &&
+                  !_isFocusMode)
+                Positioned(
+                  top: 16,
+                  right: 16,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 300, maxHeight: 350),
+                    child: Material(
+                      elevation: 6,
+                      borderRadius: BorderRadius.circular(16),
+                      child: Stack(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(16),
+                            child: SingleChildScrollView(
+                              child: CrossReferenceTracker(
+                                currentNote: _buildCurrentNoteSnapshot(),
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            top: 6,
+                            right: 6,
+                            child: IconButton(
+                              icon: const Icon(Icons.close_rounded, size: 18),
+                              onPressed: () => setState(() => _isCrossReferenceVisible = false),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -1129,12 +1354,14 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
 
   PreferredSizeWidget _buildMinimalAppBar(BuildContext context) {
     final theme = Theme.of(context);
-
+    final statusLabel = _isAutoSaving
+        ? 'Otomatik kaydediliyor...'
+        : (_isDirty ? 'Kaydedilmemiş değişiklik' : '');
 
     return CustomAppBar(
-      title: '',
+      title: statusLabel,
       showBackButton: true,
-      onBackPressed: widget.onCancel,
+      onBackPressed: _handleBackOrCancel,
       actions: [
         // Vault Lock / Unlock Toggle
         IconButton(
@@ -1184,8 +1411,17 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
           padding: const EdgeInsets.symmetric(horizontal: 6.0),
           child: ElevatedButton.icon(
             onPressed: _isLoading ? null : _saveNote,
-            icon: const Icon(Icons.check_rounded, size: 18),
-            label: const Text('Kaydet'),
+            icon: _isAutoSaving
+                ? const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.check_rounded, size: 18),
+            label: Text(_isDirty ? 'Kaydet*' : 'Kaydet'),
             style: ElevatedButton.styleFrom(
               elevation: 0,
               backgroundColor: theme.primaryColor,
@@ -1221,7 +1457,11 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
                 break;
               case 'latex':
                 Navigator.of(context).push(
-                  MaterialPageRoute(builder: (ctx) => LatexExportScreen(note: widget.note!)),
+                  MaterialPageRoute(
+                    builder: (ctx) => LatexExportScreen(
+                      note: _buildCurrentNoteSnapshot(),
+                    ),
+                  ),
                 );
                 break;
               case 'share':
@@ -1283,7 +1523,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
                 ],
               ),
             ),
-            if (widget.note != null)
+            if (widget.note != null || _persistedNoteId != null)
               PopupMenuItem(
                 value: 'backlinks',
                 child: const Row(
@@ -1518,7 +1758,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
 
         // Backlinks Section
         EditorBacklinkSection(
-          currentNoteId: widget.note?.id,
+          currentNoteId: _persistedNoteId ?? widget.note?.id,
           currentTitle: _titleController.text,
         ),
 
@@ -1569,7 +1809,11 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
         height: 300,
         child: EmojiPicker(
           onEmojiSelected: (category, emoji) {
-            setState(() => _emojiIcon = emoji.emoji);
+            setState(() {
+              _emojiIcon = emoji.emoji;
+              _isDirty = true;
+            });
+            _scheduleAutoSave();
             Navigator.pop(ctx);
           },
           config: const Config(),
