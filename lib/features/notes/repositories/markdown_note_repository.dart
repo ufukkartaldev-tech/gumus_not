@@ -266,7 +266,6 @@ class MarkdownNoteRepository implements NoteRepository {
   Future<void> _commit(String message) async {
     if (!_enableGit) return;
     try {
-      await _gitSyncService.initRepo();
       await _gitSyncService.commitChanges(message);
     } catch (_) {
       // Git is optional; file persistence must never depend on it.

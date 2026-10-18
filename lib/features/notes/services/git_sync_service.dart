@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
@@ -5,6 +6,30 @@ import '../models/note_history.dart';
 
 class GitSyncService {
   String? _repoPath;
+
+  /// Serializes all git subprocess invocations so rapid or concurrent note
+  /// saves (`insertNotes`, fast auto-saves) never race on `.git/index.lock`.
+  Future<void> _operationLock = Future<void>.value();
+
+  Future<T> _synchronized<T>(Future<T> Function() action) {
+    final completer = Completer<T>();
+    final previous = _operationLock;
+    final nextLock = Completer<void>();
+    _operationLock = nextLock.future;
+
+    previous.whenComplete(() async {
+      try {
+        final result = await action();
+        completer.complete(result);
+      } catch (e, st) {
+        completer.completeError(e, st);
+      } finally {
+        nextLock.complete();
+      }
+    });
+
+    return completer.future;
+  }
 
   Future<String> getRepoPath() async {
     if (_repoPath != null) return _repoPath!;
@@ -19,74 +44,97 @@ class GitSyncService {
   }
 
   Future<void> initRepo() async {
-    final path = await getRepoPath();
-    final gitDir = Directory('$path/.git');
-    if (!await gitDir.exists()) {
-      await Process.run('git', ['init'], workingDirectory: path);
-      // Optional: Set default branch to main
-      await Process.run('git', ['branch', '-M', 'main'], workingDirectory: path);
-    }
+    return _synchronized(() async {
+      final path = await getRepoPath();
+      final gitDir = Directory('$path/.git');
+      if (!await gitDir.exists()) {
+        await Process.run('git', ['init'], workingDirectory: path);
+        await Process.run('git', ['branch', '-M', 'main'], workingDirectory: path);
+      }
+    });
   }
 
   Future<bool> commitChanges(String message) async {
-    try {
-      final path = await getRepoPath();
-      await Process.run('git', ['add', '.'], workingDirectory: path);
-      
-      final statusResult = await Process.run('git', ['status', '--porcelain'], workingDirectory: path);
-      if (statusResult.stdout.toString().trim().isEmpty) {
-        return false; // Nothing to commit
-      }
+    return _synchronized(() async {
+      try {
+        final path = await getRepoPath();
+        final gitDir = Directory('$path/.git');
+        if (!await gitDir.exists()) {
+          await Process.run('git', ['init'], workingDirectory: path);
+          await Process.run('git', ['branch', '-M', 'main'], workingDirectory: path);
+        }
 
-      final result = await Process.run('git', ['commit', '-m', message], workingDirectory: path);
-      return result.exitCode == 0;
-    } catch (e) {
-      debugPrint('Git commit error: $e');
-      return false;
-    }
+        await Process.run('git', ['add', '-A'], workingDirectory: path);
+
+        final statusResult = await Process.run(
+          'git',
+          ['status', '--porcelain'],
+          workingDirectory: path,
+        );
+        if (statusResult.stdout.toString().trim().isEmpty) {
+          return false; // Nothing to commit
+        }
+
+        final result = await Process.run(
+          'git',
+          ['commit', '-m', message],
+          workingDirectory: path,
+        );
+        return result.exitCode == 0;
+      } catch (e) {
+        debugPrint('Git commit error: $e');
+        return false;
+      }
+    });
   }
 
   Future<List<NoteHistory>> getNoteHistory(String fileName) async {
-    try {
-      final path = await getRepoPath();
-      // format: commitHash|author|date|message
-      final result = await Process.run(
-        'git',
-        ['log', '--pretty=format:%H|%an|%cI|%s', '--', fileName],
-        workingDirectory: path,
-      );
+    return _synchronized(() async {
+      try {
+        final path = await getRepoPath();
+        // Use --follow so history is preserved across note title (file) renames
+        final result = await Process.run(
+          'git',
+          ['log', '--follow', '--pretty=format:%H|%an|%cI|%s', '--', fileName],
+          workingDirectory: path,
+        );
 
-      if (result.exitCode == 0) {
-        final output = result.stdout.toString().trim();
-        if (output.isEmpty) return [];
+        if (result.exitCode == 0) {
+          final output = result.stdout.toString().trim();
+          if (output.isEmpty) return [];
 
-        return output.split('\n').map((line) => NoteHistory.fromGitLog(line)).toList();
+          return output
+              .split('\n')
+              .map((line) => NoteHistory.fromGitLog(line))
+              .toList();
+        }
+      } catch (e) {
+        debugPrint('Git log error: $e');
       }
-    } catch (e) {
-      debugPrint('Git log error: $e');
-    }
-    return [];
+      return [];
+    });
   }
 
   Future<NoteDiff?> getNoteDiff(String fileName, String commitHash) async {
-    try {
-      final path = await getRepoPath();
-      // Get the diff for this file in the specific commit
-      final result = await Process.run(
-        'git',
-        ['show', commitHash, '--', fileName],
-        workingDirectory: path,
-      );
-
-      if (result.exitCode == 0) {
-        return NoteDiff(
-          commitHash: commitHash,
-          diffContent: result.stdout.toString(),
+    return _synchronized(() async {
+      try {
+        final path = await getRepoPath();
+        final result = await Process.run(
+          'git',
+          ['show', commitHash, '--', fileName],
+          workingDirectory: path,
         );
+
+        if (result.exitCode == 0) {
+          return NoteDiff(
+            commitHash: commitHash,
+            diffContent: result.stdout.toString(),
+          );
+        }
+      } catch (e) {
+        debugPrint('Git diff error: $e');
       }
-    } catch (e) {
-      debugPrint('Git diff error: $e');
-    }
-    return null;
+      return null;
+    });
   }
 }
