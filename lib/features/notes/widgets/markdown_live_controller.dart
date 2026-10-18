@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-/// An intelligent [TextEditingController] that provides live in-line markdown preview.
+/// An intelligent [TextEditingController] that provides live in-line markdown preview
+/// with an incremental line-level caching engine.
 ///
 /// Features:
 /// - Cursor-aware heading scaling: When the cursor is outside a heading line (# or ##),
@@ -8,6 +10,9 @@ import 'package:flutter/material.dart';
 /// - In-line styling for Bold, Italic, Strikethrough, Code, Math ($fx$), WikiLinks ([[ ]]),
 ///   Interactive Checklists (- [ ] / - [x]), Blockquotes, and Lists.
 /// - Character-count strictly preserved so caret positioning and selection remain 100% accurate.
+/// - **Incremental Line-Level Caching**: Unchanged lines are served directly from an
+///   in-memory span cache in O(1) time, avoiding redundant regex parsing on large documents.
+/// - **Fast Syntax Pre-check**: Lines without markdown control characters bypass regex execution entirely.
 class MarkdownLivePreviewController extends TextEditingController {
   MarkdownLivePreviewController({super.text});
 
@@ -20,6 +25,61 @@ class MarkdownLivePreviewController extends TextEditingController {
     r'(\$[^\$\n]+?\$)|' // 6: math $formula$
     r'(!?\[[^\]\n]*?\]\([^\)\n]+?\))', // 7: link or image
   );
+
+  /// Bounded line-level cache to eliminate redundant AST/Regex re-parsing
+  /// across 500-2,000+ line documents.
+  final Map<_LineKey, List<InlineSpan>> _lineSpanCache = {};
+  static const int _maxCacheEntries = 5000;
+
+  String? _lastParsedText;
+  List<String>? _cachedLines;
+
+  int _debugCacheHitCount = 0;
+  int _debugRegexRunCount = 0;
+
+  @visibleForTesting
+  int get debugCacheHitCount => _debugCacheHitCount;
+
+  @visibleForTesting
+  int get debugRegexRunCount => _debugRegexRunCount;
+
+  @visibleForTesting
+  void resetDebugCounters() {
+    _debugCacheHitCount = 0;
+    _debugRegexRunCount = 0;
+  }
+
+  /// Clears the span cache. Useful when themes or styles drastically change.
+  void invalidateSpanCache() {
+    _lineSpanCache.clear();
+    _lastParsedText = null;
+    _cachedLines = null;
+  }
+
+  /// Quickly tests whether [s] contains any markdown delimiter characters:
+  /// `*` (42), `~` (126), `` ` `` (96), `[` (91), `$` (36), `!` (33).
+  static bool _hasInlineMarkdownTriggers(String s) {
+    final len = s.length;
+    for (var i = 0; i < len; i++) {
+      final code = s.codeUnitAt(i);
+      if (code == 42 || code == 126 || code == 96 || code == 91 || code == 36 || code == 33) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  static bool _isHeadingLine(String line) {
+    return line.startsWith('# ') || line.startsWith('## ') || line.startsWith('### ');
+  }
+
+  @override
+  void dispose() {
+    _lineSpanCache.clear();
+    _lastParsedText = null;
+    _cachedLines = null;
+    super.dispose();
+  }
 
   @override
   TextSpan buildTextSpan({
@@ -39,7 +99,18 @@ class MarkdownLivePreviewController extends TextEditingController {
 
     final cursorPos = selection.isValid ? selection.baseOffset : -1;
     final spans = <InlineSpan>[];
-    final lines = text.split('\n');
+
+    // Reuse line splitting when text is unchanged (e.g. cursor / arrow key movements)
+    final List<String> lines;
+    if (_lastParsedText == text && _cachedLines != null) {
+      lines = _cachedLines!;
+    } else {
+      lines = text.split('\n');
+      _cachedLines = lines;
+      _lastParsedText = text;
+    }
+
+    final primaryColorValue = theme.colorScheme.primary.toARGB32();
 
     int currentOffset = 0;
     bool inCodeBlock = false;
@@ -49,41 +120,70 @@ class MarkdownLivePreviewController extends TextEditingController {
       final lineEnd = currentOffset + lineLength;
       final isCursorOnLine = cursorPos >= currentOffset && cursorPos <= lineEnd;
 
-      if (line.trimLeft().startsWith('```')) {
-        inCodeBlock = !inCodeBlock;
-        spans.add(
-          TextSpan(
-            text: line,
-            style: defaultStyle.copyWith(
-              fontFamily: 'monospace',
-              color: isDark ? Colors.tealAccent.shade100 : Colors.teal.shade800,
-              backgroundColor: theme.dividerColor.withValues(alpha: 0.12),
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        );
-      } else if (inCodeBlock) {
-        // Render code block interior strictly as monospace without running inline markdown regex
-        spans.add(
-          TextSpan(
-            text: line,
-            style: defaultStyle.copyWith(
-              fontFamily: 'monospace',
-              fontSize: (defaultStyle.fontSize ?? 16) * 0.92,
-              color: isDark ? Colors.amber.shade100 : Colors.blueGrey.shade900,
-              backgroundColor: theme.dividerColor.withValues(alpha: 0.08),
-            ),
-          ),
-        );
+      final isFence = line.trimLeft().startsWith('```');
+      final activeInCodeBlock = isFence ? false : inCodeBlock;
+      final isHeading = _isHeadingLine(line);
+      final isCursorOnHeading = isHeading && isCursorOnLine;
+
+      final cacheKey = _LineKey(
+        text: line,
+        isFence: isFence,
+        inCodeBlock: activeInCodeBlock,
+        isCursorOnHeading: isCursorOnHeading,
+        isDark: isDark,
+        primaryColor: primaryColorValue,
+      );
+
+      final cachedSpans = _lineSpanCache[cacheKey];
+      if (cachedSpans != null) {
+        _debugCacheHitCount++;
+        spans.addAll(cachedSpans);
       } else {
-        _renderLine(
-          spans: spans,
-          line: line,
-          isCursorOnLine: isCursorOnLine,
-          defaultStyle: defaultStyle,
-          theme: theme,
-          isDark: isDark,
-        );
+        final lineSpans = <InlineSpan>[];
+        if (isFence) {
+          lineSpans.add(
+            TextSpan(
+              text: line,
+              style: defaultStyle.copyWith(
+                fontFamily: 'monospace',
+                color: isDark ? Colors.tealAccent.shade100 : Colors.teal.shade800,
+                backgroundColor: theme.dividerColor.withValues(alpha: 0.12),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          );
+        } else if (inCodeBlock) {
+          lineSpans.add(
+            TextSpan(
+              text: line,
+              style: defaultStyle.copyWith(
+                fontFamily: 'monospace',
+                fontSize: (defaultStyle.fontSize ?? 16) * 0.92,
+                color: isDark ? Colors.amber.shade100 : Colors.blueGrey.shade900,
+                backgroundColor: theme.dividerColor.withValues(alpha: 0.08),
+              ),
+            ),
+          );
+        } else {
+          _renderLine(
+            spans: lineSpans,
+            line: line,
+            isCursorOnLine: isCursorOnLine,
+            defaultStyle: defaultStyle,
+            theme: theme,
+            isDark: isDark,
+          );
+        }
+
+        if (_lineSpanCache.length >= _maxCacheEntries) {
+          _lineSpanCache.clear();
+        }
+        _lineSpanCache[cacheKey] = List.unmodifiable(lineSpans);
+        spans.addAll(lineSpans);
+      }
+
+      if (isFence) {
+        inCodeBlock = !inCodeBlock;
       }
 
       if (i < lines.length - 1) {
@@ -290,6 +390,13 @@ class MarkdownLivePreviewController extends TextEditingController {
   ) {
     if (text.isEmpty) return;
 
+    // Fast-path: Skip regex execution if line contains no markdown syntax triggers
+    if (!_hasInlineMarkdownTriggers(text)) {
+      spans.add(TextSpan(text: text, style: baseStyle));
+      return;
+    }
+
+    _debugRegexRunCount++;
     final matches = _inlineRegex.allMatches(text);
     int lastEnd = 0;
 
@@ -403,4 +510,45 @@ class MarkdownLivePreviewController extends TextEditingController {
       spans.add(TextSpan(text: text.substring(lastEnd), style: baseStyle));
     }
   }
+}
+
+@immutable
+class _LineKey {
+  final String text;
+  final bool isFence;
+  final bool inCodeBlock;
+  final bool isCursorOnHeading;
+  final bool isDark;
+  final int primaryColor;
+
+  const _LineKey({
+    required this.text,
+    required this.isFence,
+    required this.inCodeBlock,
+    required this.isCursorOnHeading,
+    required this.isDark,
+    required this.primaryColor,
+  });
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is _LineKey &&
+          runtimeType == other.runtimeType &&
+          text == other.text &&
+          isFence == other.isFence &&
+          inCodeBlock == other.inCodeBlock &&
+          isCursorOnHeading == other.isCursorOnHeading &&
+          isDark == other.isDark &&
+          primaryColor == other.primaryColor;
+
+  @override
+  int get hashCode => Object.hash(
+        text,
+        isFence,
+        inCodeBlock,
+        isCursorOnHeading,
+        isDark,
+        primaryColor,
+      );
 }
