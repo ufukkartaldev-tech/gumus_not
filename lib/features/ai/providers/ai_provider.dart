@@ -98,9 +98,13 @@ class AiProvider extends ChangeNotifier {
     }
   }
 
-  // --- Caching Proxy Methods (Fuzzy %5 Tolerance) ---
+  // --- Caching Proxy Methods (SimHash LSH + SHA-256) ---
 
-  Future<String> getSummary(String text, {required String noteId}) async {
+  Future<String> getSummary(
+    String text, {
+    required String noteId,
+    bool isEncrypted = false,
+  }) async {
     if (!isAiEnabled) {
       throw AiException.unconfigured(
         'AI servisi kapalı veya yapılandırılmamış. Lütfen Ayarlar > Yapay Zeka ekranından yapılandırın.',
@@ -112,14 +116,25 @@ class AiProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final cached = await _cacheService.getCached('summary', noteId, text);
+      final cached = await _cacheService.getCached(
+        'summary',
+        noteId,
+        text,
+        allowDiskRead: !isEncrypted,
+      );
       if (cached != null) {
-        debugPrint("AI Cache Hit (Fuzzy %5): Özet önbellekten getirildi.");
+        debugPrint("AI Cache Hit (SimHash LSH): Özet önbellekten getirildi.");
         return cached;
       }
 
       final result = await _activeService!.generateSummary(text);
-      await _cacheService.setCached('summary', noteId, text, result);
+      await _cacheService.setCached(
+        'summary',
+        noteId,
+        text,
+        result,
+        persistToDisk: !isEncrypted,
+      );
       return result;
     } on AiException catch (e) {
       _lastError = e.message;
@@ -134,7 +149,11 @@ class AiProvider extends ChangeNotifier {
     }
   }
 
-  Future<List<String>> getTags(String text, {required String noteId}) async {
+  Future<List<String>> getTags(
+    String text, {
+    required String noteId,
+    bool isEncrypted = false,
+  }) async {
     if (!isAiEnabled) {
       throw AiException.unconfigured(
         'AI servisi kapalı veya yapılandırılmamış. Lütfen Ayarlar > Yapay Zeka ekranından yapılandırın.',
@@ -146,14 +165,25 @@ class AiProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final cached = await _cacheService.getCached('tags', noteId, text);
+      final cached = await _cacheService.getCached(
+        'tags',
+        noteId,
+        text,
+        allowDiskRead: !isEncrypted,
+      );
       if (cached != null) {
-        debugPrint("AI Cache Hit (Fuzzy %5): Etiketler önbellekten getirildi.");
+        debugPrint("AI Cache Hit (SimHash LSH): Etiketler önbellekten getirildi.");
         return cached.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
       }
 
       final result = await _activeService!.suggestTags(text);
-      await _cacheService.setCached('tags', noteId, text, result.join(','));
+      await _cacheService.setCached(
+        'tags',
+        noteId,
+        text,
+        result.join(','),
+        persistToDisk: !isEncrypted,
+      );
       return result;
     } on AiException catch (e) {
       _lastError = e.message;

@@ -6,9 +6,97 @@ import 'package:connected_notebook/features/ai/models/ai_config.dart';
 import 'package:connected_notebook/features/ai/models/ai_exception.dart';
 import 'package:connected_notebook/features/ai/models/ai_provider_type.dart';
 import 'package:connected_notebook/features/ai/providers/ai_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:connected_notebook/features/ai/services/ai_cache_service.dart';
 import 'package:connected_notebook/features/ai/services/openai_compatible_service.dart';
 
 void main() {
+  group('AiCacheService Security & SimHash Tests', () {
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+    });
+
+    test('Should NEVER store raw plaintext note content in SharedPreferences', () async {
+      final cache = AiCacheService();
+      const secretNote = 'Çok gizli kriptografik mimari notları ve API sırları.';
+
+      await cache.setCached('summary', '42', secretNote, 'Kısa özet');
+
+      final prefs = await SharedPreferences.getInstance();
+      for (final key in prefs.getKeys()) {
+        final value = prefs.get(key)?.toString() ?? '';
+        expect(value, isNot(contains('gizli kriptografik')));
+        expect(key, isNot(startsWith('ai_cache_text_')));
+      }
+      expect(prefs.getString('ai_cache_sha256_summary_42'), isNotNull);
+      expect(prefs.getString('ai_cache_simhash_summary_42'), hasLength(16));
+    });
+
+    test('Should NOT hit cache when two completely different texts have identical length', () async {
+      final cache = AiCacheService();
+      const textA = 'Flutter ile mobil uygulama geliştirme süreçleri hakkında detaylı teknik notlar';
+      const textB = 'Rust programlama dilinde bellek güvenliği ve borrow checker kuralları analizi.';
+      expect(textA.length, equals(textB.length)); // Same exact length (78 chars)!
+
+      await cache.setCached('summary', '10', textA, 'Flutter Özeti');
+
+      final cachedForB = await cache.getCached('summary', '10', textB);
+      expect(cachedForB, isNull, reason: 'Different texts with identical length must not collide');
+    });
+
+    test('Should hit cache on minor typo fix via 64-bit SimHash Hamming distance', () async {
+      final cache = AiCacheService();
+      const original =
+          'Yazılım mühendisliğinde katmanlı mimari ve bağımlılık enjeksiyonu '
+          'kullanmak test edilebilirliği doğrudan artırır ve spagetti kodu önler.';
+      const typoFixed =
+          'Yazılım mühendisliğinde katmanlı mimari ve bağımlılık enjeksiyonu '
+          'kullanmak test edilebilirliği doğrudan arttırır ve spagetti kodu önler!';
+
+      await cache.setCached('summary', '99', original, 'Mimari Özeti');
+
+      final hit = await cache.getCached('summary', '99', typoFixed);
+      expect(hit, equals('Mimari Özeti'));
+    });
+
+    test('Should keep encrypted notes strictly in volatile RAM when persistToDisk is false', () async {
+      final cache = AiCacheService();
+      const encryptedBody = 'Kasa içi hassas veri';
+
+      await cache.setCached(
+        'summary',
+        '77',
+        encryptedBody,
+        'Gizli Özet',
+        persistToDisk: false,
+      );
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getKeys(), isEmpty);
+
+      // Should still hit from volatile L1 memory during active session
+      final memoryHit = await cache.getCached(
+        'summary',
+        '77',
+        encryptedBody,
+        allowDiskRead: false,
+      );
+      expect(memoryHit, equals('Gizli Özet'));
+    });
+
+    test('Should purge legacy plaintext cache keys automatically on read/write', () async {
+      SharedPreferences.setMockInitialValues({
+        'ai_cache_text_summary_5': 'Eski düz metin sızıntısı',
+      });
+
+      final cache = AiCacheService();
+      await cache.getCached('summary', '5', 'Yeni metin');
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.containsKey('ai_cache_text_summary_5'), isFalse);
+    });
+  });
+
   group('AiException Tests', () {
     test('Should display user-friendly message without raw Exception prefix', () {
       final exc = AiException.missingApiKey();

@@ -647,12 +647,20 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
       final String noteId = widget.note?.id?.toString() ?? _titleController.text.trim();
       
       if (action == 'summary') {
-        final summary = await aiProvider.getSummary(text, noteId: noteId);
+        final summary = await aiProvider.getSummary(
+          text,
+          noteId: noteId,
+          isEncrypted: _isEncrypted,
+        );
         final formattedSummary = '\n\n> **✨ AI Özeti:**\n> ${summary.replaceAll('\n', '\n> ')}\n\n';
         _insertTextAtCursor(formattedSummary);
-        _showSuccess('Özet eklendi (Gerekirse %5 toleransla önbellekten)!');
+        _showSuccess('Özet eklendi!');
       } else if (action == 'tags') {
-        final suggestedTags = await aiProvider.getTags(text, noteId: noteId);
+        final suggestedTags = await aiProvider.getTags(
+          text,
+          noteId: noteId,
+          isEncrypted: _isEncrypted,
+        );
         setState(() {
           for (var tag in suggestedTags) {
             if (!_tags.contains(tag)) _tags.add(tag);
