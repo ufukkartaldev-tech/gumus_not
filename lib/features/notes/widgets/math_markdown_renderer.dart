@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:flutter_math_fork/flutter_math.dart';
 import 'package:markdown/markdown.dart' as md;
 import 'package:flutter_highlighter/flutter_highlighter.dart';
 import 'package:flutter_highlighter/themes/github.dart';
@@ -20,6 +21,41 @@ class WikilinkSyntax extends md.InlineSyntax {
     element.attributes['href'] = 'zettel://$title';
     parser.addNode(element);
     return true;
+  }
+}
+
+class InlineMathSyntax extends md.InlineSyntax {
+  InlineMathSyntax() : super(r'\$([^\$\n]+?)\$');
+
+  @override
+  bool onMatch(md.InlineParser parser, Match match) {
+    final formula = match.group(1)!;
+    final element = md.Element.text('inline-math', formula);
+    parser.addNode(element);
+    return true;
+  }
+}
+
+class InlineMathBuilder extends MarkdownElementBuilder {
+  final BuildContext context;
+  InlineMathBuilder(this.context);
+
+  @override
+  Widget? visitElementAfter(md.Element element, TextStyle? preferredStyle) {
+    final formula = element.textContent.trim();
+    final textStyle = preferredStyle ?? Theme.of(context).textTheme.bodyMedium;
+    return Math.tex(
+      formula,
+      mathStyle: MathStyle.text,
+      textStyle: textStyle,
+      onErrorFallback: (err) => Text(
+        '\$$formula\$',
+        style: (textStyle ?? const TextStyle()).copyWith(
+          fontFamily: 'monospace',
+          color: Colors.redAccent,
+        ),
+      ),
+    );
   }
 }
 
@@ -89,6 +125,7 @@ class MathMarkdownRenderer extends StatelessWidget {
             [
               ...md.ExtensionSet.gitHubFlavored.inlineSyntaxes,
               WikilinkSyntax(),
+              InlineMathSyntax(),
             ],
           ),
           onTapLink: (text, href, title) {
@@ -107,7 +144,10 @@ class MathMarkdownRenderer extends StatelessWidget {
               }
             }
           },
-          builders: {'code': CodeElementBuilder(context)},
+          builders: {
+            'code': CodeElementBuilder(context),
+            'inline-math': InlineMathBuilder(context),
+          },
           styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
             p: style ?? Theme.of(context).textTheme.bodyMedium,
             blockquoteDecoration: BoxDecoration(
@@ -194,17 +234,19 @@ class MathMarkdownRenderer extends StatelessWidget {
         children: [
           const Icon(Icons.image_not_supported, color: Colors.orange),
           const SizedBox(width: 8),
-          Text(message ?? 'Resim yÃ¼klenemedi', style: const TextStyle(fontSize: 12)),
+          Text(message ?? 'Resim yüklenemedi', style: const TextStyle(fontSize: 12)),
         ],
       ),
     );
   }
 
   Widget _buildMathBlock(BuildContext context, String content) {
+    final formula = content.replaceAll(r'$$', '').trim();
+    final textStyle = Theme.of(context).textTheme.bodyLarge?.copyWith(fontSize: 18);
     return Center(
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 12),
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.secondaryContainer,
           borderRadius: BorderRadius.circular(8),
@@ -212,12 +254,17 @@ class MathMarkdownRenderer extends StatelessWidget {
         ),
         child: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
-          child: Text(
-            content.replaceAll(r'$$', '').trim(),
-            style: const TextStyle(
-              fontFamily: 'monospace',
-              fontSize: 16,
-              fontStyle: FontStyle.italic,
+          child: Math.tex(
+            formula,
+            mathStyle: MathStyle.display,
+            textStyle: textStyle,
+            onErrorFallback: (err) => Text(
+              formula,
+              style: const TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 16,
+                fontStyle: FontStyle.italic,
+              ),
             ),
           ),
         ),

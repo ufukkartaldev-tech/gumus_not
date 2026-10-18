@@ -42,20 +42,49 @@ class MarkdownLivePreviewController extends TextEditingController {
     final lines = text.split('\n');
 
     int currentOffset = 0;
+    bool inCodeBlock = false;
     for (int i = 0; i < lines.length; i++) {
       final line = lines[i];
       final lineLength = line.length;
       final lineEnd = currentOffset + lineLength;
       final isCursorOnLine = cursorPos >= currentOffset && cursorPos <= lineEnd;
 
-      _renderLine(
-        spans: spans,
-        line: line,
-        isCursorOnLine: isCursorOnLine,
-        defaultStyle: defaultStyle,
-        theme: theme,
-        isDark: isDark,
-      );
+      if (line.trimLeft().startsWith('```')) {
+        inCodeBlock = !inCodeBlock;
+        spans.add(
+          TextSpan(
+            text: line,
+            style: defaultStyle.copyWith(
+              fontFamily: 'monospace',
+              color: isDark ? Colors.tealAccent.shade100 : Colors.teal.shade800,
+              backgroundColor: theme.dividerColor.withValues(alpha: 0.12),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        );
+      } else if (inCodeBlock) {
+        // Render code block interior strictly as monospace without running inline markdown regex
+        spans.add(
+          TextSpan(
+            text: line,
+            style: defaultStyle.copyWith(
+              fontFamily: 'monospace',
+              fontSize: (defaultStyle.fontSize ?? 16) * 0.92,
+              color: isDark ? Colors.amber.shade100 : Colors.blueGrey.shade900,
+              backgroundColor: theme.dividerColor.withValues(alpha: 0.08),
+            ),
+          ),
+        );
+      } else {
+        _renderLine(
+          spans: spans,
+          line: line,
+          isCursorOnLine: isCursorOnLine,
+          defaultStyle: defaultStyle,
+          theme: theme,
+          isDark: isDark,
+        );
+      }
 
       if (i < lines.length - 1) {
         spans.add(TextSpan(text: '\n', style: defaultStyle));
@@ -76,22 +105,6 @@ class MarkdownLivePreviewController extends TextEditingController {
     required bool isDark,
   }) {
     if (line.isEmpty) {
-      return;
-    }
-
-    // Code block marker ```
-    if (line.startsWith('```')) {
-      spans.add(
-        TextSpan(
-          text: line,
-          style: defaultStyle.copyWith(
-            fontFamily: 'monospace',
-            color: isDark ? Colors.tealAccent.shade100 : Colors.teal.shade800,
-            backgroundColor: theme.dividerColor.withValues(alpha: 0.12),
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      );
       return;
     }
 
