@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -273,72 +272,69 @@ class MathMarkdownRenderer extends StatelessWidget {
   }
 
   Widget _buildMermaidBlock(BuildContext context, String content) {
-    // Use mermaid.ink to render the diagram as an SVG
-    final encodedContent = base64UrlEncode(utf8.encode(content));
-    final imageUrl = 'https://mermaid.ink/svg/$encodedContent';
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 16),
       width: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E1F24) : const Color(0xFFF8F9FA),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Theme.of(context).dividerColor.withValues(alpha: 0.5)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        border: Border.all(color: theme.dividerColor.withValues(alpha: 0.5)),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
+              color: theme.primaryColor.withValues(alpha: 0.1),
               borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
             ),
             child: Row(
               children: [
-                Icon(Icons.auto_graph, size: 14, color: Theme.of(context).primaryColor),
+                Icon(Icons.account_tree_rounded, size: 15, color: theme.primaryColor),
                 const SizedBox(width: 8),
                 Text(
-                  'Diyagram (Mermaid)',
+                  'Diyagram Şeması (Mermaid — Yerel / Çevrimdışı)',
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
-                    color: Theme.of(context).primaryColor,
+                    color: theme.primaryColor,
                   ),
                 ),
                 const Spacer(),
-                const Icon(Icons.zoom_out_map, size: 14, color: Colors.grey),
+                IconButton(
+                  icon: const Icon(Icons.copy_rounded, size: 14, color: Colors.grey),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  tooltip: 'Mermaid Kodunu Kopyala',
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: content));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Mermaid şeması panoya kopyalandı!'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  },
+                ),
               ],
             ),
           ),
           Padding(
             padding: const EdgeInsets.all(16.0),
-            child: ClipRRect(
-              child: Image.network(
-                imageUrl,
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return const Center(child: CircularProgressIndicator());
-                },
-                errorBuilder: (context, error, stackTrace) {
-                  return Column(
-                    children: [
-                      const Icon(Icons.error_outline, color: Colors.red),
-                      const SizedBox(height: 8),
-                      const Text('Diyagram Ã§izilemedi.'),
-                      TextButton(
-                        onPressed: () {}, // Future: Open in browser
-                        child: const Text('DÃ¼zenlemede hata olabilir mi?'),
-                      ),
-                    ],
-                  );
-                },
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: SelectableText(
+                content,
+                style: TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 13.5,
+                  height: 1.5,
+                  color: isDark ? Colors.tealAccent.shade100 : Colors.blueGrey.shade900,
+                ),
               ),
             ),
           ),
@@ -348,229 +344,6 @@ class MathMarkdownRenderer extends StatelessWidget {
   }
 }
 
-class EnhancedMarkdownEditor extends StatefulWidget {
-  final String? initialContent;
-  final Function(String) onContentChanged;
-  final bool showPreview;
-
-  const EnhancedMarkdownEditor({
-    super.key,
-    this.initialContent,
-    required this.onContentChanged,
-    this.showPreview = false,
-  });
-
-  @override
-  State<EnhancedMarkdownEditor> createState() => _EnhancedMarkdownEditorState();
-}
-
-class _EnhancedMarkdownEditorState extends State<EnhancedMarkdownEditor> {
-  late TextEditingController _controller;
-  bool _isPreviewMode = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = TextEditingController(text: widget.initialContent ?? '');
-    _isPreviewMode = widget.showPreview;
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _insertMathSyntax(String syntax) {
-    final text = _controller.text;
-    final selection = _controller.selection;
-    
-    final cursorPos = selection.baseOffset;
-    final newText = text.replaceRange(
-      selection.start,
-      selection.end,
-      syntax,
-    );
-    
-    _controller.value = TextEditingValue(
-      text: newText,
-      selection: TextSelection.collapsed(
-        offset: cursorPos + syntax.length,
-      ),
-    );
-    
-    widget.onContentChanged(newText);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        _buildMathToolbar(context),
-        Expanded(
-          child: _isPreviewMode ? _buildPreview(context) : _buildEditor(),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMathToolbar(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(8.0),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
-      ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            _buildMathButton(context, 'x^2', 'Ãœst'),
-            _buildMathButton(context, 'x_2', 'Alt'),
-            _buildMathButton(context, '\\frac{x}{y}', 'Kesir'),
-            _buildMathButton(context, r'$$\n$$', 'Matematik BloÄŸu'),
-            _buildMathButton(context, '```mermaid\ngraph TD\n  A --> B\n```', 'Diyagram (Mermaid)'),
-            _buildFormatButton(context),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFormatButton(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 4.0),
-      child: Tooltip(
-        message: 'Kodu Formatla (Otomatik Düzelt)',
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: _formatContent,
-            borderRadius: BorderRadius.circular(4),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey.shade300),
-                borderRadius: BorderRadius.circular(4),
-                color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.format_align_left, size: 14),
-                  SizedBox(width: 4),
-                  Text('Format', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _formatContent() {
-    // Basic formatting: fixing indentation for code blocks
-    String text = _controller.text;
-    
-    // We can simulate Prettier-like formatting by cleaning up excessive spaces,
-    // empty lines, and ensuring code blocks have proper spacing.
-    // For a full implementation, integrating dart_style or prettier.js would be ideal.
-    
-    final lines = text.split('\n');
-    final formattedLines = <String>[];
-    bool inCodeBlock = false;
-    
-    for (var line in lines) {
-      if (line.trim().startsWith('```')) {
-        inCodeBlock = !inCodeBlock;
-        formattedLines.add(line.trim()); // Ensure backticks have no leading spaces
-        continue;
-      }
-      
-      if (!inCodeBlock) {
-        // Clean up trailing spaces in text, but keep Markdown newlines if intentional
-        formattedLines.add(line.trimRight());
-      } else {
-        // Simple code indentation fix: replace hard tabs with spaces
-        formattedLines.add(line.replaceAll('\t', '  '));
-      }
-    }
-    
-    // Remove multiple empty lines outside code blocks
-    String formattedText = formattedLines.join('\n').replaceAll(RegExp(r'\n{3,}'), '\n\n');
-    
-    _controller.value = TextEditingValue(
-      text: formattedText,
-      selection: TextSelection.collapsed(offset: formattedText.length),
-    );
-    
-    widget.onContentChanged(formattedText);
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Markdown ve kod blokları formatlandı!'),
-        duration: Duration(seconds: 2),
-      ),
-    );
-  }
-
-  Widget _buildMathButton(BuildContext context, String syntax, String tooltip) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 4.0),
-      child: Tooltip(
-        message: tooltip,
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () => _insertMathSyntax(syntax),
-            borderRadius: BorderRadius.circular(4),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey.shade300),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(
-                syntax.replaceAll(r'$$\n$$', 'BloÄŸu'),
-                style: const TextStyle(fontSize: 12),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEditor() {
-    return TextField(
-      controller: _controller,
-      maxLines: null,
-      expands: true,
-      decoration: const InputDecoration(
-        border: OutlineInputBorder(),
-        contentPadding: EdgeInsets.all(16),
-        hintText: 'Markdown yazÄ±n...',
-      ),
-      style: const TextStyle(
-        fontFamily: 'monospace',
-        fontSize: 14,
-      ),
-      onChanged: widget.onContentChanged,
-    );
-  }
-
-  Widget _buildPreview(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: MathMarkdownRenderer(
-        data: _controller.text,
-        style: Theme.of(context).textTheme.bodyMedium,
-        selectable: true,
-      ),
-    );
-  }
-}
 
 class CodeElementBuilder extends MarkdownElementBuilder {
   final BuildContext context;
