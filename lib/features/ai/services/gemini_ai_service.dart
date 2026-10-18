@@ -8,9 +8,17 @@ import '../models/ai_exception.dart';
 class GeminiAiService implements IAiService {
   final GenerativeModel _model;
   final String _apiKey;
+  final Duration _requestTimeout;
+  final Duration _streamChunkTimeout;
 
-  GeminiAiService(AiConfig config, {int maxOutputTokens = IAiService.defaultMaxOutputTokens})
-      : _apiKey = config.apiKey?.trim() ?? '',
+  GeminiAiService(
+    AiConfig config, {
+    int maxOutputTokens = IAiService.defaultMaxOutputTokens,
+    Duration requestTimeout = IAiService.defaultRequestTimeout,
+    Duration streamChunkTimeout = IAiService.defaultStreamChunkTimeout,
+  })  : _apiKey = config.apiKey?.trim() ?? '',
+        _requestTimeout = requestTimeout,
+        _streamChunkTimeout = streamChunkTimeout,
         _model = GenerativeModel(
           model: config.modelName?.isNotEmpty == true
               ? config.modelName!.trim()
@@ -23,8 +31,8 @@ class GeminiAiService implements IAiService {
     if (e is AiException) return e;
     if (e is SocketException) return AiException.network(e.message);
     if (e is TimeoutException) {
-      return const AiException(
-        'Gemini isteği zaman aşımına uğradı (30 saniye). Lütfen internet bağlantınızı kontrol edin.',
+      return AiException(
+        'Gemini isteği zaman aşımına uğradı (${_requestTimeout.inSeconds} saniye). Lütfen internet bağlantınızı kontrol edin.',
       );
     }
     if (e is GenerativeAIException) {
@@ -60,7 +68,7 @@ class GeminiAiService implements IAiService {
     try {
       final response = await _model
           .generateContent([Content.text(prompt)])
-          .timeout(const Duration(seconds: 30));
+          .timeout(_requestTimeout);
 
       final text = response.text?.trim() ?? '';
       if (text.isEmpty) {
@@ -84,7 +92,7 @@ class GeminiAiService implements IAiService {
     var emittedAny = false;
     try {
       final responseStream = _model.generateContentStream([Content.text(prompt)]);
-      await for (final chunk in responseStream.timeout(const Duration(seconds: 30))) {
+      await for (final chunk in responseStream.timeout(_streamChunkTimeout)) {
         final piece = chunk.text;
         if (piece != null && piece.isNotEmpty) {
           emittedAny = true;

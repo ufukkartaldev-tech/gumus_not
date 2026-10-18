@@ -2,6 +2,13 @@ abstract class IAiService {
   /// Default maximum output tokens for summaries and technical generation.
   static const int defaultMaxOutputTokens = 2048;
 
+  /// Default timeout for initial LLM connection or full completion requests
+  /// (120s accommodates local Ollama / LM Studio reasoning models cold-loading weights).
+  static const Duration defaultRequestTimeout = Duration(seconds: 120);
+
+  /// Maximum idle time between consecutive SSE chunks once streaming has started.
+  static const Duration defaultStreamChunkTimeout = Duration(seconds: 90);
+
   /// Maximum input character budget (~24k tokens) before smart head+tail
   /// context window compaction is applied.
   static const int maxInputChars = 96000;

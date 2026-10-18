@@ -11,6 +11,8 @@ class OpenAiCompatibleService implements IAiService {
   final String _baseUrl;
   final String _modelName;
   final int _maxOutputTokens;
+  final Duration _requestTimeout;
+  final Duration _streamChunkTimeout;
   final http.Client _client;
   final bool _ownsClient;
 
@@ -18,6 +20,8 @@ class OpenAiCompatibleService implements IAiService {
     AiConfig config, {
     http.Client? client,
     int maxOutputTokens = IAiService.defaultMaxOutputTokens,
+    Duration requestTimeout = IAiService.defaultRequestTimeout,
+    Duration streamChunkTimeout = IAiService.defaultStreamChunkTimeout,
   })  : _apiKey = config.apiKey?.trim() ?? '',
         _baseUrl = config.baseUrl?.isNotEmpty == true
             ? config.baseUrl!.trim().replaceAll(RegExp(r'/+$'), '')
@@ -26,6 +30,8 @@ class OpenAiCompatibleService implements IAiService {
             ? config.modelName!.trim()
             : 'gpt-4o-mini',
         _maxOutputTokens = maxOutputTokens,
+        _requestTimeout = requestTimeout,
+        _streamChunkTimeout = streamChunkTimeout,
         _client = client ?? http.Client(),
         _ownsClient = client == null;
 
@@ -76,8 +82,8 @@ class OpenAiCompatibleService implements IAiService {
     if (e is AiException) return e;
     if (e is SocketException) return AiException.network(e.message);
     if (e is TimeoutException) {
-      return const AiException(
-        'İstek zaman aşımına uğradı (30 saniye). Lütfen ağ bağlantınızı kontrol edin.',
+      return AiException(
+        'İstek zaman aşımına uğradı (${_requestTimeout.inSeconds} saniye). Lütfen ağ bağlantınızı veya yerel modelinizin durumunu kontrol edin.',
       );
     }
     if (e is FormatException) {
@@ -115,7 +121,7 @@ class OpenAiCompatibleService implements IAiService {
               'max_tokens': maxTokens ?? _maxOutputTokens,
             }),
           )
-          .timeout(const Duration(seconds: 30));
+          .timeout(_requestTimeout);
 
       if (response.statusCode == 200) {
         String decodedBody;
@@ -170,7 +176,7 @@ class OpenAiCompatibleService implements IAiService {
 
     try {
       final streamedResponse =
-          await _client.send(request).timeout(const Duration(seconds: 30));
+          await _client.send(request).timeout(_requestTimeout);
 
       if (streamedResponse.statusCode != 200) {
         final errorBytes = await streamedResponse.stream.toBytes();
@@ -179,7 +185,7 @@ class OpenAiCompatibleService implements IAiService {
 
       var emittedAny = false;
       final lineStream = streamedResponse.stream
-          .timeout(const Duration(seconds: 30))
+          .timeout(_streamChunkTimeout)
           .transform(utf8.decoder)
           .transform(const LineSplitter());
 
