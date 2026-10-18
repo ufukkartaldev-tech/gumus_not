@@ -22,10 +22,11 @@ class WidgetService {
       final recentNotes = await _repository.getRecentNotes(limit: 3);
       final pendingTasks = await _repository.getPendingTasks(limit: 5);
 
-      // Widget verisini hazırla
+      // Widget verisini hazırla (şifreli notların gövdesi widget
+      // depolamasına sızmasın)
       final widgetData = {
-        'recentNotes': recentNotes.map((note) => note.toMap()).toList(),
-        'pendingTasks': pendingTasks.map((task) => task.toMap()).toList(),
+        'recentNotes': recentNotes.map(_redactForWidget).map((note) => note.toMap()).toList(),
+        'pendingTasks': pendingTasks.map(_redactForWidget).map((task) => task.toMap()).toList(),
         'lastUpdated': DateTime.now().millisecondsSinceEpoch,
       };
 
@@ -62,6 +63,9 @@ class WidgetService {
       print('❌ Hızlı not widget güncelleme hatası: $e');
     }
   }
+
+  Note _redactForWidget(Note note) =>
+      note.isEncrypted ? note.copyWith(content: '') : note;
 
   // Günlük motivasyon alıntıları
   String _getDailyQuote() {

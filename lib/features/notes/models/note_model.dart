@@ -194,6 +194,7 @@ class Note {
   }
 
   String get excerpt {
+    if (isEncrypted) return '🔒 Şifreli not';
     final cleanContent = MarkdownCleaner.clean(content);
     if (cleanContent.length <= 100) {
       return cleanContent;

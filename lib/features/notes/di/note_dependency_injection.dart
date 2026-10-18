@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
 
+import 'package:connected_notebook/core/security/note_encryption_service.dart';
 import 'package:connected_notebook/features/notes/providers/note_provider.dart';
 import 'package:connected_notebook/features/notes/providers/note_editor_provider.dart';
 import 'package:connected_notebook/features/notes/repositories/markdown_note_repository.dart';
@@ -29,12 +30,18 @@ class NoteDependencyInjection {
       Provider<GitSyncService>(
         create: (_) => GitSyncService(),
       ),
+      Provider<NoteEncryptionService>(
+        create: (_) => NoteEncryptionService(),
+      ),
       Provider<NoteRepository>(
         create: (context) {
           if (_isTestMode) {
             return MockNoteRepository();
           }
-          return MarkdownNoteRepository(context.read<GitSyncService>());
+          return MarkdownNoteRepository(
+            gitSyncService: context.read<GitSyncService>(),
+            encryptionService: context.read<NoteEncryptionService>(),
+          );
         },
       ),
       Provider<BacklinkService>(

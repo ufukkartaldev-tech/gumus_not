@@ -21,6 +21,8 @@ import 'package:connected_notebook/core/utils/shortcut_manager.dart';
 import 'package:connected_notebook/features/export/presentation/latex_export_screen.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'package:connected_notebook/features/notes/services/voice_note_service.dart';
+import 'package:connected_notebook/features/security/services/biometric_service.dart';
+import 'package:connected_notebook/core/security/note_encryption_service.dart';
 import 'package:connected_notebook/features/ai/providers/ai_provider.dart';
 import 'package:connected_notebook/features/ai/models/ai_exception.dart';
 
@@ -48,6 +50,10 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
   bool _isFocusMode = false;
   bool _isLoading = false;
   bool _isEncrypted = false;
+  bool _isUnlocked = false;
+  String _storedEncryptedContent = '';
+  final NoteEncryptionService _encryptionService = NoteEncryptionService();
+  final BiometricService _biometricService = BiometricService();
   int? _selectedColor;
   String? _emojiIcon;
   bool _isPomodoroVisible = false;
@@ -94,7 +100,15 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
     _isEncrypted = widget.note?.isEncrypted ?? false;
 
     if (_isEncrypted) {
-      content = '🔒 Bu not şifreli. İçeriği görmek için kasayı açın.';
+      _storedEncryptedContent = widget.note?.content ?? '';
+      if (NoteEncryptionService.isEncryptedPayload(_storedEncryptedContent)) {
+        content = NoteEncryptionService.lockedNotePlaceholder;
+      } else {
+        // Legacy body: the flag used to be a no-op, so the text was stored
+        // in clear. Treat it as already unlocked.
+        content = _storedEncryptedContent;
+        _isUnlocked = true;
+      }
     }
 
     _contentController = MarkdownLivePreviewController(text: content);
@@ -289,15 +303,21 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
     }
     setState(() => _isLoading = true);
     try {
-      final plaintextContent = _contentController.text;
+      // A locked note that was never unlocked must keep its stored body:
+      // the controller only holds the placeholder, which would destroy the
+      // ciphertext (or legacy text) if persisted.
+      final wasEncrypted = widget.note?.isEncrypted ?? false;
+      final content = (wasEncrypted && !_isUnlocked)
+          ? _storedEncryptedContent
+          : _contentController.text;
 
       final note = Note(
         id: widget.note?.id,
         title: _titleController.text.trim(),
-        content: plaintextContent,
+        content: content,
         createdAt: widget.note?.createdAt ?? DateTime.now().millisecondsSinceEpoch,
         updatedAt: DateTime.now().millisecondsSinceEpoch,
-        isEncrypted: widget.note?.isEncrypted ?? false,
+        isEncrypted: _isEncrypted,
         tags: _tags,
         color: _selectedColor,
         folderName: widget.note?.folderName ?? 'Genel',
@@ -322,6 +342,70 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
   void _showError(String msg) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
+  }
+
+  Future<void> _toggleEncryption() async {
+    if (!_isEncrypted) {
+      setState(() {
+        _isEncrypted = true;
+        _isUnlocked = true;
+      });
+      _showSuccess('Not kaydedilirken şifrelenecek 🔒');
+      return;
+    }
+
+    if (!_isUnlocked) {
+      await _unlockVault();
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Şifreleme Kaldırılsın mı?'),
+        content: const Text('Not düz metin olarak saklanacak. Devam edilsin mi?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('İptal'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Kaldır'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    setState(() => _isEncrypted = false);
+    _showSuccess('Şifreleme kaldırıldı');
+  }
+
+  Future<void> _unlockVault() async {
+    try {
+      // The vault key itself lives in the platform secure storage; the
+      // biometric check is a best-effort gate for devices that offer it.
+      final canCheck = await _biometricService.canCheckBiometrics();
+      if (canCheck) {
+        final authenticated = await _biometricService.authenticate();
+        if (!authenticated) {
+          _showError('Kimlik doğrulanamadı, kasa açılamadı');
+          return;
+        }
+      }
+
+      final decrypted = await _encryptionService.decrypt(_storedEncryptedContent);
+      if (!mounted) return;
+      setState(() {
+        _contentController.text = decrypted;
+        _isUnlocked = true;
+      });
+    } on NoteDecryptionException {
+      _showError('Kasa anahtarı okunamadı; veri bozuk veya anahtar kayıpsa not açılamaz');
+    } catch (e) {
+      _showError('Kasa açma hatası: $e');
+    }
   }
 
   void _showSuccess(String msg) {
@@ -768,6 +852,20 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
       showBackButton: true,
       onBackPressed: widget.onCancel,
       actions: [
+        // Vault Lock / Unlock Toggle
+        IconButton(
+          icon: Icon(
+            !_isEncrypted
+                ? Icons.lock_outline
+                : (_isUnlocked ? Icons.lock_open : Icons.lock),
+            color: _isEncrypted ? theme.colorScheme.primary : null,
+          ),
+          onPressed: _toggleEncryption,
+          tooltip: !_isEncrypted
+              ? 'Notu Şifrele'
+              : (_isUnlocked ? 'Şifrelemeyi Kaldır' : 'Kasayı Aç'),
+        ),
+
         // Live Preview / Preview Toggle
         IconButton(
           icon: Icon(
