@@ -71,18 +71,33 @@ void main() {
       expect(restored.isEncrypted, isFalse);
     });
 
-    test('stores id in the file name, not the frontmatter', () {
+    test('names files after sanitized note title and stores id in frontmatter', () {
       final doc = NoteMarkdownCodec.serialize(note);
-      expect(doc.startsWith('---\ntitle:'), isTrue);
-      expect(doc.contains('id:'), isFalse);
-      expect(NoteMarkdownCodec.fileNameFor(123), '123.md');
-      expect(NoteMarkdownCodec.idFromFileName('123.md'), 123);
+      expect(doc.startsWith('---\nid: 123\ntitle:'), isTrue);
+      expect(
+        NoteMarkdownCodec.fileNameForTitle(note.title),
+        'Araştırma fikirler.md',
+      );
+      expect(
+        NoteMarkdownCodec.fileNameForTitle(note.title, collisionIndex: 2),
+        'Araştırma fikirler (2).md',
+      );
+      expect(NoteMarkdownCodec.fileNameForTitle('   ***   '), 'Adsız Not.md');
     });
 
-    test('derives a stable id for hand-dropped files', () {
+    test('derives a stable id and title for hand-dropped files without frontmatter', () {
       final id = NoteMarkdownCodec.idFromFileName('my daily journal.md');
       expect(id, NoteMarkdownCodec.idFromFileName('my daily journal.md'));
       expect(id, isNonZero);
+
+      final restored = NoteMarkdownCodec.deserialize(
+        id,
+        '# Merhaba',
+        fileName: 'my daily journal.md',
+      );
+      expect(restored.id, id);
+      expect(restored.title, 'my daily journal');
     });
   });
 }
+

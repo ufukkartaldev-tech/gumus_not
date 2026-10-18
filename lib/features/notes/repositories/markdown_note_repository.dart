@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 
+import 'package:connected_notebook/core/security/note_encryption_service.dart';
 import 'package:connected_notebook/core/storage/note_markdown_codec.dart';
 import 'package:connected_notebook/features/notes/models/note_model.dart';
 import 'package:connected_notebook/features/notes/repositories/note_repository.dart';
@@ -13,32 +14,133 @@ import 'package:connected_notebook/features/notes/services/git_sync_service.dart
 /// committed to a local git repository when git is available, which gives
 /// note history for free.
 ///
+/// Notes flagged `isEncrypted` have their body stored as an AES-256-GCM
+/// payload (see [NoteEncryptionService]); frontmatter metadata stays
+/// readable so title/tag search still works. Bodies produced before real
+/// encryption existed were plain text and remain readable until the next
+/// save re-encrypts them.
+///
 /// Backlinks are derived from note content on demand instead of being stored,
 /// so the files always remain the single source of truth.
 class MarkdownNoteRepository implements NoteRepository {
-  MarkdownNoteRepository([GitSyncService? gitSyncService])
-      : _gitSyncService = gitSyncService ?? GitSyncService();
+  MarkdownNoteRepository({
+    GitSyncService? gitSyncService,
+    NoteEncryptionService? encryptionService,
+    bool enableGit = true,
+    Future<Directory> Function()? notesDirResolver,
+  })  : _gitSyncService = gitSyncService ?? GitSyncService(),
+        _encryption = encryptionService ?? NoteEncryptionService(),
+        _enableGit = enableGit,
+        _notesDirResolver = notesDirResolver;
 
   final GitSyncService _gitSyncService;
+  final NoteEncryptionService _encryption;
+  final bool _enableGit;
+  final Future<Directory> Function()? _notesDirResolver;
+  final Map<int, String> _idToFilePath = {};
 
   bool get _isAvailable => !kIsWeb;
 
   Future<Directory> _notesDir() async {
-    final dir = Directory(await _gitSyncService.getRepoPath());
+    final Directory dir;
+    if (_notesDirResolver != null) {
+      dir = await _notesDirResolver!();
+    } else {
+      dir = Directory(await _gitSyncService.getRepoPath());
+    }
     if (!dir.existsSync()) dir.createSync(recursive: true);
     return dir;
   }
 
-  Future<File> _fileFor(Directory dir, int id) =>
-      Future.value(File(p.join(dir.path, NoteMarkdownCodec.fileNameFor(id))));
+  File? _findFileById(Directory dir, int id) {
+    final cachedPath = _idToFilePath[id];
+    if (cachedPath != null) {
+      final cachedFile = File(cachedPath);
+      if (cachedFile.existsSync()) {
+        try {
+          if (NoteMarkdownCodec.deserializeFromFile(cachedFile).id == id) {
+            return cachedFile;
+          }
+        } catch (_) {}
+      }
+      _idToFilePath.remove(id);
+    }
+
+    // Legacy fallback: `<id>.md`
+    final legacyFile = File(p.join(dir.path, '$id.md'));
+    if (legacyFile.existsSync()) {
+      try {
+        if (NoteMarkdownCodec.deserializeFromFile(legacyFile).id == id) {
+          _idToFilePath[id] = legacyFile.path;
+          return legacyFile;
+        }
+      } catch (_) {}
+    }
+
+    for (final entity in dir.listSync(followLinks: false)) {
+      if (entity is! File) continue;
+      final fileName = p.basename(entity.path);
+      if (!NoteMarkdownCodec.isNoteFileName(fileName)) continue;
+      try {
+        final note = NoteMarkdownCodec.deserializeFromFile(entity);
+        if (note.id != null) {
+          _idToFilePath[note.id!] = entity.path;
+          if (note.id == id) return entity;
+        }
+      } catch (_) {}
+    }
+    return null;
+  }
+
+  Future<void> _writeAndReplaceOldFile({
+    required Directory dir,
+    required Note noteToSave,
+    required File? existingFile,
+  }) async {
+    final targetFile = NoteMarkdownCodec.resolveUniqueFile(
+      dir,
+      noteToSave,
+      currentFile: existingFile,
+    );
+
+    if (existingFile != null &&
+        existingFile.existsSync() &&
+        existingFile.path != targetFile.path &&
+        existingFile.path.toLowerCase() == targetFile.path.toLowerCase()) {
+      await existingFile.rename(targetFile.path);
+    }
+
+    await targetFile.writeAsString(NoteMarkdownCodec.serialize(noteToSave));
+
+    if (existingFile != null &&
+        existingFile.existsSync() &&
+        existingFile.path.toLowerCase() != targetFile.path.toLowerCase()) {
+      await existingFile.delete();
+    }
+
+    if (noteToSave.id != null) {
+      _idToFilePath[noteToSave.id!] = targetFile.path;
+    }
+  }
 
   Future<void> _commit(String message) async {
+    if (!_enableGit) return;
     try {
       await _gitSyncService.initRepo();
       await _gitSyncService.commitChanges(message);
     } catch (_) {
       // Git is optional; file persistence must never depend on it.
     }
+  }
+
+  /// Returns the body to store for [note]: plaintext unless the note is
+  /// flagged encrypted. Already-encrypted payloads (internal re-saves) pass
+  /// through unchanged; anything else is sealed with the vault key.
+  Future<String> _persistableBody(Note note) async {
+    if (!note.isEncrypted || NoteEncryptionService.isEncryptedPayload(note.content)) {
+      return note.content;
+    }
+    return _encryption.encrypt(note.content);
   }
 
   @override
@@ -50,11 +152,11 @@ class MarkdownNoteRepository implements NoteRepository {
       if (entity is! File) continue;
       final fileName = p.basename(entity.path);
       if (!NoteMarkdownCodec.isNoteFileName(fileName)) continue;
-      final raw = entity.readAsStringSync();
-      notes.add(NoteMarkdownCodec.deserialize(
-        NoteMarkdownCodec.idFromFileName(fileName),
-        raw,
-      ));
+      final note = NoteMarkdownCodec.deserializeFromFile(entity);
+      if (note.id != null) {
+        _idToFilePath[note.id!] = entity.path;
+      }
+      notes.add(note);
     }
     notes.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
     return notes;
@@ -64,9 +166,9 @@ class MarkdownNoteRepository implements NoteRepository {
   Future<Note?> getNoteById(int id) async {
     if (!_isAvailable) return null;
     final dir = await _notesDir();
-    final file = await _fileFor(dir, id);
-    if (!file.existsSync()) return null;
-    return NoteMarkdownCodec.deserialize(id, file.readAsStringSync());
+    final file = _findFileById(dir, id);
+    if (file == null || !file.existsSync()) return null;
+    return NoteMarkdownCodec.deserializeFromFile(file);
   }
 
   @override
@@ -78,15 +180,19 @@ class MarkdownNoteRepository implements NoteRepository {
       );
     }
     final dir = await _notesDir();
+    final existingIds =
+        (await getAllNotes()).map((n) => n.id).whereType<int>().toSet();
 
     var id = note.id ?? DateTime.now().millisecondsSinceEpoch;
-    var file = await _fileFor(dir, id);
-    while (file.existsSync()) {
+    while (existingIds.contains(id)) {
       id++;
-      file = await _fileFor(dir, id);
     }
 
-    await file.writeAsString(NoteMarkdownCodec.serialize(note.copyWith(id: id)));
+    final body = await _persistableBody(note);
+    final toSave = note.copyWith(id: id, content: body);
+    final file = NoteMarkdownCodec.resolveUniqueFile(dir, toSave);
+    await file.writeAsString(NoteMarkdownCodec.serialize(toSave));
+    _idToFilePath[id] = file.path;
     await _commit('Add note: ${note.title}');
     return id;
   }
@@ -102,9 +208,38 @@ class MarkdownNoteRepository implements NoteRepository {
       return;
     }
     final dir = await _notesDir();
-    final file = await _fileFor(dir, id);
-    final toSave = note.copyWith(updatedAt: DateTime.now().millisecondsSinceEpoch);
-    await file.writeAsString(NoteMarkdownCodec.serialize(toSave));
+    final existingFile = _findFileById(dir, id);
+
+    // A locked note re-saved without unlocking carries only the placeholder
+    // in its content; persisting it would destroy the stored ciphertext.
+    if (note.isEncrypted &&
+        note.content == NoteEncryptionService.lockedNotePlaceholder &&
+        existingFile != null &&
+        existingFile.existsSync()) {
+      final existing = NoteMarkdownCodec.deserializeFromFile(existingFile);
+      final toSave = note.copyWith(
+        content: existing.content,
+        updatedAt: DateTime.now().millisecondsSinceEpoch,
+      );
+      await _writeAndReplaceOldFile(
+        dir: dir,
+        noteToSave: toSave,
+        existingFile: existingFile,
+      );
+      await _commit('Update note metadata: ${note.title}');
+      return;
+    }
+
+    final body = await _persistableBody(note);
+    final toSave = note.copyWith(
+      content: body,
+      updatedAt: DateTime.now().millisecondsSinceEpoch,
+    );
+    await _writeAndReplaceOldFile(
+      dir: dir,
+      noteToSave: toSave,
+      existingFile: existingFile,
+    );
     await _commit('Update note: ${note.title}');
   }
 
@@ -112,9 +247,10 @@ class MarkdownNoteRepository implements NoteRepository {
   Future<void> deleteNote(int id) async {
     if (!_isAvailable) return;
     final dir = await _notesDir();
-    final file = await _fileFor(dir, id);
-    if (file.existsSync()) {
+    final file = _findFileById(dir, id);
+    if (file != null && file.existsSync()) {
       await file.delete();
+      _idToFilePath.remove(id);
       await _commit('Delete note: $id');
     }
   }

@@ -68,7 +68,7 @@ class SqliteToMarkdownMigrator {
         final note = Note.fromMap(row);
         final id = note.id;
         if (id == null) continue;
-        final file = File(p.join(notesDir.path, NoteMarkdownCodec.fileNameFor(id)));
+        final file = NoteMarkdownCodec.resolveUniqueFile(notesDir, note);
         await file.writeAsString(NoteMarkdownCodec.serialize(note));
         noteCount++;
       }
