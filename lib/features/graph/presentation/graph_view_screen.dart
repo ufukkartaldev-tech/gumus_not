@@ -36,7 +36,6 @@ class _GraphViewScreenState extends State<GraphViewScreen> {
   // Performance monitoring
   final Stopwatch _frameStopwatch = Stopwatch();
   double _averageFrameTime = 0.0;
-  final bool _didSetupDependencies = false;
 
   @override
   void initState() {

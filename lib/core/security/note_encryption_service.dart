@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 import 'package:encrypt/encrypt.dart' as enc;
@@ -91,8 +90,9 @@ class NoteEncryptionService {
     if (kIsWeb) return null;
     try {
       final Directory dir;
-      if (_vaultDirResolver != null) {
-        dir = await _vaultDirResolver!();
+      final resolver = _vaultDirResolver;
+      if (resolver != null) {
+        dir = await resolver();
       } else {
         final docs = await getApplicationDocumentsDirectory();
         dir = Directory(p.join(docs.path, 'GumusNot', 'notes'));

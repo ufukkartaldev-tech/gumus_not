@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:connected_notebook/core/theme/theme_provider.dart';
-import 'package:connected_notebook/core/theme/app_theme.dart';
 import 'package:connected_notebook/features/settings/presentation/about_screen.dart';
 import 'package:connected_notebook/features/home_widget/presentation/widget_screen.dart';
 import 'package:connected_notebook/core/utils/shortcut_manager.dart';

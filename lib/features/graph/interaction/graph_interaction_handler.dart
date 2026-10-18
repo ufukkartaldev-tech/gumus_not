@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
-import 'package:vector_math/vector_math_64.dart' hide Character, Colors;
+import 'package:vector_math/vector_math_64.dart' hide Colors;
 import '../models/graph_models.dart';
 import '../rendering/graph_custom_painter.dart';
 import '../constants/graph_constants.dart';

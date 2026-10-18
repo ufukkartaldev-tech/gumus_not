@@ -8,7 +8,6 @@ class ConfettiEffect {
     final size = renderBox?.size ?? Size.zero;
     final position = offset ?? (renderBox != null ? renderBox.localToGlobal(Offset(size.width / 2, size.height / 2)) : Offset.zero);
 
-    final List<OverlayEntry> entries = [];
     final random = Random();
 
     for (int i = 0; i < 15; i++) {

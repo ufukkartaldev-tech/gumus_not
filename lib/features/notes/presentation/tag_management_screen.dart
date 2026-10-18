@@ -150,7 +150,6 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                         itemBuilder: (context, index) {
                           final tag = filteredTags[index];
                           final count = tagFrequency[tag] ?? 0;
-                          final notes = noteProvider.getNotesByTag(tag);
                           
                           return Card(
                             margin: const EdgeInsets.only(bottom: 8),

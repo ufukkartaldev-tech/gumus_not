@@ -893,7 +893,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     final bgColor = _selectedColor != null
         ? Color(_selectedColor!)
         : Theme.of(context).colorScheme.surface;
@@ -1018,7 +1018,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
 
   PreferredSizeWidget _buildMinimalAppBar(BuildContext context) {
     final theme = Theme.of(context);
-    final mood = _findCurrentMood();
+
 
     return CustomAppBar(
       title: '',

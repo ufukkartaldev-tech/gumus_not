@@ -19,9 +19,13 @@ class _BatchExportScreenState extends State<BatchExportScreen> {
   bool _isExporting = false;
   String _exportFormat = 'txt';
   final bool _includeEncrypted = false;
-  String? _exportPath;
   int _progress = 0;
   String? _errorMessage;
+
+  List<Note> _exportableNotes(NoteProvider provider) {
+    if (_includeEncrypted) return provider.notes;
+    return provider.notes.where((n) => !n.isEncrypted).toList();
+  }
 
   @override
   void initState() {
@@ -32,8 +36,9 @@ class _BatchExportScreenState extends State<BatchExportScreen> {
   Future<void> _loadNotes() async {
     final noteProvider = Provider.of<NoteProvider>(context, listen: false);
     await noteProvider.loadNotes();
+    if (!mounted) return;
     setState(() {
-      _selectedNotes = noteProvider.notes;
+      _selectedNotes = List.from(_exportableNotes(noteProvider));
     });
   }
 
@@ -48,7 +53,6 @@ class _BatchExportScreenState extends State<BatchExportScreen> {
 
     setState(() {
       _isExporting = true;
-      _exportPath = directory;
       _errorMessage = null;
       _progress = 0;
     });
@@ -291,17 +295,23 @@ class _BatchExportScreenState extends State<BatchExportScreen> {
                 const Spacer(),
                 TextButton(
                   onPressed: () {
+                    final exportable = _exportableNotes(
+                      Provider.of<NoteProvider>(context, listen: false),
+                    );
                     setState(() {
-                      if (_selectedNotes.length == Provider.of<NoteProvider>(context).notes.length) {
+                      if (_selectedNotes.length == exportable.length) {
                         _selectedNotes = [];
                       } else {
-                        _selectedNotes = List.from(Provider.of<NoteProvider>(context).notes);
+                        _selectedNotes = List.from(exportable);
                       }
                     });
                   },
-                  child: Text(_selectedNotes.length == Provider.of<NoteProvider>(context).notes.length 
-                      ? 'Hepsini Kaldır' 
-                      : 'Hepsini Seç'),
+                  child: Text(
+                    _selectedNotes.length ==
+                            _exportableNotes(Provider.of<NoteProvider>(context)).length
+                        ? 'Hepsini Kaldır'
+                        : 'Hepsini Seç',
+                  ),
                 ),
               ],
             ),

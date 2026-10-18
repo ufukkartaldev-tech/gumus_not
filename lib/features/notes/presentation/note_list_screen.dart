@@ -441,7 +441,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
   }
 
   Widget _buildSidebarFooter() {
-    final theme = Theme.of(context);
+
     if (_isSidebarCollapsed) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
@@ -1421,7 +1421,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
     );
   }
 
-  void _showImportExport() {
+  void showImportExport() {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => const ImportExportScreen(),
@@ -1437,7 +1437,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
     );
   }
 
-  void _showAdvancedSearch() {
+  void showAdvancedSearch() {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => const AdvancedSearchScreen(),

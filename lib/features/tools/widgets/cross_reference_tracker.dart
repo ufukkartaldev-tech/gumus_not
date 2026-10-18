@@ -306,15 +306,6 @@ class _CrossReferenceTrackerState extends State<CrossReferenceTracker> {
     });
   }
 
-  Note? _getNoteById(int id) {
-    try {
-      final noteProvider = Provider.of<NoteProvider>(context, listen: false);
-      return noteProvider.notes.firstWhere((note) => note.id == id);
-    } catch (e) {
-      return null;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {

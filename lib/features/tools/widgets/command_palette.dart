@@ -341,7 +341,7 @@ class _CommandPaletteState extends State<CommandPalette> {
     ];
   }
 
-  void _showQuickTaskDialog(BuildContext context) {
+  void showQuickTaskDialog(BuildContext context) {
     final textController = TextEditingController();
     showDialog(
       context: context,

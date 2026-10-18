@@ -69,8 +69,9 @@ class MarkdownNoteRepository implements NoteRepository {
 
   Future<Directory> _notesDir() async {
     final Directory dir;
-    if (_notesDirResolver != null) {
-      dir = await _notesDirResolver!();
+    final resolver = _notesDirResolver;
+    if (resolver != null) {
+      dir = await resolver();
     } else {
       dir = Directory(await _gitSyncService.getRepoPath());
     }
