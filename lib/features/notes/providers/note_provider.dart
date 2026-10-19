@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:connected_notebook/features/notes/models/note_model.dart';
 import 'package:connected_notebook/features/notes/repositories/note_repository.dart';
+import 'package:connected_notebook/features/notes/repositories/markdown_note_repository.dart';
 import 'package:connected_notebook/features/notes/services/search_service_interface.dart';
+import 'package:connected_notebook/features/notes/services/workspace_service.dart';
 
 /// State management provider for notes
 /// Follows Single Responsibility Principle: Only manages UI state
@@ -10,6 +12,7 @@ class NoteProvider with ChangeNotifier {
   // Dependencies injected via constructor
   final NoteRepository _repository;
   final SearchService _searchService;
+  final WorkspaceService? _workspaceService;
 
   // State
   List<Note> _notes = [];
@@ -91,7 +94,25 @@ class NoteProvider with ChangeNotifier {
   NoteProvider({
     required NoteRepository repository,
     required SearchService searchService,
-  }) : _repository = repository, _searchService = searchService;
+    WorkspaceService? workspaceService,
+  })  : _repository = repository,
+        _searchService = searchService,
+        _workspaceService = workspaceService {
+    _initWorkspaceWatcher();
+  }
+
+  void _initWorkspaceWatcher() {
+    final ws = _workspaceService;
+    if (ws != null && !ws.isWatching) {
+      ws.startWatching(onExternalChange: () async {
+        debugPrint('External file system change detected in workspace. Refreshing notes...');
+        if (_repository is MarkdownNoteRepository) {
+          (_repository as MarkdownNoteRepository).invalidateCache();
+        }
+        await loadNotes();
+      });
+    }
+  }
 
   /// Load all notes from repository
   Future<void> loadNotes() async {
@@ -308,5 +329,11 @@ class NoteProvider with ChangeNotifier {
     _selectedTag = null;
     _invalidateDerivedCaches();
     _notifyOnce();
+  }
+
+  @override
+  void dispose() {
+    _workspaceService?.stopWatching();
+    super.dispose();
   }
 }

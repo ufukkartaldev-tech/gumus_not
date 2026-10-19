@@ -4,10 +4,13 @@ import 'package:connected_notebook/features/settings/presentation/about_screen.d
 import 'package:connected_notebook/features/home_widget/presentation/widget_screen.dart';
 import 'package:connected_notebook/core/utils/shortcut_manager.dart';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:connected_notebook/features/ai/presentation/ai_settings_screen.dart';
 import 'package:connected_notebook/features/settings/screens/theme_selection_screen.dart';
 import 'package:connected_notebook/features/security/services/biometric_service.dart';
 import 'package:connected_notebook/core/security/note_encryption_service.dart';
+import 'package:connected_notebook/features/notes/services/workspace_service.dart';
+import 'package:connected_notebook/features/notes/providers/note_provider.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -22,11 +25,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _isAppLockEnabled = false;
   bool _isLoadingLockSetting = true;
   bool _hasVaultEnvelope = false;
+  String _workspacePath = '';
 
   @override
   void initState() {
     super.initState();
     _loadAppLockSetting();
+    _loadWorkspacePath();
+  }
+
+  Future<void> _loadWorkspacePath() async {
+    final workspaceService = context.read<WorkspaceService>();
+    final path = await workspaceService.getActiveWorkspacePath();
+    if (mounted) {
+      setState(() {
+        _workspacePath = path;
+      });
+    }
   }
 
   Future<void> _loadAppLockSetting() async {
@@ -69,6 +84,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         padding: const EdgeInsets.all(16.0),
         children: [
           _buildSecuritySection(),
+          const SizedBox(height: 24),
+          _buildWorkspaceSection(),
           const SizedBox(height: 24),
           _buildAiSection(),
           const SizedBox(height: 24),
@@ -290,6 +307,95 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 }
               },
               child: const Text('Kaydet'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWorkspaceSection() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.folder_open, size: 24, color: Colors.amber),
+                SizedBox(width: 8),
+                Text(
+                  'Çalışma Alanı (Workspace)',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Notlarınızın, şifrelenmiş içeriklerin ve Git geçmişinizin tutulduğu yerel klasör.',
+              style: TextStyle(fontSize: 13, color: Colors.grey),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
+              ),
+              child: SelectableText(
+                _workspacePath.isEmpty ? 'Yükleniyor...' : _workspacePath,
+                style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.edit_location_alt, size: 18),
+                  label: const Text('Dizin Değiştir'),
+                  onPressed: () async {
+                    final selectedPath = await FilePicker.platform.getDirectoryPath();
+                    if (selectedPath != null && selectedPath.isNotEmpty) {
+                      if (!context.mounted) return;
+                      final wsService = context.read<WorkspaceService>();
+                      await wsService.setCustomWorkspacePath(selectedPath);
+                      final updatedPath = await wsService.getActiveWorkspacePath();
+                      if (context.mounted) {
+                        await context.read<NoteProvider>().loadNotes();
+                      }
+                      if (mounted) {
+                        setState(() {
+                          _workspacePath = updatedPath;
+                        });
+                        _showSuccess('Çalışma dizini güncellendi: $updatedPath');
+                      }
+                    }
+                  },
+                ),
+                TextButton.icon(
+                  icon: const Icon(Icons.restore, size: 18),
+                  label: const Text('Varsayılana Sıfırla'),
+                  onPressed: () async {
+                    final wsService = context.read<WorkspaceService>();
+                    await wsService.resetToDefault();
+                    final updatedPath = await wsService.getActiveWorkspacePath();
+                    if (context.mounted) {
+                      await context.read<NoteProvider>().loadNotes();
+                    }
+                    if (mounted) {
+                      setState(() {
+                        _workspacePath = updatedPath;
+                      });
+                      _showSuccess('Çalışma dizini varsayılana sıfırlandı');
+                    }
+                  },
+                ),
+              ],
             ),
           ],
         ),

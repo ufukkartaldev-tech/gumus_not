@@ -14,6 +14,7 @@ import 'package:connected_notebook/features/notes/services/advanced_search_servi
 import 'package:connected_notebook/features/notes/services/backlink_service.dart';
 import 'package:connected_notebook/features/notes/services/note_service.dart';
 import 'package:connected_notebook/features/notes/services/search_service_interface.dart';
+import 'package:connected_notebook/features/notes/services/workspace_service.dart';
 
 class NoteDependencyInjection {
   static bool _isTestMode = false;
@@ -28,11 +29,19 @@ class NoteDependencyInjection {
 
   static List<SingleChildWidget> getProviders() {
     return [
+      Provider<WorkspaceService>(
+        create: (_) => WorkspaceService(),
+        dispose: (_, service) => service.dispose(),
+      ),
       Provider<ImageService>(
         create: (_) => ImageService(),
       ),
       Provider<GitSyncService>(
-        create: (_) => GitSyncService(),
+        create: (context) => GitSyncService(
+          repoPathResolver: () =>
+              context.read<WorkspaceService>().getActiveWorkspacePath(),
+        ),
+        dispose: (_, service) => service.dispose(),
       ),
       Provider<NoteEncryptionService>(
         create: (_) => NoteEncryptionService(),
@@ -42,9 +51,11 @@ class NoteDependencyInjection {
           if (_isTestMode) {
             return MockNoteRepository();
           }
+          final workspaceService = context.read<WorkspaceService>();
           return MarkdownNoteRepository(
             gitSyncService: context.read<GitSyncService>(),
             encryptionService: context.read<NoteEncryptionService>(),
+            notesDirResolver: () => workspaceService.getNotesDirectory(),
           );
         },
       ),
@@ -65,6 +76,7 @@ class NoteDependencyInjection {
         create: (context) => NoteProvider(
           repository: context.read<NoteRepository>(),
           searchService: context.read<SearchService>(),
+          workspaceService: context.read<WorkspaceService>(),
         ),
       ),
       ChangeNotifierProvider<NoteEditorProvider>(
@@ -111,6 +123,7 @@ class NoteDependencyInjection {
 
 extension NoteDependencyInjectionExtension on BuildContext {
   ImageService get imageService => read<ImageService>();
+  WorkspaceService get workspaceService => read<WorkspaceService>();
   NoteRepository get noteRepository => read<NoteRepository>();
   SearchService get searchService => read<SearchService>();
   NoteProvider get noteProvider => read<NoteProvider>();

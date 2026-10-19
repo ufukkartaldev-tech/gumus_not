@@ -266,10 +266,18 @@ class MarkdownNoteRepository implements NoteRepository {
   Future<void> _commit(String message) async {
     if (!_enableGit) return;
     try {
-      await _gitSyncService.commitChanges(message);
+      _gitSyncService.queueCommit(message);
     } catch (_) {
       // Git is optional; file persistence must never depend on it.
     }
+  }
+
+  /// Flushes any pending debounced Git commits immediately.
+  Future<void> flushPendingCommits() async {
+    if (!_enableGit) return;
+    try {
+      await _gitSyncService.flushPendingCommits();
+    } catch (_) {}
   }
 
   /// Returns the body to store for [note]: plaintext unless the note is

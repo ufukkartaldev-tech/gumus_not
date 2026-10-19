@@ -6,10 +6,21 @@ import '../models/note_history.dart';
 
 class GitSyncService {
   String? _repoPath;
+  final Future<String> Function()? _repoPathResolver;
+  final Duration commitDebounceDuration;
+
+  Timer? _debounceTimer;
+  String? _pendingCommitMessage;
+  bool _isRepoInitialized = false;
 
   /// Serializes all git subprocess invocations so rapid or concurrent note
   /// saves (`insertNotes`, fast auto-saves) never race on `.git/index.lock`.
   Future<void> _operationLock = Future<void>.value();
+
+  GitSyncService({
+    Future<String> Function()? repoPathResolver,
+    this.commitDebounceDuration = const Duration(seconds: 4),
+  }) : _repoPathResolver = repoPathResolver;
 
   Future<T> _synchronized<T>(Future<T> Function() action) {
     final completer = Completer<T>();
@@ -32,6 +43,15 @@ class GitSyncService {
   }
 
   Future<String> getRepoPath() async {
+    if (_repoPathResolver != null) {
+      final custom = await _repoPathResolver!();
+      final dir = Directory(custom);
+      if (!await dir.exists()) {
+        await dir.create(recursive: true);
+      }
+      return custom;
+    }
+
     if (_repoPath != null) return _repoPath!;
     final directory = await getApplicationDocumentsDirectory();
     final path = '${directory.path}/GumusNot/notes';
@@ -51,7 +71,28 @@ class GitSyncService {
         await Process.run('git', ['init'], workingDirectory: path);
         await Process.run('git', ['branch', '-M', 'main'], workingDirectory: path);
       }
+      _isRepoInitialized = true;
     });
+  }
+
+  /// Queues a debounced asynchronous commit to avoid spawning OS processes
+  /// on every rapid keystroke or 1.5s auto-save timer trigger.
+  void queueCommit(String message) {
+    _pendingCommitMessage = message;
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(commitDebounceDuration, () async {
+      await flushPendingCommits();
+    });
+  }
+
+  /// Flushes any pending queued commit immediately.
+  Future<bool> flushPendingCommits() async {
+    _debounceTimer?.cancel();
+    _debounceTimer = null;
+    final message = _pendingCommitMessage;
+    if (message == null) return false;
+    _pendingCommitMessage = null;
+    return await commitChanges(message);
   }
 
   Future<bool> commitChanges(String message) async {
@@ -59,9 +100,10 @@ class GitSyncService {
       try {
         final path = await getRepoPath();
         final gitDir = Directory('$path/.git');
-        if (!await gitDir.exists()) {
+        if (!_isRepoInitialized && !await gitDir.exists()) {
           await Process.run('git', ['init'], workingDirectory: path);
           await Process.run('git', ['branch', '-M', 'main'], workingDirectory: path);
+          _isRepoInitialized = true;
         }
 
         await Process.run('git', ['add', '-A'], workingDirectory: path);
@@ -136,5 +178,9 @@ class GitSyncService {
       }
       return null;
     });
+  }
+
+  void dispose() {
+    _debounceTimer?.cancel();
   }
 }
