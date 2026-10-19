@@ -675,8 +675,18 @@ class _NoteListScreenState extends State<NoteListScreen> {
                     message: _searchController.text.isNotEmpty 
                         ? 'Aramanızla eşleşen hiçbir not bulamadık.'
                         : 'İkinci beyninizi inşa etmeye başlamak için ilk notunuzu oluşturun.',
-                    buttonText: _searchController.text.isEmpty ? 'Yeni Not Oluştur' : null,
-                    onButtonPressed: _searchController.text.isEmpty ? () => _createNote() : null,
+                    buttonText: _searchController.text.isEmpty ? 'Yeni Not Oluştur' : 'Aramayı Temizle',
+                    onButtonPressed: _searchController.text.isEmpty 
+                        ? () => _createNote() 
+                        : () {
+                            _searchController.clear();
+                            _onSearchChanged('');
+                          },
+                    secondaryButtonText: _searchController.text.isEmpty ? 'Şablon Seç' : null,
+                    onSecondaryButtonPressed: _searchController.text.isEmpty ? () => _showTemplates() : null,
+                    shortcutHint: _searchController.text.isNotEmpty
+                        ? 'İpucu: Esc veya temizle butonu ile tüm notlara dönebilirsiniz'
+                        : 'İpucu: Ctrl+N ile yeni not, Ctrl+K ile arama yapabilirsiniz',
                   ),
               ],
             ),
