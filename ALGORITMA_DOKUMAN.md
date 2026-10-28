@@ -1,85 +1,89 @@
-# GümüşNot Algoritma ve Mantık Dokümantasyonu
+# GümüşNot — Algoritma ve Veri Yapıları Dokümantasyonu
 
-Bu belge, GümüşNot uygulamasının arkasındaki temel algoritmaları ve veri işleme mantıklarını açıklar.
+Bu belge, GümüşNot kod tabanında kullanılan çekirdek algoritmaları, kriptografik protokolleri ve performans optimizasyonlarını açıklar.
 
-## 1. Kuvvet Yönelimli Grafik Algoritması (Force-Directed Graph)
-**Dosya:** `lib/screens/graph_view_screen.dart`
+---
 
-Bu algoritma, notları birbirine bağlı düğümler (node) olarak görselleştirir. Fizik tabanlı bir simülasyon kullanır.
+## 1. Kuvvet Yönelimli Grafik Motoru ve Quadtree Uzamsal İndeksleme
+**Dosyalar:**
+* `lib/features/graph/algorithms/graph_physics_engine.dart`
+* `lib/features/graph/algorithms/quadtree.dart`
+* `lib/features/graph/models/graph_builder.dart`
 
-### Mantık:
-Her karede (frame) aşağıdaki kuvvetler hesaplanır ve düğüm pozisyonlarına uygulanır:
+### Çalışma Mantığı
+Bilgi grafiği, notları düğüm (`GraphNode`) ve `[[WikiLink]]` / ortak etiket ilişkilerini kenar (`GraphEdge`) olarak modeller. Henüz dosyası oluşturulmamış ancak referans verilmiş bağlantılar **Hayalet Düğüm (`isGhost: true`)** olarak grafiğe eklenir.
 
-1.  **İtme Kuvveti (Repulsion):**
-    *   Tüm düğümler birbirini iter.
-    *   Formül: `F = k / d^2` (k: itme katsayısı, d: mesafe).
-    *   Amaç: Düğümlerin üst üste binmesini engellemek.
+Ana UI iş parçacığının (thread) 60 FPS akıcılığını korumak için tüm fizik simülasyonu `GraphPhysicsIsolate` üzerinden arka plan **Dart `Isolate`** iş parçacığında hesaplanır:
 
-2.  **Çekme Kuvveti (Attraction - Yay Kuvveti):**
-    *   Sadece birbirine bağlı (linklenmiş) düğümler arasında oluşur.
-    *   Formül: `F = c * (d - L)` (c: yay sabiti, d: mesafe, L: ideal uzunluk).
-    *   Amaç: İlişkili notları birbirine yakın tutmak.
+1. **Coulomb İtme Kuvveti (Repulsion):**
+   $$F_{\text{rep}} = \frac{k_r}{\max(d^2, 1.0)}$$
+   Düğümlerin üst üste binmesini engeller. Düğüm sayısı $N > 100$ olduğunda `GraphSpatialIndex` (**Quadtree**) devreye girerek uzayı dörde böler ve yalnızca $R = 300$ piksel yarıçapındaki komşu düğümleri sorgular; böylece karmaşıklık $O(N^2)$'den **$O(N \log N)$** seviyesine iner.
+2. **Hooke Yay Çekim Kuvveti (Attraction):**
+   $$F_{\text{att}} = (d - L_{\text{ideal}}) \cdot k_a \cdot w$$
+   Birbirine bağlı düğümleri ideal yay uzunluğunda ($L_{\text{ideal}}$) dengeler.
+3. **Merkezcil Kuvvet (Center Gravity) ve Sönümleme (Damping):**
+   Düğümlerin tuval dışına savrulmasını önlemek için merkeze doğru hafif bir çekim uygulanır ve her adımda hız vektörü sönümleme katsayısıyla ($\text{damping} \approx 0.85$) çarpılarak maksimum hız ($v_{\max} = 50$) sınırlandırılır.
 
-3.  **Merkezcil Kuvvet (Gravity):**
-    *   Tüm düğümler hafifçe ekranın merkezine çekilir.
-    *   Amaç: Grafiğin ekran dışına savrulmasını önlemek.
+---
 
-4.  **Sürtünme (Damping):**
-    *   Her adımda hız belirli bir katsayıyla (örn. 0.9) çarpılır.
-    *   Amaç: Sonsuz salınımı engelleyip sistemin durulmasını (stabilize) sağlamak.
+## 2. Zarf Şifreleme (Envelope Encryption) ve Anahtar Türetimi
+**Dosya:** `lib/core/security/note_encryption_service.dart`
 
-## 2. PDF Dışa Aktarma Algoritması
-**Dosya:** `lib/services/pdf_export_service.dart`
+Gizli Kasa (*Vault*) içindeki notlar endüstri standardı **Zarf Şifreleme** mimarisiyle korunur:
 
-Markdown formatındaki düz metni analiz edip yapılandırılmış bir PDF belgesine dönüştürür.
+1. **Veri Şifreleme Anahtarı (DEK):** `Random.secure()` ile üretilen kriptografik olarak rastgele 256-bit (32-byte) anahtardır. Aktif oturumda işletim sistemi güvenli anahtarlığında (`FlutterSecureStorage`) tutulur.
+2. **Anahtar Şifreleme Anahtarı (KEK) — `PBKDF2-HMAC-SHA256`:**
+   Kullanıcının belirlediği Ana Paroladan (*Master Password*), RFC 8018 uyumlu `PBKDF2-HMAC-SHA256` algoritması (**120.000 iterasyon**, 128-bit rastgele tuz/salt) ile 256-bit KEK türetilir. Sabit zamanlı karşılaştırma (*constant-time comparison*) uygulanır.
+3. **Anahtar Sarma (`.vault_key.json`):**
+   DEK, KEK kullanılarak **`AES-256-GCM`** (96-bit IV + 128-bit kimlik doğrulama etiketi) ile şifrelenir ve `<Belgelerim>/GumusNot/notes/.vault_key.json` dosyasına yazılır. Parola değiştirildiğinde not dosyaları yeniden şifrelenmez; yalnızca `.vault_key.json` içindeki DEK zarfı yeniden sarılır.
+4. **Not Yükü Şifrelemesi (`enc:v1`):**
+   Her şifreli not kaydında yeni bir 12-byte IV üretilir ve gövde `enc:v1:<base64_iv>:<base64_ciphertext>` formatında YAML frontmatter altına yazılır.
 
-### Adımlar:
-1.  **Satır Ayrıştırma (Parsing):**
-    *   Not içeriği satır satır (`\n`) bölünür.
-2.  **Desen Eşleştirme (Pattern Matching):**
-    *   `# ` ile başlayanlar -> **Başlık 1** (Büyük, Kalın Font)
-    *   `## ` ile başlayanlar -> **Başlık 2** (Orta, Kalın Font)
-    *   `- ` ile başlayanlar -> **Madde İşareti** (Bullet Point)
-    *   Diğerleri -> **Paragraf**
-3.  **Sayfa Oluşturma (Layout):**
-    *   `pdf` paketi kullanılarak A4 sayfa yapısı, kenar boşlukları (margin) ve alt/üst bilgiler eklenir.
-4.  **Dosya Yazma:**
-    *   Oluşturulan binary veri `.pdf` uzantısıyla dosya sistemine kaydedilir.
+---
 
-## 3. Görev Çıkarımı ve Toplama (Task Hub)
-**Dosya:** `lib/screens/task_hub_screen.dart`
+## 3. 64-Bit Charikar SimHash Semantik AI Önbelleği
+**Dosya:** `lib/features/ai/services/ai_cache_service.dart`
 
-Uygulama genelindeki yüzlerce notun içinden "yapılacakları" bulur.
+Yapay zekâ isteklerinde hem API kotasını korumak hem de diskte düz metin not saklamamak için iki katmanlı (L1 RAM + L2 `SharedPreferences`) **SimHash** önbelleği kullanılır:
 
-### Algoritma:
-1.  **Veri Çekme:** Veritabanındaki *tüm* notlar listelenir.
-2.  **Regex Taraması:**
-    *   Her notun içeriğinde `r'- \[ \] (.*)'` regex deseni aranır.
-    *   Bu desen, `- [ ] ` ile başlayan (tamamlanmamış) satırları yakalar.
-3.  **Nesneleştirme:**
-    *   Bulunan her görev için bir `TaskItem` objesi oluşturulur (Görev metni + Kaynak Not referansı).
-4.  **Listeleme:**
-    *   Elde edilen liste ekranda gösterilir. Tıklanınca kaynak nota navigasyon sağlanır.
+1. **Özellik Çıkarımı (Shingling):** Metin normalize edilir; kelime token'ları (ağırlık: `2`) ve 3-gram karakter dizileri (ağırlık: `1`) çıkarılır.
+2. **64-Bit FNV-1a ve SimHash Vektörü:** Her özellik 64-bit FNV-1a (`0xCBF29CE484222325` offset, `0x100000001B3` asal çarpan) ile hash'lenir. 64 elemanlı ağırlık vektörü $V$'de bit `1` ise $+w$, `0` ise $-w$ eklenir. Sonuçta $V[i] > 0$ olan bitler `1` yapılarak 64-bit SimHash imzası elde edilir.
+3. **Hamming Mesafesi ile Yakın Eşleşme:** İki metin arasındaki 64-bit SimHash farkının bit sayısı ($\text{popcount}(h_1 \oplus h_2) \le 4$) eşik değerinin altındaysa önbellekteki AI yanıtı doğrudan döndürülür. Şifreli notlar (`isEncrypted: true`) yalnızca L1 RAM önbelleğinde tutulur, diske yazılmaz.
 
-## 4. Backlink (Geri Bağlantı) Sistemi
-**Dosya:** `lib/services/database_service.dart`
+---
 
-Notlar arasındaki `[[Başlık]]` şeklindeki bağlantıları yönetir.
+## 4. TF-IDF ve Kosinüs Benzerliği ile Çapraz Referans Tespiti
+**Dosya:** `lib/features/tools/widgets/cross_reference_tracker.dart`
 
-### Kayıt Algoritması (Insert/Update):
-1.  Bir not kaydedilirken, içeriği `r'\[\[([^\]]+)\]\]'` regex'i ile taranır.
-2.  Eşleşen her "Bağlantı Metni" için:
-    *   Veritabanında bu başlığa sahip bir not var mı diye bakılır.
-    *   **Yoksa:** "Hayalet Not" (Ghost Note) olarak geçici bir kayıt veya taslak oluşturulur.
-    *   **Varsa:** Mevcut notun ID'si alınır.
-3.  `backlinks` tablosuna `source_id` (kaynak) ve `target_id` (hedef) olarak kaydedilir.
+Açık olan not ile çalışma alanındaki diğer tüm şifresiz notlar arasındaki anlamsal yakınlık arka plan `Isolate`'ında (`Isolate.run`) hesaplanır:
 
-## 5. Okuma Süresi Tahmini
-**Dosya:** `lib/widgets/note_card.dart`
+1. **Ön İşleme:** Markdown işaretleri temizlenir, Türkçe/İngilizce etkisiz kelimeler (*stop words*) çıkarılır.
+2. **TF-IDF Vektörleştirme:**
+   $$\text{TF}(t, d) = \frac{\text{count}(t, d)}{|d|}, \quad \text{IDF}(t) = \ln\left(\frac{N}{\text{df}(t)}\right) + 1$$
+3. **Kosinüs Benzerliği ve Hibrit Skor:**
+   $$\text{CosineSim}(A, B) = \frac{\vec{V}_A \cdot \vec{V}_B}{\|\vec{V}_A\| \|\vec{V}_B\|}$$
+   Kosinüs benzerliği (%45 ağırlık), ortak etiket oranı (%35 ağırlık) ve doğrudan `[[WikiLink]]` bağlantısı (%20 ağırlık) birleştirilerek en yüksek skorlu 5 ilişkili not önerilir.
 
-Basit bir heuristik algoritma kullanır.
+---
 
-### Formül:
-1.  Metin boşluklardan (`\s+`) bölünerek kelime sayısı (`WordCount`) bulunur.
-2.  Ortalama bir insanın dakikada 200 kelime okuduğu varsayılır.
-3.  `Süre = Tavan(WordCount / 200)` formülüyle dakika cinsinden süre hesaplanır.
+## 5. Ağırlıklı Bulanık (Levenshtein) ve Zettelkasten Graf Araması
+**Dosyalar:**
+* `lib/features/notes/services/advanced_search_service.dart`
+* `lib/features/search/services/search_service.dart`
+
+1. **Çok Kriterli ve Bulanık Puanlama:**
+   * Tam başlık eşleşmesi, başlık başlangıcı, etiket eşleşmesi ve gövde içi geçiş sıklığı puanlanır.
+   * Yazım hatalarını tolere etmek için dinamik programlama tabanlı **Levenshtein Mesafesi** ($\text{mesafe} \le 2$) uygulanır (etkisiz kelimeler bulanık aramadan muaf tutulur).
+2. **Semantik Komşuluk Desteği (Graph Boost) ve Güncellik (Recency):**
+   * Arama terimiyle doğrudan eşleşen çekirdek (*seed*) notların `[[WikiLink]]` komşularına semantik bonus puan eklenir.
+   * `AdvancedSearchService` içinde gelen bağlantı sayısına göre logaritmik PageRank bonusu ve son güncellenme tarihine göre üstel zaman aşımı çarpanı ($e^{-0.005 \cdot \text{gün}}$) uygulanır.
+
+---
+
+## 6. Canlı Markdown Sözdizimi Gizleme ve Artımlı Dosya Önbelleği
+**Dosyalar:**
+* `lib/features/notes/widgets/markdown_live_controller.dart`
+* `lib/features/notes/repositories/markdown_note_repository.dart`
+
+* **Satır Bazlı `InlineSpan` Önbelleği (`MarkdownLivePreviewController`):** Yalnızca imlecin bulunduğu aktif satırda ham Markdown sembollerini gösterir; diğer satırlarda sembolleri gizleyip biçimlendirilmiş `TextSpan` ağacını `_LineKey` ile önbelleğe alır (maks. 5.000 satır). ASCII karakter kodu ön kontrolü ile düz metin satırlarda Regex motorunu çalıştırmaz.
+* **`FileStat` Önbelleği ve Atomik Yazma (`MarkdownNoteRepository`):** Her `.md` dosyasının `modified` zaman damgası ve `size` bilgisi bellekte tutulur; değişmeyen dosyalar diskten tekrar okunmaz. Kayıt işlemleri `<dosya>.<timestamp>.tmp` üzerinden `flush()` + `rename()` ile atomik olarak gerçekleştirilir.

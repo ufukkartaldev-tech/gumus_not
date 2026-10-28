@@ -1,40 +1,28 @@
-# Bağlantılı Düşünce Not Defteri - Sistem Analiz Raporu
+# GümüşNot — Sistem Analiz ve Mimari Durum Raporu
 
 ## 1. Sistem Özeti
-Proje, **Flutter** ile geliştirilmiş, yerel (offline-first) çalışan, gelişmiş bir not alma uygulamasıdır. Öne çıkan özellikleri:
-*   **Bağlantılı Notlar (Zettelkasten)**: `[[WikiLink]]` formatı ile notlar arası bağlantı.
-*   **Grafik Görünümü**: Notlar arasındaki ilişkilerin görselleştirilmesi.
-*   **Şifreli Kasa**: AES-256 ile şifrelenmiş özel notlar (`EncryptionService`).
-*   **Markdown & LaTeX**: Matematiksel formül ve zengin metin desteği.
-*   **Veritabanı**: SQLite (`sqflite`) tabanlı yerel depolama.
+**GümüşNot** (`connected_notebook`), Flutter ile geliştirilmiş, **yerel öncelikli (*Local-First*)**, çok platformlu bir Kişisel Bilgi Yönetimi (PKM) ve Zettelkasten not alma ekosistemidir.
 
-## 2. Yapılan Düzeltmeler
+* **Depolama Mimarisi**: `<Belgelerim>/GumusNot/notes/` altında YAML Frontmatter + Markdown (`.md`) dosyaları (`MarkdownNoteRepository`, `NoteMarkdownCodec`).
+* **Bağlantılı Notlar (Zettelkasten)**: `[[WikiLink]]` çift yönlü bağlantılar, geri bağlantılar (`BacklinkService`), Hayalet Düğümler (`Ghost Nodes`) ve `Isolate` + `Quadtree` tabanlı 60 FPS Bilgi Grafiği.
+* **Gizli Kasa (Vault)**: RFC 8018 `PBKDF2-HMAC-SHA256` (120.000 iterasyon) + `AES-256-GCM` zarf şifreleme (`NoteEncryptionService`, `.vault_key.json`).
+* **Sürüm Kontrolü ve Yedekleme**: Yerel Git otomatik commit ve diff görüntüleme (`GitSyncService`), Google Drive `appDataFolder` üzerinde `AES-256-GCM` (`GNCB\x02`) şifreli bulut senkronizasyonu (`CloudSyncService`) ve `.zip` arşivleme.
+* **Yapay Zekâ Asistanı**: Google Gemini ve OpenAI uyumlu (Ollama, LM Studio, DeepSeek, Groq) sağlayıcılarla RAG sohbet, özetleme, aksiyon çıkarımı ve 64-bit Charikar SimHash önbellekleme (`AiCacheService`).
 
-### A. Windows Başlatma Hatası (Kritik)
-*   **Sorun**: Windows gibi masaüstü platformlarda `sqflite` başlatılırken `sqfliteFfiInit()` çağrısı eksikti. Bu, uygulamanın veritabanına erişmeye çalışırken çökmesine neden olurdu.
-*   **Düzeltme**: `lib/main.dart` dosyasına gerekli başlatma kodu eklendi.
+---
 
-### B. Şifre Kurtarma Mantığı Hatası
-*   **Sorun**: `EncryptionService` içindeki `verifyRecoveryKey` ve `_generateRecoveryKey` metodları `DateTime.now()` (anlık zaman) bilgisini hashing işlemine dahil ediyordu. Bu, oluşturulan bir kurtarma anahtarının asla doğrulanamamasına (çünkü doğrulama anındaki zaman farklı olacağından) neden oluyordu.
-*   **Düzeltme**: Hashing işlemi deterministik hale getirildi (sabit bir 'salt' kullanılarak). Artık oluşturulan anahtar matematiksel olarak doğrulanabilir.
-*   *Not*: Mevcut mimaride "Kurtarma Anahtarı" aslında şifrenin bir yinelemesidir. Gerçek bir unutuılan şifre kurtarma senaryosu için mimari değişikliği önerilmektedir (Bkz. Gelecek Özellikler).
+## 2. Tamamlanan Kritik Mühendislik İyileştirmeleri
 
-### C. Windows OCR Uyumluluk Sorunu
-*   **Sorun**: `google_mlkit_text_recognition` kütüphanesi Windows'u desteklemediği için derleme ve çalışma hatalarına yol açıyordu.
-*   **Düzeltme**: OCR özelliği ve ilgili kütüphane Windows kararlılığı için geçici olarak projeden kaldırıldı.
+### A. SQLite'tan Yerel Markdown Dosya Mimarisine Geçiş
+* **Önceki Durum**: Notlar kapalı bir `connected_notebook.db` SQLite veritabanında tutuluyordu; harici editörlerle düzenlenemiyor ve Git ile satır bazlı takip edilemiyordu.
+* **Güncel Mimari**: Tüm notlar ve şablonlar YAML frontmatter içeren `.md` dosyalarına taşındı. `SqliteToMarkdownMigrator` eski SQLite verilerini ilk açılışta otomatik olarak `.md` dosyalarına aktarır. `WorkspaceService` dosya sistemini canlı izleyerek harici değişiklikleri anında yakalar.
+* **CLI Uyumluluğu**: `bin/gumus_not.dart` komut satırı aracı da doğrudan `<Belgelerim>/GumusNot/notes/` altındaki `.md` dosyalarını `NoteMarkdownCodec` ile atomik olarak okuyup yazacak şekilde güncellendi.
 
+### B. Endüstri Standardı Zarf Şifreleme (Envelope Encryption)
+* **Önceki Durum**: Eski şifreleme yapısında anahtar türetimi ve kurtarma doğrulamasında deterministik olmayan zaman damgası hataları mevcuttu.
+* **Güncel Mimari**: `NoteEncryptionService` ile 256-bit rastgele DEK üretilmekte, kullanıcı parolasından `PBKDF2-HMAC-SHA256` (120.000 iterasyon) ile türetilen KEK kullanılarak `AES-256-GCM` ile `.vault_key.json` içinde sarılmaktadır. Kasa kilitliyken yapılan not güncellemelerinde diskteki şifreli metnin (`enc:v1:...`) üzerine kilit yer tutucusunun yazılmasını önleyen koruma mevcuttur.
 
-## 3. Gelecek Özellik Önerileri
-
-### 🚀 Kısa Vadeli
-1.  **Hayalet Notlar (Ghost Nodes)**: (TAMAMLANDI) Grafik görünümünde, henüz oluşturulmamış ancak referans verilen notların (örn. `[[Daha Yazılmadı]]`) silik ve farklı bir renkte (gri) gösterilmesi. Bu, eksik halkaları görmeyi kolaylaştırır ve tıklanarak oluşturulabilir.
-2.  **Latex/PDF Dışa Aktarma**: `lib/services/latex_export_service.dart` mevcut ancak arayüzde aktif değil. Bu özelliğin tamamlanması.
-3.  **Etiket Yönetimi**: Etiketleri toplu yeniden adlandırma veya silme ekranı.
-
-### 🛠 Teknik & Orta Vadeli
-4.  **Güvenli Kurtarma Mimarisi**: Şu anki `verifyRecoveryKey` sadece şifrenin hash'ini kontrol eder. Gerçek bir kurtarma için, Ana Anahtar'ın (Master Key) rastgele oluşturulması ve bu anahtarın hem Şifre hem de Kurtarma Anahtarı ile ayrı ayrı şifrelenerek saklanması gerekir.
-5.  **Tam Metin Arama (FTS5)**: Mevcut `LIKE` sorgusu yerine SQLite FTS5 modülü ile çok daha hızlı ve hataya dayanıklı arama.
-
-### ☁️ Uzun Vadeli
-6.  **Bulut Senkronizasyonu**: `googleapis` kütüphanesi projeye eklenmiş ancak entegre edilmemiş. Google Drive üzerinden şifreli yedekleme ve senkronizasyon.
-7.  **Mobil & Masaüstü Düzen Uyumu**: (TAMAMLANDI) Masaüstü için 3 panelli (Liste | Editör | Graf), tablet için 2 panelli (Liste | Editör), mobil için tek sütunlu akış görünümü eklendi.
+### C. Performans ve Eşzamanlılık (Concurrency) Optimizasyonları
+* **Fizik Motoru ve TF-IDF Isolate Ayrımı**: Grafik fizik simülasyonu (`GraphPhysicsIsolate`) ve TF-IDF Kosinüs Benzerliği hesaplamaları (`CrossReferenceTracker`) arka plan `Isolate`'larına taşınarak ana UI thread'inde takılmalar önlendi.
+* **Canlı Editör Sözdizimi Önbelleği**: `MarkdownLivePreviewController` içinde satır bazlı `InlineSpan` önbelleklemesi ve hızlı ASCII ön kontrolü uygulanarak uzun dökümanlarda yazma gecikmesi ortadan kaldırıldı.
+* **Git Alt Süreç Senkronizasyonu**: `GitSyncService` içinde `Completer` tabanlı asenkron mutex kilidi ve 4 saniyelik debounce uygulanarak eşzamanlı kayıtlarda `.git/index.lock` çakışmaları engellendi.

@@ -1,199 +1,119 @@
-# SOLID Architecture Migration Guide
+# SOLID ve Temiz Mimari Rehberi (Clean Architecture Guide)
 
-## 🎯 **Tamamlanan SOLID Güçlendirmesi**
-
-### ✅ **1. Repository Pattern (Single Responsibility)**
-- `INoteRepository` - Abstract interface
-- `SqlNoteRepository` - SQLite implementation  
-- `MockNoteRepository` - Test implementation
-
-### ✅ **2. Service Layer (Single Responsibility)**
-- `NoteService` - Note business logic
-- `BacklinkService` - Link management
-- `NoteSearchService` - Advanced search operations
-
-### ✅ **3. Provider Separation (Single Responsibility)**
-- `NoteStateProvider` - Only state management
-- `NoteActionProvider` - Only business actions
-
-### ✅ **4. Database Interface (Interface Segregation)**
-- `IDatabaseService` - Abstract database operations
-- `SqliteDatabaseService` - SQLite implementation
-
-### ✅ **5. Dependency Injection (Dependency Inversion)**
-- `DependencyInjection` - DI configuration
-- `AppWithProviders` - Application wrapper
-- Environment-based configuration (dev/prod/test)
-
-### ✅ **6. Test Coverage (Open/Closed)**
-- Repository tests
-- Service tests
-- Mock implementations for testing
+Bu belge, GümüşNot projesinde uygulanan **SOLID** prensiplerini, **Feature-First (Özellik Odaklı) Katmanlı Mimari** yapısını ve bağımlılık enjeksiyonu (`NoteDependencyInjection`) düzenini açıklar.
 
 ---
 
-## 🔄 **Geçiş Rehberi**
+## 🎯 Uygulanan SOLID Prensipleri
 
-### **Eski Kullanım:**
-```dart
-// Önceki hali - SOLID ihlali
-final noteProvider = Provider.of<NoteProvider>(context);
-await noteProvider.addNote(note);
+### 1. Single Responsibility Principle (Tek Sorumluluk)
+* **`MarkdownNoteRepository`** (`lib/features/notes/repositories/markdown_note_repository.dart`): Yalnızca `.md` dosyalarının disk üzerindeki CRUD operasyonlarından, `FileStat` önbelleğinden ve atomik yazmadan sorumludur.
+* **`NoteMarkdownCodec` & `MarkdownFrontmatter`** (`lib/core/storage/`): Yalnızca `Note` nesneleri ile YAML Frontmatter + Markdown metni arasındaki serileştirme/ayrıştırma işlemlerini yürütür.
+* **`NoteEncryptionService`** (`lib/core/security/note_encryption_service.dart`): Yalnızca `PBKDF2-HMAC-SHA256` anahtar türetimi ve `AES-256-GCM` zarf şifreleme operasyonlarını yönetir.
+* **`BacklinkService`** (`lib/features/notes/services/backlink_service.dart`): Yalnızca `[[WikiLink]]` bağlantı grafiği analizi, kırık bağlantı tespiti ve başlık değişimlerinde bağlantı yayılımından sorumludur.
+* **`AdvancedSearchService`** (`lib/features/notes/services/advanced_search_service.dart`): Yalnızca çok kriterli filtreleme, Levenshtein bulanık arama ve Zettelkasten semantik puanlamadan sorumludur.
+
+### 2. Open/Closed & Liskov Substitution Principles (Açık/Kapalı ve Yerine Geçme)
+* **`NoteRepository`** (`lib/features/notes/repositories/note_repository.dart`) soyut arayüzü; üretim ortamında `MarkdownNoteRepository`, birim ve widget testlerinde ise `MockNoteRepository` ile hiçbir üst katman kodu değiştirilmeden ikame edilebilir.
+* **`IAiService`** (`lib/features/ai/services/iai_service.dart`) soyut arayüzü; `GeminiAiService` ve `OpenAiCompatibleService` tarafından gerçeklenir.
+
+### 3. Interface Segregation & Dependency Inversion (Arayüz Ayrımı ve Bağımlılığın Tersine Çevrilmesi)
+* Üst seviye durum yöneticileri (`NoteProvider`, `AiProvider`), somut sınıflara değil soyut arayüzlere (`NoteRepository`, `SearchService`, `IAiService`) bağımlıdır.
+* Tüm bağımlılıklar `NoteDependencyInjection` (`lib/features/notes/di/note_dependency_injection.dart`) üzerinden merkezi olarak enjekte edilir.
+
+---
+
+## 📁 Güncel Dizin ve Katman Yapısı
+
+```text
+lib/
+├── core/
+│   ├── security/
+│   │   └── note_encryption_service.dart      # AES-256-GCM + PBKDF2 Zarf Şifreleme
+│   ├── storage/
+│   │   ├── markdown_frontmatter.dart         # YAML Frontmatter kodlayıcı/çözücü
+│   │   ├── note_markdown_codec.dart          # Note <-> .md dosya dönüştürücü
+│   │   └── sqlite_to_markdown_migrator.dart  # Tek seferlik SQLite -> .md göç servisi
+│   ├── theme/
+│   │   ├── app_theme.dart                    # Material 3 tema tanımları
+│   │   └── theme_provider.dart               # Tema ve tipografi durum yönetimi
+│   └── utils/
+│       ├── markdown_cleaner.dart             # Markdown düz metin ve hashtag çıkarıcı
+│       └── shortcut_manager.dart             # Klavye kısayol yöneticisi
+├── features/
+│   ├── ai/                                   # Çoklu sağlayıcı LLM ve SimHash önbellek
+│   ├── backup/                               # Google Drive v2 AES-GCM ve ZIP yedekleme
+│   ├── calendar/                             # Takvim görünümü
+│   ├── export/                               # PDF, LaTeX ve toplu dışa/içe aktarım
+│   ├── graph/                                # Quadtree + Isolate fizik motoru ve graf UI
+│   ├── home_widget/                          # Android/iOS ana ekran widget servisi
+│   ├── media/                                # Görsel seçimi ve yerel medya yönetimi
+│   ├── notes/
+│   │   ├── di/
+│   │   │   └── note_dependency_injection.dart
+│   │   ├── models/
+│   │   │   ├── note_model.dart
+│   │   │   ├── note_history.dart
+│   │   │   └── note_template.dart
+│   │   ├── providers/
+│   │   │   ├── note_provider.dart
+│   │   │   └── note_editor_provider.dart
+│   │   ├── repositories/
+│   │   │   ├── note_repository.dart          # Soyut Repository arayüzü
+│   │   │   ├── markdown_note_repository.dart # Dosya tabanlı üretim implementasyonu
+│   │   │   └── mock_note_repository.dart     # Bellek içi test implementasyonu
+│   │   ├── services/
+│   │   │   ├── search_service_interface.dart
+│   │   │   ├── advanced_search_service.dart
+│   │   │   ├── backlink_service.dart
+│   │   │   ├── git_sync_service.dart
+│   │   │   ├── workspace_service.dart
+│   │   │   ├── template_file_storage.dart
+│   │   │   └── voice_note_service.dart
+│   │   ├── presentation/                     # Ekranlar (Main, NoteList, TagManagement vb.)
+│   │   └── widgets/                          # MarkdownEditor, LivePreviewController, MathRenderer
+│   ├── search/                               # Arama ekranı ve yardımcı arama servisi
+│   ├── security/                             # BiometricService ve LockScreen
+│   ├── settings/                             # Uygulama, AI ve çalışma alanı ayarları
+│   └── tools/                                # CommandPalette, CrossReferenceTracker, Pomodoro, Heatmap
+└── shared/                                   # SharingService ve ortak bileşenler
 ```
 
-### **Yeni Kullanım:**
+---
+
+## 🚀 Bağımlılık Enjeksiyonu ve Kullanım Örnekleri
+
+### 1. Uygulama Başlatma (`lib/main.dart`)
 ```dart
-// SOLID uyumlu yeni yapı
-final noteActionProvider = context.noteActionProvider;
-await noteActionProvider.createNote(
-  title: 'Yeni Not',
-  content: 'İçerik',
-  tags: ['etiket'],
+MultiProvider(
+  providers: [
+    ChangeNotifierProvider.value(value: themeProvider),
+    ChangeNotifierProvider.value(value: shortcutManager),
+    ChangeNotifierProvider(create: (_) => AiProvider()..loadConfig()),
+    ...NoteDependencyInjection.getProviders(),
+  ],
+  child: ConnectedNotebookApp(...),
 );
 ```
 
----
-
-## 📁 **Yeni Dosya Yapısı**
-
-```
-lib/
-├── core/
-│   ├── database/
-│   │   ├── idatabase_service.dart          # Interface
-│   │   └── sqlite_database_service.dart    # Implementation
-│   └── di/
-│       ├── dependency_injection.dart      # DI configuration
-│       └── app_providers.dart              # App wrapper
-├── features/notes/
-│   ├── repositories/
-│   │   ├── inote_repository.dart          # Interface
-│   │   ├── sql_note_repository.dart       # Implementation
-│   │   └── mock_note_repository.dart       # Test
-│   ├── services/
-│   │   ├── note_service.dart              # Business logic
-│   │   ├── backlink_service.dart          # Link management
-│   │   └── note_search_service.dart       # Search logic
-│   └── providers/
-│       ├── note_state_provider.dart       # State only
-│       └── note_action_provider.dart     # Actions only
-└── test/
-    ├── repositories/
-    │   └── note_repository_test.dart       # Repository tests
-    └── services/
-        └── note_service_test.dart          # Service tests
-```
-
----
-
-## 🚀 **Uygulama Kurulumu**
-
-### **1. Main.dart güncellemesi:**
+### 2. Widget İçinden Servis ve Provider Erişimi
+`NoteDependencyInjectionExtension` sayesinde `BuildContext` üzerinden tip güvenli erişim sağlanır:
 ```dart
-void main() {
-  runApp(
-    AppWithProviders(
-      environment: kDebugMode ? Environment.development : Environment.production,
-      child: MyApp(),
-    ),
-  );
-}
+final noteProvider = context.noteProvider;
+final repository = context.noteRepository;
+final workspaceService = context.workspaceService;
+
+await noteProvider.addNote(newNote);
 ```
 
-### **2. Widget kullanımı:**
+### 3. Birim ve Widget Testlerinde İzolasyon
 ```dart
-class MyWidget extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Consumer<NoteActionProvider>(
-        builder: (context, noteActionProvider, child) {
-          return ElevatedButton(
-            onPressed: () => noteActionProvider.loadNotes(),
-            child: Text('Notları Yükle'),
-          );
-        },
-      ),
-    );
-  }
-}
-```
-
----
-
-## 🧪 **Test Kurulumu**
-
-### **Test çalıştırma:**
-```bash
-flutter test test/repositories/note_repository_test.dart
-flutter test test/services/note_service_test.dart
-flutter test --coverage
-```
-
-### **Test modu:**
-```dart
-// Testlerde mock kullanımı
-testWidgets('Note creation test', (tester) async {
-  await tester.pumpWidget(
-    AppWithProviders(
-      environment: Environment.test,
-      child: MyApp(),
-    ),
-  );
-});
-```
-
----
-
-## ✨ **SOLID Avantajları**
-
-### **1. Test Edilebilirlik**
-- Her katman bağımsız test edilebilir
-- Mock'lar ile izolasyon testleri
-
-### **2. Bakım Kolaylığı**
-- Tek sorumluluk prensibi
-- Değişiklikler lokal kalır
-
-### **3. Genişletilebilirlik**
-- Yeni veritabanı türleri eklenebilir
-- Yeni servisler kolayca entegre edilebilir
-
-### **4. Bağımlılık Yönetimi**
-- Interface'ler üzerinden gevşek bağlantı
-- Dependency injection ile esneklik
-
----
-
-## 🔄 **Mevcut Kodu Geçirme**
-
-### **Adım 1: Provider'ları güncelle**
-```dart
-// Eski: Provider.of<NoteProvider>(context)
-// Yeni: context.noteActionProvider veya context.noteStateProvider
-```
-
-### **Adım 2: Servisleri kullan**
-```dart
-// Doğrudan DatabaseService yerine:
-final noteService = context.noteService;
-await noteService.createNote(...);
-```
-
-### **Adım 3: Testleri ekle**
-```dart
-// Mock repository ile testler
 final mockRepo = MockNoteRepository();
-final service = NoteService(mockRepo, backlinkService);
+final searchService = AdvancedSearchService(mockRepo);
+final provider = NoteProvider(
+  repository: mockRepo,
+  searchService: searchService,
+);
+
+await provider.loadNotes();
 ```
-
----
-
-## 🎯 **Sonuç**
-
-Projeniz artık tam SOLID uyumlu! 
-- **Test edilebilir**, **bakım kolaylığı**, **genişletilebilir** bir mimariye sahip.
-- Her bileşenin tek sorumluluğu var.
-- Bağımlılıklar yönetilebilir ve test edilebilir.
-
-Bu yapı gelecekteki geliştirmeler için sağlam bir temel oluşturur! 🚀
