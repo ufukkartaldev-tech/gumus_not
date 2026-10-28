@@ -4,23 +4,15 @@ import '../models/note_model.dart';
 class NoteEditorProvider with ChangeNotifier {
   NoteEditorProvider();
 
-  final bool _isBusy = false;
   bool _isEncrypted = false;
   bool _isDecrypted = false;
-  String? _resolvedContent;
-  String? _errorMessage;
 
-  bool get isBusy => _isBusy;
   bool get isEncrypted => _isEncrypted;
   bool get isDecrypted => _isDecrypted;
-  String? get resolvedContent => _resolvedContent;
-  String? get errorMessage => _errorMessage;
 
   Future<void> initialize(Note? note) async {
     _isEncrypted = note?.isEncrypted ?? false;
     _isDecrypted = !_isEncrypted;
-    _resolvedContent = _isEncrypted ? null : note?.content;
-    _errorMessage = null;
     notifyListeners();
   }
 
