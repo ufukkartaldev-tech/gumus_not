@@ -9,6 +9,7 @@ import 'package:connected_notebook/features/notes/presentation/tag_management_sc
 import 'package:connected_notebook/features/search/presentation/advanced_search_screen.dart';
 import 'package:connected_notebook/features/notes/widgets/note_template_manager.dart';
 import 'package:connected_notebook/core/utils/markdown_cleaner.dart';
+import 'package:connected_notebook/core/security/note_encryption_service.dart';
 
 /// Item representation in the Raycast/Linear command palette.
 class PaletteItem {
@@ -328,6 +329,29 @@ class _CommandPaletteState extends State<CommandPalette> {
         },
       ),
 
+
+      // Lock Vault
+      PaletteItem(
+        id: 'lock_vault',
+        title: 'Kasayı Kilitle',
+        subtitle: 'DEK anahtarını bellekten sıfırla ve şifreli kasayı kilitle',
+        icon: Icons.lock_rounded,
+        iconColor: Colors.orange,
+        category: 'SİSTEM',
+        action: () async {
+          final messenger = ScaffoldMessenger.maybeOf(context);
+          final encryptionService = Provider.of<NoteEncryptionService?>(
+            context,
+            listen: false,
+          );
+          await encryptionService?.lockVault();
+          messenger?.showSnackBar(
+            const SnackBar(
+              content: Text('Kasa kilitlendi ve DEK anahtarı bellekten sıfırlandı 🔒'),
+            ),
+          );
+        },
+      ),
 
       // Settings
       PaletteItem(

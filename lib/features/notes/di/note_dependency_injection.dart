@@ -44,7 +44,10 @@ class NoteDependencyInjection {
         dispose: (_, service) => service.dispose(),
       ),
       Provider<NoteEncryptionService>(
-        create: (_) => NoteEncryptionService(),
+        create: (context) => NoteEncryptionService(
+          vaultDirResolver: () =>
+              context.read<WorkspaceService>().getNotesDirectory(),
+        ),
       ),
       Provider<NoteRepository>(
         create: (context) {
@@ -124,6 +127,8 @@ class NoteDependencyInjection {
 extension NoteDependencyInjectionExtension on BuildContext {
   ImageService get imageService => read<ImageService>();
   WorkspaceService get workspaceService => read<WorkspaceService>();
+  NoteEncryptionService get noteEncryptionService =>
+      read<NoteEncryptionService>();
   NoteRepository get noteRepository => read<NoteRepository>();
   SearchService get searchService => read<SearchService>();
   NoteProvider get noteProvider => read<NoteProvider>();

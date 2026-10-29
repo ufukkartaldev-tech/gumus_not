@@ -3,15 +3,46 @@ import 'package:flutter/foundation.dart';
 import 'package:home_widget/home_widget.dart';
 import 'package:connected_notebook/features/notes/models/note_model.dart';
 import 'package:connected_notebook/features/notes/repositories/markdown_note_repository.dart';
+import 'package:connected_notebook/features/notes/repositories/note_repository.dart';
+import 'package:connected_notebook/features/notes/services/workspace_service.dart';
 
 class WidgetService {
   bool get _isSupportedPlatform => !kIsWeb;
   static final WidgetService _instance = WidgetService._internal();
   factory WidgetService() => _instance;
-  WidgetService._internal();
 
-  final MarkdownNoteRepository _repository = MarkdownNoteRepository();
+  WidgetService._internal()
+      : _repository = MarkdownNoteRepository(
+          notesDirResolver: () => WorkspaceService().getNotesDirectory(),
+        );
+
+  @visibleForTesting
+  WidgetService.forTesting(this._repository);
+
+  static const String redactedEncryptedTitle = '🔒 Şifreli Not';
+
+  final NoteRepository _repository;
   StreamSubscription? _periodicSubscription;
+
+  /// Masks both the title, body, tags, and emoji metadata of encrypted notes
+  /// before serializing them to OS home-screen widget shared storage
+  /// (SRS Section 6.2 & Phase 2).
+  @visibleForTesting
+  static Note redactForWidget(Note note) {
+    if (!note.isEncrypted) return note;
+    return Note(
+      id: note.id,
+      title: redactedEncryptedTitle,
+      content: '',
+      createdAt: note.createdAt,
+      updatedAt: note.updatedAt,
+      isEncrypted: true,
+      tags: const [],
+      color: note.color,
+      folderName: note.folderName,
+      emojiIcon: '🔒',
+    );
+  }
 
   // Widget'ı güncellemek için ana fonksiyon
   Future<void> updateWidget() async {
@@ -22,22 +53,40 @@ class WidgetService {
       final recentNotes = await _repository.getRecentNotes(limit: 3);
       final pendingTasks = await _repository.getPendingTasks(limit: 5);
 
-      // Widget verisini hazırla (şifreli notların gövdesi widget
+      // Widget verisini hazırla (şifreli notların başlık ve gövdesi widget
       // depolamasına sızmasın)
-      final widgetData = {
-        'recentNotes': recentNotes.map(_redactForWidget).map((note) => note.toMap()).toList(),
-        'pendingTasks': pendingTasks.map(_redactForWidget).map((task) => task.toMap()).toList(),
-        'lastUpdated': DateTime.now().millisecondsSinceEpoch,
-      };
+      final widgetData = buildRedactedWidgetPayload(
+        recentNotes: recentNotes,
+        pendingTasks: pendingTasks,
+      );
 
       // Widget'ı güncelle
       await HomeWidget.saveWidgetData('widget_data', widgetData);
       await HomeWidget.updateWidget(name: 'GumusNotWidget');
 
-      print('✅ Widget başarıyla güncellendi');
+      debugPrint('Widget başarıyla güncellendi');
     } catch (e) {
-      print('❌ Widget güncelleme hatası: $e');
+      debugPrint('Widget güncelleme hatası: $e');
     }
+  }
+
+  @visibleForTesting
+  static Map<String, dynamic> buildRedactedWidgetPayload({
+    required List<Note> recentNotes,
+    required List<Note> pendingTasks,
+    int? timestampMs,
+  }) {
+    return {
+      'recentNotes': recentNotes
+          .map(redactForWidget)
+          .map((note) => note.toMap())
+          .toList(),
+      'pendingTasks': pendingTasks
+          .map(redactForWidget)
+          .map((task) => task.toMap())
+          .toList(),
+      'lastUpdated': timestampMs ?? DateTime.now().millisecondsSinceEpoch,
+    };
   }
 
   // Hızlı not widget'ı için
@@ -58,23 +107,20 @@ class WidgetService {
       await HomeWidget.saveWidgetData('quick_note_data', quickNoteData);
       await HomeWidget.updateWidget(name: 'QuickNoteWidget');
 
-      print('✅ Hızlı not widget\'ı güncellendi');
+      debugPrint('Hızlı not widget\'ı güncellendi');
     } catch (e) {
-      print('❌ Hızlı not widget güncelleme hatası: $e');
+      debugPrint('Hızlı not widget güncelleme hatası: $e');
     }
   }
-
-  Note _redactForWidget(Note note) =>
-      note.isEncrypted ? note.copyWith(content: '') : note;
 
   // Günlük motivasyon alıntıları
   String _getDailyQuote() {
     final quotes = [
-      "Bilgi, gücün temelidir.",
-      "Not almak, düşünmek için yazmaktır.",
-      "Küçük adımlar, büyük değişimler yaratır.",
-      "Başarı, iyi alışkanlıkların birikimidir.",
-      "Bugün yazdığın, yarının bilgisidir.",
+      'Bilgi, gücün temelidir.',
+      'Not almak, düşünmek için yazmaktır.',
+      'Küçük adımlar, büyük değişimler yaratır.',
+      'Başarı, iyi alışkanlıkların birikimidir.',
+      'Bugün yazdığın, yarının bilgisidir.',
     ];
 
     final dayOfYear = DateTime.now()
@@ -102,9 +148,9 @@ class WidgetService {
       };
 
       await HomeWidget.saveWidgetData('widget_config', config);
-      print('✅ Widget konfigürasyonu kaydedildi');
+      debugPrint('Widget konfigürasyonu kaydedildi');
     } catch (e) {
-      print('❌ Widget konfigürasyon hatası: $e');
+      debugPrint('Widget konfigürasyon hatası: $e');
     }
   }
 
@@ -123,7 +169,7 @@ class WidgetService {
     try {
       return await HomeWidget.getWidgetData('widget_data');
     } catch (e) {
-      print('❌ Widget verisi okuma hatası: $e');
+      debugPrint('Widget verisi okuma hatası: $e');
       return null;
     }
   }
@@ -134,7 +180,8 @@ class WidgetService {
 
     _periodicSubscription?.cancel();
     // Her 30 dakikada bir widget'ı güncelle
-    _periodicSubscription = Stream.periodic(const Duration(minutes: 30)).listen((_) {
+    _periodicSubscription =
+        Stream.periodic(const Duration(minutes: 30)).listen((_) {
       updateWidget();
       updateQuickNoteWidget();
     });

@@ -37,12 +37,14 @@ class InvalidVaultPasswordException extends NoteDecryptionException {
 
 /// Encrypts note bodies at rest with AES-256-GCM using **Envelope Encryption**.
 ///
-/// - **DEK (Data Encryption Key)**: A random 256-bit key generated once and
-///   cached in platform secure storage (`FlutterSecureStorage`) for fast daily
-///   use.
+/// - **DEK (Data Encryption Key)**: A random 256-bit key held in memory as a
+///   mutable [Uint8List] so it can be deterministically zeroed (`fillRange`)
+///   when the vault is locked, and optionally cached in platform secure storage
+///   (`FlutterSecureStorage`).
 /// - **KEK (Key Encryption Key)**: Derived from the user's Master Password via
 ///   `PBKDF2-HMAC-SHA256` (120,000 iterations by default) with a random
-///   128-bit salt.
+///   128-bit salt, and deterministically wiped from memory immediately after
+///   wrapping/unwrapping the DEK.
 /// - **Envelope (`.vault_key.json`)**: Stores the KDF parameters, salt, IV, and
 ///   the AES-256-GCM encrypted DEK inside the notes directory so the vault
 ///   travels safely with Git repositories, folder copies, and ZIP backups.
@@ -50,10 +52,12 @@ class NoteEncryptionService {
   NoteEncryptionService({
     Future<String?> Function(String key)? keyReader,
     Future<void> Function(String key, String value)? keyWriter,
+    Future<void> Function(String key)? keyDeleter,
     Future<Directory> Function()? vaultDirResolver,
     int pbkdf2Iterations = defaultPbkdf2Iterations,
   })  : _keyReader = keyReader ?? _defaultKeyReader,
         _keyWriter = keyWriter ?? _defaultKeyWriter,
+        _keyDeleter = keyDeleter ?? _defaultKeyDeleter,
         _vaultDirResolver = vaultDirResolver,
         _pbkdf2Iterations = pbkdf2Iterations;
 
@@ -61,6 +65,8 @@ class NoteEncryptionService {
   static const String _payloadPrefix = 'enc:v1:';
   static const String envelopeFileName = '.vault_key.json';
   static const int defaultPbkdf2Iterations = 120000;
+  static const int minPbkdf2Iterations = 1000;
+  static const int maxPbkdf2Iterations = 5000000;
 
   /// Placeholder the editor shows for encrypted notes that have not been
   /// unlocked. Repositories must never persist this back over real
@@ -72,6 +78,7 @@ class NoteEncryptionService {
 
   final Future<String?> Function(String key) _keyReader;
   final Future<void> Function(String key, String value) _keyWriter;
+  final Future<void> Function(String key) _keyDeleter;
   final Future<Directory> Function()? _vaultDirResolver;
   final int _pbkdf2Iterations;
 
@@ -79,12 +86,50 @@ class NoteEncryptionService {
       _storage.read(key: key);
   static Future<void> _defaultKeyWriter(String key, String value) =>
       _storage.write(key: key, value: value);
+  static Future<void> _defaultKeyDeleter(String key) =>
+      _storage.delete(key: key);
 
   /// Returns true when [body] is a payload produced by [encrypt].
   static bool isEncryptedPayload(String body) =>
       body.startsWith(_payloadPrefix);
 
-  String? _cachedKey;
+  /// Mutable 32-byte DEK buffer in RAM; zeroed deterministically on [lockVault].
+  Uint8List? _cachedDekBytes;
+
+  /// Exposes the in-memory DEK buffer strictly for deterministic zeroing tests.
+  @visibleForTesting
+  Uint8List? get debugCachedDekBuffer => _cachedDekBytes;
+
+  /// Returns true if an unlocked 32-byte DEK is currently resident in RAM.
+  bool get isUnlockedInMemory =>
+      _cachedDekBytes != null && _cachedDekBytes!.length == 32;
+
+  void _setCachedDekBytes(List<int> rawBytes) {
+    final existing = _cachedDekBytes;
+    if (existing != null) {
+      existing.fillRange(0, existing.length, 0);
+    }
+    _cachedDekBytes = Uint8List.fromList(rawBytes);
+  }
+
+  /// Deterministically zeroes the in-memory DEK buffer (`fillRange(0, len, 0)`)
+  /// without waiting for Dart GC.
+  ///
+  /// When [purgePersistedIfRecoverable] is `true` and a `.vault_key.json`
+  /// envelope exists on disk (meaning the DEK can be safely unwrapped again
+  /// using the Master Password), the cached DEK is also removed from platform
+  /// secure storage so subsequent accesses require re-authentication.
+  Future<void> lockVault({bool purgePersistedIfRecoverable = true}) async {
+    final dekBytes = _cachedDekBytes;
+    if (dekBytes != null) {
+      dekBytes.fillRange(0, dekBytes.length, 0);
+      _cachedDekBytes = null;
+    }
+
+    if (purgePersistedIfRecoverable && await hasEnvelope()) {
+      await _keyDeleter(_keyName);
+    }
+  }
 
   Future<File?> _envelopeFile() async {
     if (kIsWeb) return null;
@@ -114,13 +159,43 @@ class NoteEncryptionService {
   /// Returns true if this device currently holds a valid unlocked DEK in
   /// memory or platform secure storage.
   Future<bool> hasLocalKey() async {
-    if (_cachedKey != null) return true;
+    if (isUnlockedInMemory) return true;
     final stored = await _keyReader(_keyName);
-    if (stored != null && _isValidKey(stored)) {
-      _cachedKey = stored;
+    final decoded = _tryDecodeValidKey(stored);
+    if (decoded != null) {
+      _setCachedDekBytes(decoded);
+      decoded.fillRange(0, decoded.length, 0);
       return true;
     }
     return false;
+  }
+
+  Future<Uint8List> _getOrCreateDekBytes() async {
+    final cached = _cachedDekBytes;
+    if (cached != null && cached.length == 32) {
+      return cached;
+    }
+
+    final stored = await _keyReader(_keyName);
+    final decoded = _tryDecodeValidKey(stored);
+    if (decoded != null) {
+      _setCachedDekBytes(decoded);
+      decoded.fillRange(0, decoded.length, 0);
+      return _cachedDekBytes!;
+    }
+
+    if (await hasEnvelope()) {
+      throw const VaultLockedByPasswordException();
+    }
+
+    final generated = enc.Key.fromSecureRandom(32);
+    try {
+      await _keyWriter(_keyName, generated.base64);
+      _setCachedDekBytes(generated.bytes);
+      return _cachedDekBytes!;
+    } finally {
+      generated.bytes.fillRange(0, generated.bytes.length, 0);
+    }
   }
 
   /// Loads the vault DEK from secure storage, generating and persisting a
@@ -130,24 +205,8 @@ class NoteEncryptionService {
   /// local storage has no key, throws [VaultLockedByPasswordException] to
   /// prevent silently generating a conflicting key.
   Future<String> getOrCreateKey() async {
-    final cached = _cachedKey;
-    if (cached != null) return cached;
-
-    final stored = await _keyReader(_keyName);
-    if (stored != null && _isValidKey(stored)) {
-      _cachedKey = stored;
-      return stored;
-    }
-
-    if (await hasEnvelope()) {
-      throw const VaultLockedByPasswordException();
-    }
-
-    final key = enc.Key.fromSecureRandom(32);
-    final encoded = key.base64;
-    await _keyWriter(_keyName, encoded);
-    _cachedKey = encoded;
-    return encoded;
+    final dekBytes = await _getOrCreateDekBytes();
+    return base64Encode(dekBytes);
   }
 
   /// Wraps the current (or newly created) 256-bit DEK with a KEK derived from
@@ -159,8 +218,7 @@ class NoteEncryptionService {
     if (masterPassword.trim().isEmpty) {
       throw ArgumentError('Master parola boş olamaz.');
     }
-    final dekBase64 = await getOrCreateKey();
-    final dekBytes = base64Decode(dekBase64);
+    final dekBytes = await _getOrCreateDekBytes();
 
     final salt = enc.IV.fromSecureRandom(16).bytes;
     final iv = enc.IV.fromSecureRandom(16);
@@ -171,10 +229,15 @@ class NoteEncryptionService {
       keyLength: 32,
     );
 
-    final kekEncrypter = enc.Encrypter(
-      enc.AES(enc.Key(kekBytes), mode: enc.AESMode.gcm),
-    );
-    final wrappedDek = kekEncrypter.encryptBytes(dekBytes, iv: iv);
+    final enc.Encrypted wrappedDek;
+    try {
+      final kekEncrypter = enc.Encrypter(
+        enc.AES(enc.Key(kekBytes), mode: enc.AESMode.gcm),
+      );
+      wrappedDek = kekEncrypter.encryptBytes(dekBytes, iv: iv);
+    } finally {
+      kekBytes.fillRange(0, kekBytes.length, 0);
+    }
 
     final envelope = <String, Object>{
       'version': 1,
@@ -240,11 +303,19 @@ class NoteEncryptionService {
         'Kasa anahtar dosyası eksik alanlar içeriyor.',
       );
     }
+    if (iterations < minPbkdf2Iterations ||
+        iterations > maxPbkdf2Iterations) {
+      throw const InvalidVaultPasswordException(
+        'Geçersiz PBKDF2 iterasyon sayısı.',
+      );
+    }
 
+    Uint8List? kekBytes;
+    Uint8List? unwrappedDek;
     try {
       final salt = base64Decode(saltB64);
       final iv = enc.IV.fromBase64(ivB64);
-      final kekBytes = pbkdf2Sha256(
+      kekBytes = pbkdf2Sha256(
         password: masterPassword,
         salt: salt,
         iterations: iterations,
@@ -254,23 +325,28 @@ class NoteEncryptionService {
       final kekEncrypter = enc.Encrypter(
         enc.AES(enc.Key(kekBytes), mode: enc.AESMode.gcm),
       );
-      final dekBytes = kekEncrypter.decryptBytes(
-        enc.Encrypted.fromBase64(ciphertextB64),
-        iv: iv,
+      unwrappedDek = Uint8List.fromList(
+        kekEncrypter.decryptBytes(
+          enc.Encrypted.fromBase64(ciphertextB64),
+          iv: iv,
+        ),
       );
 
-      if (dekBytes.length != 32) {
+      if (unwrappedDek.length != 32) {
         throw const InvalidVaultPasswordException();
       }
 
-      final dekBase64 = base64Encode(dekBytes);
+      final dekBase64 = base64Encode(unwrappedDek);
       await _keyWriter(_keyName, dekBase64);
-      _cachedKey = dekBase64;
+      _setCachedDekBytes(unwrappedDek);
       return dekBase64;
     } on InvalidVaultPasswordException {
       rethrow;
     } catch (_) {
       throw const InvalidVaultPasswordException();
+    } finally {
+      kekBytes?.fillRange(0, kekBytes.length, 0);
+      unwrappedDek?.fillRange(0, unwrappedDek.length, 0);
     }
   }
 
@@ -311,22 +387,26 @@ class NoteEncryptionService {
         blockIndex * hashLength,
         t,
       );
+      u.fillRange(0, u.length, 0);
+      t.fillRange(0, t.length, 0);
     }
 
     return Uint8List.sublistView(derivedKey, 0, keyLength);
   }
 
-  static bool _isValidKey(String value) {
+  static Uint8List? _tryDecodeValidKey(String? value) {
+    if (value == null || value.isEmpty) return null;
     try {
-      return enc.Key.fromBase64(value).length == 32;
+      final decoded = base64Decode(value);
+      return decoded.length == 32 ? decoded : null;
     } on FormatException {
-      return false;
+      return null;
     }
   }
 
   Future<String> encrypt(String plaintext) async {
-    final key = await getOrCreateKey();
-    final encrypter = _encrypterFor(key);
+    final dekBytes = await _getOrCreateDekBytes();
+    final encrypter = _encrypterForBytes(dekBytes);
     final iv = enc.IV.fromSecureRandom(16);
     final encrypted = encrypter.encrypt(plaintext, iv: iv);
     return '$_payloadPrefix${iv.base64}:${encrypted.base64}';
@@ -342,10 +422,10 @@ class NoteEncryptionService {
       throw const NoteDecryptionException('Malformed payload structure');
     }
 
-    final key = await getOrCreateKey();
+    final dekBytes = await _getOrCreateDekBytes();
     try {
       final iv = enc.IV.fromBase64(parts[0]);
-      final decrypted = _encrypterFor(key).decryptBytes(
+      final decrypted = _encrypterForBytes(dekBytes).decryptBytes(
         enc.Encrypted.fromBase64(parts[1]),
         iv: iv,
       );
@@ -361,6 +441,6 @@ class NoteEncryptionService {
     }
   }
 
-  static enc.Encrypter _encrypterFor(String base64Key) =>
-      enc.Encrypter(enc.AES(enc.Key.fromBase64(base64Key), mode: enc.AESMode.gcm));
+  static enc.Encrypter _encrypterForBytes(Uint8List keyBytes) =>
+      enc.Encrypter(enc.AES(enc.Key(keyBytes), mode: enc.AESMode.gcm));
 }

@@ -17,7 +17,6 @@ import 'package:connected_notebook/features/notes/models/note_model.dart';
 import 'package:connected_notebook/features/notes/providers/note_editor_provider.dart';
 import 'package:connected_notebook/features/notes/providers/note_provider.dart';
 import 'package:connected_notebook/features/notes/services/voice_note_service.dart';
-import 'package:connected_notebook/features/notes/widgets/custom_widgets.dart';
 import 'package:connected_notebook/features/notes/widgets/editor_ai_sheet.dart';
 import 'package:connected_notebook/features/notes/widgets/editor_app_bar.dart';
 import 'package:connected_notebook/features/notes/widgets/editor_bottom_sheets.dart';
@@ -71,8 +70,13 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
   bool _isEncrypted = false;
   bool _isUnlocked = false;
   String _storedEncryptedContent = '';
-  final NoteEncryptionService _encryptionService = NoteEncryptionService();
+  final NoteEncryptionService _fallbackEncryptionService =
+      NoteEncryptionService();
   final BiometricService _biometricService = BiometricService();
+
+  NoteEncryptionService get _encryptionService =>
+      Provider.of<NoteEncryptionService?>(context, listen: false) ??
+      _fallbackEncryptionService;
   int? _selectedColor;
   String? _emojiIcon;
   bool _isPomodoroVisible = false;
@@ -464,6 +468,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
     if (!_isEncrypted) {
       final hasEnv = await _encryptionService.hasEnvelope();
       final hasLocal = await _encryptionService.hasLocalKey();
+      if (!mounted) return;
 
       if (!hasEnv) {
         final created = await EditorVaultDialogs.promptSetupMasterPassword(
@@ -508,6 +513,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
 
   Future<void> _unlockVault() async {
     try {
+      final alreadyUnlockedInSession = _encryptionService.isUnlockedInMemory;
       final hasLocal = await _encryptionService.hasLocalKey();
       final hasEnv = await _encryptionService.hasEnvelope();
 
@@ -519,8 +525,17 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
             _showError('Kimlik doğrulanamadı, kasa açılamadı');
             return;
           }
+        } else if (hasEnv && !alreadyUnlockedInSession) {
+          if (!mounted) return;
+          final unlocked =
+              await EditorVaultDialogs.promptUnlockWithMasterPassword(
+            context,
+            _encryptionService,
+          );
+          if (!unlocked) return;
         }
       } else if (hasEnv) {
+        if (!mounted) return;
         final unlocked = await EditorVaultDialogs.promptUnlockWithMasterPassword(
           context,
           _encryptionService,
@@ -533,6 +548,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
         decrypted = await _encryptionService.decrypt(_storedEncryptedContent);
       } on NoteDecryptionException {
         if (hasEnv) {
+          if (!mounted) return;
           final unlocked = await EditorVaultDialogs.promptUnlockWithMasterPassword(
             context,
             _encryptionService,

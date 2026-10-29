@@ -21,17 +21,25 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   final BiometricService _biometricService = BiometricService();
-  final NoteEncryptionService _encryptionService = NoteEncryptionService();
+  final NoteEncryptionService _fallbackEncryptionService =
+      NoteEncryptionService();
   bool _isAppLockEnabled = false;
   bool _isLoadingLockSetting = true;
   bool _hasVaultEnvelope = false;
+  bool _isVaultUnlocked = false;
   String _workspacePath = '';
+
+  NoteEncryptionService get _encryptionService =>
+      Provider.of<NoteEncryptionService?>(context, listen: false) ??
+      _fallbackEncryptionService;
 
   @override
   void initState() {
     super.initState();
-    _loadAppLockSetting();
-    _loadWorkspacePath();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadAppLockSetting();
+      _loadWorkspacePath();
+    });
   }
 
   Future<void> _loadWorkspacePath() async {
@@ -47,10 +55,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _loadAppLockSetting() async {
     final enabled = await _biometricService.isAppLockEnabled();
     final hasEnvelope = await _encryptionService.hasEnvelope();
+    final isUnlocked = await _encryptionService.hasLocalKey();
     if (mounted) {
       setState(() {
         _isAppLockEnabled = enabled;
         _hasVaultEnvelope = hasEnvelope;
+        _isVaultUnlocked = isUnlocked;
         _isLoadingLockSetting = false;
       });
     }
@@ -148,9 +158,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         onChanged: (val) async {
                           if (val) {
                             // Açmak isterse önce bir kere kimlik doğrulasın
-                            final authenticated = await _biometricService.authenticate();
+                            final authenticated =
+                                await _biometricService.authenticate();
                             if (!authenticated) {
-                              _showError('Kimlik doğrulanamadığı için kilit etkinleştirilemedi');
+                              _showError(
+                                'Kimlik doğrulanamadığı için kilit etkinleştirilemedi',
+                              );
                               return;
                             }
                           }
@@ -187,6 +200,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
               trailing: const Icon(Icons.chevron_right),
               onTap: _showVaultPasswordDialog,
             ),
+            if (_hasVaultEnvelope || _isVaultUnlocked) ...[
+              const Divider(height: 16),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(
+                  _isVaultUnlocked ? Icons.lock_outline : Icons.lock_rounded,
+                  color: _isVaultUnlocked ? Colors.orange : Colors.grey,
+                ),
+                title: const Text(
+                  'Kasayı Şimdi Kilitle',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                subtitle: Text(
+                  _isVaultUnlocked
+                      ? 'DEK anahtarını bellekten sıfırla (Uint8List.fillRange) ve kasayı kilitle'
+                      : 'Kasa şu anda kilitli',
+                  style: const TextStyle(fontSize: 12),
+                ),
+                trailing: OutlinedButton(
+                  onPressed: _isVaultUnlocked
+                      ? () async {
+                          await _encryptionService.lockVault();
+                          await _loadAppLockSetting();
+                          _showSuccess(
+                            'Kasa kilitlendi ve DEK anahtarı bellekten sıfırlandı 🔒',
+                          );
+                        }
+                      : null,
+                  child: const Text('Kilitle'),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -207,7 +252,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           title: Text(
-            hasEnvelope ? 'Kasa Parolasını Güncelle / Doğrula' : 'Kasa Parolası Belirle',
+            hasEnvelope
+                ? 'Kasa Parolasını Güncelle / Doğrula'
+                : 'Kasa Parolası Belirle',
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -269,8 +316,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
                 try {
                   if (hasEnvelope && newPass.isEmpty) {
-                    await _encryptionService.unlockWithMasterPassword(currentPass);
+                    await _encryptionService.unlockWithMasterPassword(
+                      currentPass,
+                    );
                     if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+                    await _loadAppLockSetting();
                     _showSuccess('Kasa anahtarı bu cihazda başarıyla açıldı');
                     return;
                   }
@@ -341,7 +391,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                color: Theme.of(context)
+                    .colorScheme
+                    .surfaceContainerHighest
+                    .withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
               ),
@@ -359,20 +412,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   icon: const Icon(Icons.edit_location_alt, size: 18),
                   label: const Text('Dizin Değiştir'),
                   onPressed: () async {
-                    final selectedPath = await FilePicker.platform.getDirectoryPath();
+                    final selectedPath =
+                        await FilePicker.platform.getDirectoryPath();
                     if (selectedPath != null && selectedPath.isNotEmpty) {
-                      if (!context.mounted) return;
+                      if (!mounted) return;
                       final wsService = context.read<WorkspaceService>();
+                      final noteProvider = context.read<NoteProvider>();
                       await wsService.setCustomWorkspacePath(selectedPath);
-                      final updatedPath = await wsService.getActiveWorkspacePath();
-                      if (context.mounted) {
-                        await context.read<NoteProvider>().loadNotes();
-                      }
+                      final updatedPath =
+                          await wsService.getActiveWorkspacePath();
+                      if (!mounted) return;
+                      await noteProvider.loadNotes();
                       if (mounted) {
                         setState(() {
                           _workspacePath = updatedPath;
                         });
-                        _showSuccess('Çalışma dizini güncellendi: $updatedPath');
+                        await _loadAppLockSetting();
+                        _showSuccess(
+                          'Çalışma dizini güncellendi: $updatedPath',
+                        );
                       }
                     }
                   },
@@ -382,15 +440,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   label: const Text('Varsayılana Sıfırla'),
                   onPressed: () async {
                     final wsService = context.read<WorkspaceService>();
+                    final noteProvider = context.read<NoteProvider>();
                     await wsService.resetToDefault();
-                    final updatedPath = await wsService.getActiveWorkspacePath();
-                    if (context.mounted) {
-                      await context.read<NoteProvider>().loadNotes();
-                    }
+                    final updatedPath =
+                        await wsService.getActiveWorkspacePath();
+                    if (!mounted) return;
+                    await noteProvider.loadNotes();
                     if (mounted) {
                       setState(() {
                         _workspacePath = updatedPath;
                       });
+                      await _loadAppLockSetting();
                       _showSuccess('Çalışma dizini varsayılana sıfırlandı');
                     }
                   },
@@ -407,7 +467,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Card(
       child: ListTile(
         leading: const Icon(Icons.auto_awesome, color: Colors.deepPurple),
-        title: const Text('Yapay Zeka (AI) Asistanı', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text(
+          'Yapay Zeka (AI) Asistanı',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         subtitle: const Text('Gemini, DeepSeek, OpenAI yapılandırması'),
         trailing: const Icon(Icons.chevron_right),
         onTap: () {
@@ -435,7 +498,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     SizedBox(width: 8),
                     Text(
                       'Geliştirici Araçları',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ],
                 ),
@@ -447,9 +513,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Vim Tuş Bağlantıları', style: TextStyle(fontWeight: FontWeight.w600)),
-                          Text('Editörde h, j, k, l gibi Vim komutlarını etkinleştir', 
-                               style: TextStyle(fontSize: 12, color: Colors.grey)),
+                          Text(
+                            'Vim Tuş Bağlantıları',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          Text(
+                            'Editörde h, j, k, l gibi Vim komutlarını etkinleştir',
+                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
                         ],
                       ),
                     ),
@@ -457,7 +528,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       value: shortcutManager.isVimModeEnabled,
                       onChanged: (val) {
                         shortcutManager.setVimMode(val);
-                        _showSuccess(val ? 'Vim modu etkinleştirildi' : 'Vim modu devredışı');
+                        _showSuccess(
+                          val
+                              ? 'Vim modu etkinleştirildi'
+                              : 'Vim modu devredışı',
+                        );
                       },
                     ),
                   ],
@@ -465,21 +540,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const Divider(),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Komut Paleti Kısayolu', style: TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: Text(shortcutManager.customShortcuts['command_palette'] ?? 'ctrl+k'),
+                  title: const Text(
+                    'Komut Paleti Kısayolu',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Text(
+                    shortcutManager.customShortcuts['command_palette'] ??
+                        'ctrl+k',
+                  ),
                   trailing: const Icon(Icons.edit, size: 20),
                   onTap: () {
-                    // Kısayol düzenleme mantığı (basitçe prompt ile yapalım)
-                    _editShortcut(shortcutManager, 'command_palette', 'Komut Paleti Kısayolu');
+                    _editShortcut(
+                      shortcutManager,
+                      'command_palette',
+                      'Komut Paleti Kısayolu',
+                    );
                   },
                 ),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Yeni Not Kısayolu', style: TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: Text(shortcutManager.customShortcuts['new_note'] ?? 'ctrl+n'),
+                  title: const Text(
+                    'Yeni Not Kısayolu',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Text(
+                    shortcutManager.customShortcuts['new_note'] ?? 'ctrl+n',
+                  ),
                   trailing: const Icon(Icons.edit, size: 20),
                   onTap: () {
-                    _editShortcut(shortcutManager, 'new_note', 'Yeni Not Kısayolu');
+                    _editShortcut(
+                      shortcutManager,
+                      'new_note',
+                      'Yeni Not Kısayolu',
+                    );
                   },
                 ),
               ],
@@ -491,7 +584,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _editShortcut(AppShortcutManager manager, String action, String title) {
-    final controller = TextEditingController(text: manager.customShortcuts[action] ?? '');
+    final controller =
+        TextEditingController(text: manager.customShortcuts[action] ?? '');
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -520,18 +614,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-
   Widget _buildThemeSection() {
     return Card(
       child: ListTile(
         leading: const Icon(Icons.color_lens_outlined, color: Colors.blue),
-        title: const Text('Temalar ve Görünüm', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text(
+          'Temalar ve Görünüm',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         subtitle: const Text('Dracula, Nord, karanlık/aydınlık mod'),
         trailing: const Icon(Icons.chevron_right),
         onTap: () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => const ThemeSelectionScreen()),
+            MaterialPageRoute(
+              builder: (context) => const ThemeSelectionScreen(),
+            ),
           );
         },
       ),
@@ -571,6 +669,4 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     );
   }
-
 }
-
