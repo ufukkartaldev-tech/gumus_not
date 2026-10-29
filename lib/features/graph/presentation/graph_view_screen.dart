@@ -32,6 +32,7 @@ class _GraphViewScreenState extends State<GraphViewScreen> {
   Timer? _physicsTimer;
   bool _isPhysicsActive = true;
   bool _isInitialized = false;
+  bool _isFrameInFlight = false;
 
   // Performance monitoring
   final Stopwatch _frameStopwatch = Stopwatch();
@@ -97,11 +98,12 @@ class _GraphViewScreenState extends State<GraphViewScreen> {
       edges: graphData.edges,
       screenSize: screenSize,
     );
+    if (!mounted) return;
+
+    _isInitialized = true;
 
     // Start physics loop
     _startPhysicsLoop();
-
-    _isInitialized = true;
   }
 
   void _updatePainter() {
@@ -124,6 +126,7 @@ class _GraphViewScreenState extends State<GraphViewScreen> {
 
   void _startPhysicsLoop() {
     if (!_isPhysicsActive) return;
+    _physicsTimer?.cancel();
 
     _physicsTimer = Timer.periodic(
       GraphConstants.physicsFrameDuration,
@@ -132,21 +135,38 @@ class _GraphViewScreenState extends State<GraphViewScreen> {
   }
 
   Future<void> _updatePhysics() async {
-    if (!_isPhysicsActive || !_isInitialized) return;
+    if (!_isPhysicsActive || !_isInitialized || _isFrameInFlight || !mounted) {
+      return;
+    }
 
+    _isFrameInFlight = true;
     _frameStopwatch.start();
+    final screenSize = MediaQuery.of(context).size;
 
     try {
       final response = await _physicsEngine.updatePhysics(
         nodes: _graphController.nodes,
         edges: _graphController.edges,
-        screenSize: MediaQuery.of(context).size,
+        screenSize: screenSize,
       );
+      if (!mounted) return;
 
       if (response.hasMovement) {
+        final nodeById = <String, GraphNode>{
+          for (final node in response.nodes) node.id: node,
+        };
+        final reboundEdges = _graphController.edges
+            .map(
+              (edge) => edge.copyWith(
+                source: nodeById[edge.source.id] ?? edge.source,
+                target: nodeById[edge.target.id] ?? edge.target,
+              ),
+            )
+            .toList(growable: false);
+
         _graphController.updateGraph(
           newNodes: response.nodes,
-          newEdges: _graphController.edges,
+          newEdges: reboundEdges,
         );
 
         // Update performance stats
@@ -159,11 +179,12 @@ class _GraphViewScreenState extends State<GraphViewScreen> {
         _updatePainter();
       }
     } catch (e) {
-      print('Physics update error: $e');
+      debugPrint('Physics update error: $e');
+    } finally {
+      _frameStopwatch.stop();
+      _updateFrameStats();
+      _isFrameInFlight = false;
     }
-
-    _frameStopwatch.stop();
-    _updateFrameStats();
   }
 
   void _updateFrameStats() {
