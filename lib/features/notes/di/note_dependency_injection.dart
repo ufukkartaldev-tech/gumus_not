@@ -7,7 +7,6 @@ import 'package:connected_notebook/features/media/services/image_service.dart';
 import 'package:connected_notebook/features/notes/providers/note_provider.dart';
 import 'package:connected_notebook/features/notes/providers/note_editor_provider.dart';
 import 'package:connected_notebook/features/notes/repositories/markdown_note_repository.dart';
-import 'package:connected_notebook/features/notes/repositories/mock_note_repository.dart';
 import 'package:connected_notebook/features/notes/repositories/note_repository.dart';
 import 'package:connected_notebook/features/notes/services/git_sync_service.dart';
 import 'package:connected_notebook/features/notes/services/advanced_search_service.dart';
@@ -17,15 +16,7 @@ import 'package:connected_notebook/features/notes/services/search_service_interf
 import 'package:connected_notebook/features/notes/services/workspace_service.dart';
 
 class NoteDependencyInjection {
-  static bool _isTestMode = false;
-
-  static void enableTestMode() {
-    _isTestMode = true;
-  }
-
-  static void disableTestMode() {
-    _isTestMode = false;
-  }
+  const NoteDependencyInjection._();
 
   static List<SingleChildWidget> getProviders() {
     return [
@@ -51,9 +42,6 @@ class NoteDependencyInjection {
       ),
       Provider<NoteRepository>(
         create: (context) {
-          if (_isTestMode) {
-            return MockNoteRepository();
-          }
           final workspaceService = context.read<WorkspaceService>();
           return MarkdownNoteRepository(
             gitSyncService: context.read<GitSyncService>(),
@@ -87,41 +75,6 @@ class NoteDependencyInjection {
       ),
     ];
   }
-
-  static List<SingleChildWidget> getTestProviders() {
-    enableTestMode();
-    return getProviders();
-  }
-
-  static Widget setupProviders({
-    required Widget child,
-    bool isTestMode = false,
-  }) {
-    if (isTestMode) {
-      enableTestMode();
-    }
-    return MultiProvider(providers: getProviders(), child: child);
-  }
-
-  static Future<void> initializeServices(BuildContext context) async {
-    debugPrint('Note services initialized successfully');
-  }
-
-  static Future<void> cleanupServices(BuildContext context) async {
-    debugPrint('Note services cleaned up successfully');
-  }
-
-  static Future<void> optimizeDatabase(BuildContext context) async {
-    debugPrint('Database optimization completed');
-  }
-
-  static Map<String, dynamic> getPerformanceStats(BuildContext context) {
-    return {
-      'isTestMode': _isTestMode,
-    };
-  }
-
-  static bool get isTestMode => _isTestMode;
 }
 
 extension NoteDependencyInjectionExtension on BuildContext {
