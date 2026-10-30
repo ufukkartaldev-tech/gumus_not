@@ -3,7 +3,10 @@ import 'package:local_auth/local_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class BiometricService {
-  final LocalAuthentication _auth = LocalAuthentication();
+  final LocalAuthentication _auth;
+
+  BiometricService({LocalAuthentication? auth})
+      : _auth = auth ?? LocalAuthentication();
 
   static const String _appLockKey = 'app_lock_enabled';
 
@@ -34,13 +37,14 @@ class BiometricService {
     await prefs.setBool(_appLockKey, enabled);
   }
 
-  /// Kimlik doğrulama işlemini başlatır
+  /// Kimlik doğrulama işlemini başlatır (Fail-closed).
+  /// Donanım veya biyometri/PIN desteği yoksa ya da kullanıcı iptal ederse `false` döner.
   Future<bool> authenticate() async {
     try {
       final isSupported = await canCheckBiometrics();
       if (!isSupported) {
-        // Cihaz kilit desteklemiyorsa erişime izin ver
-        return true;
+        // Cihaz kilit desteklemiyorsa fail-closed çalış (asla otomatik izin verme)
+        return false;
       }
 
       // biometricOnly: false -> Yüz/Parmak izi yoksa Windows Hello veya telefon PIN'ini sorar.
@@ -50,6 +54,8 @@ class BiometricService {
         biometricOnly: false,
       );
     } on PlatformException catch (_) {
+      return false;
+    } catch (_) {
       return false;
     }
   }

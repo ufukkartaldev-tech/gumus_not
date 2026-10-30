@@ -350,6 +350,72 @@ class NoteEncryptionService {
     }
   }
 
+  /// Verifies whether [masterPassword] correctly unwraps `.vault_key.json`
+  /// without persisting or caching the DEK in the vault session.
+  ///
+  /// This allows using the master password as an authentication fallback for
+  /// app lock without inadvertently unlocking all encrypted notes in the
+  /// editor session.
+  ///
+  /// Returns `true` if the password is valid, `false` otherwise.
+  Future<bool> verifyMasterPassword(String masterPassword) async {
+    if (masterPassword.trim().isEmpty) return false;
+
+    final file = await _envelopeFile();
+    if (file == null || !file.existsSync()) {
+      return false;
+    }
+
+    final Map<String, dynamic> data;
+    try {
+      data = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
+    } catch (_) {
+      return false;
+    }
+
+    final saltB64 = data['salt'] as String?;
+    final ivB64 = data['iv'] as String?;
+    final ciphertextB64 = data['ciphertext'] as String?;
+    final iterations = data['iterations'] as int? ?? defaultPbkdf2Iterations;
+
+    if (saltB64 == null || ivB64 == null || ciphertextB64 == null) {
+      return false;
+    }
+    if (iterations < minPbkdf2Iterations || iterations > maxPbkdf2Iterations) {
+      return false;
+    }
+
+    Uint8List? kekBytes;
+    Uint8List? unwrappedDek;
+    try {
+      final salt = base64Decode(saltB64);
+      final iv = enc.IV.fromBase64(ivB64);
+      kekBytes = pbkdf2Sha256(
+        password: masterPassword,
+        salt: salt,
+        iterations: iterations,
+        keyLength: 32,
+      );
+
+      final kekEncrypter = enc.Encrypter(
+        enc.AES(enc.Key(kekBytes), mode: enc.AESMode.gcm),
+      );
+      unwrappedDek = Uint8List.fromList(
+        kekEncrypter.decryptBytes(
+          enc.Encrypted.fromBase64(ciphertextB64),
+          iv: iv,
+        ),
+      );
+
+      return unwrappedDek.length == 32;
+    } catch (_) {
+      return false;
+    } finally {
+      kekBytes?.fillRange(0, kekBytes.length, 0);
+      unwrappedDek?.fillRange(0, unwrappedDek.length, 0);
+    }
+  }
+
   /// Standard PBKDF2-HMAC-SHA256 implementation (RFC 8018).
   @visibleForTesting
   static Uint8List pbkdf2Sha256({

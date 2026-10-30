@@ -75,6 +75,84 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  Future<bool> _authenticateForAppLock() async {
+    final canBiometric = await _biometricService.canCheckBiometrics();
+    if (canBiometric) {
+      final ok = await _biometricService.authenticate();
+      if (ok) return true;
+    }
+
+    if (_hasVaultEnvelope) {
+      final passController = TextEditingController();
+      String? errorText;
+
+      final verified = await showDialog<bool>(
+        context: context,
+        builder: (dialogCtx) => StatefulBuilder(
+          builder: (ctx, setDialogState) => AlertDialog(
+            title: const Text('Kasa Parolası ile Doğrulayın'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Bu güvenlik ayarını değiştirmek için lütfen kasa parolanızı girin.',
+                  style: TextStyle(fontSize: 13),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: passController,
+                  obscureText: true,
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    labelText: 'Kasa Parolası',
+                    errorText: errorText,
+                    border: const OutlineInputBorder(),
+                  ),
+                  onSubmitted: (_) async {
+                    final valid = await _encryptionService
+                        .verifyMasterPassword(passController.text);
+                    if (valid) {
+                      if (ctx.mounted) Navigator.of(ctx).pop(true);
+                    } else {
+                      setDialogState(() {
+                        errorText = 'Kasa parolası hatalı!';
+                      });
+                    }
+                  },
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogCtx).pop(false),
+                child: const Text('İptal'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  final valid = await _encryptionService
+                      .verifyMasterPassword(passController.text);
+                  if (valid) {
+                    if (dialogCtx.mounted) Navigator.of(dialogCtx).pop(true);
+                  } else {
+                    setDialogState(() {
+                      errorText = 'Kasa parolası hatalı!';
+                    });
+                  }
+                },
+                child: const Text('Doğrula'),
+              ),
+            ],
+          ),
+        ),
+      );
+
+      return verified == true;
+    }
+
+    return false;
+  }
+
   void _showSuccess(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -156,17 +234,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     : Switch(
                         value: _isAppLockEnabled,
                         onChanged: (val) async {
-                          if (val) {
-                            // Açmak isterse önce bir kere kimlik doğrulasın
-                            final authenticated =
-                                await _biometricService.authenticate();
-                            if (!authenticated) {
-                              _showError(
-                                'Kimlik doğrulanamadığı için kilit etkinleştirilemedi',
-                              );
-                              return;
-                            }
+                          final canBiometric =
+                              await _biometricService.canCheckBiometrics();
+                          if (val && !canBiometric && !_hasVaultEnvelope) {
+                            _showError(
+                              'Uygulama kilidini etkinleştirmek için cihazınızda biyometrik kilit veya bir kasa ana parolası tanımlı olmalıdır.',
+                            );
+                            return;
                           }
+
+                          // Hem açarken hem kapatırken kimlik doğrulaması zorunludur (fail-closed)
+                          final authenticated =
+                              await _authenticateForAppLock();
+                          if (!authenticated) {
+                            _showError(
+                              val
+                                  ? 'Kimlik doğrulanamadığı için kilit etkinleştirilemedi'
+                                  : 'Kimlik doğrulanamadığı için kilit kapatılamadı',
+                            );
+                            return;
+                          }
+
                           await _biometricService.setAppLockEnabled(val);
                           setState(() {
                             _isAppLockEnabled = val;

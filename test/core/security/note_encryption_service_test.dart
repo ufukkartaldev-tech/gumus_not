@@ -271,5 +271,37 @@ void main() {
         throwsA(isA<InvalidVaultPasswordException>()),
       );
     });
+
+    test('verifyMasterPassword validates password without caching or unlocking vault session', () async {
+      final storage = <String, String>{};
+      final service = NoteEncryptionService(
+        keyReader: (k) async => storage[k],
+        keyWriter: (k, v) async => storage[k] = v,
+        keyDeleter: (k) async => storage.remove(k),
+        vaultDirResolver: () async => tempVaultDir,
+        pbkdf2Iterations: 1000,
+      );
+
+      // Create envelope with master password
+      await service.setupMasterPassword('DogruParola123!');
+      await service.lockVault();
+
+      expect(service.isUnlockedInMemory, isFalse);
+
+      // Verification with correct password returns true but DOES NOT unlock vault in RAM
+      final valid = await service.verifyMasterPassword('DogruParola123!');
+      expect(valid, isTrue);
+      expect(service.isUnlockedInMemory, isFalse);
+      expect(service.debugCachedDekBuffer, isNull);
+
+      // Verification with wrong password returns false
+      final invalid = await service.verifyMasterPassword('YanlisParola');
+      expect(invalid, isFalse);
+      expect(service.isUnlockedInMemory, isFalse);
+
+      // Empty password returns false
+      expect(await service.verifyMasterPassword(''), isFalse);
+      expect(await service.verifyMasterPassword('   '), isFalse);
+    });
   });
 }
