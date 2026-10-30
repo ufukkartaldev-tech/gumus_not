@@ -12,6 +12,8 @@ class EditorZenCanvas extends StatelessWidget {
   final String? emojiIcon;
   final List<String> tags;
   final Note currentNote;
+  final bool isLocked;
+  final VoidCallback? onUnlockVault;
   final ValueChanged<Note> onSelectBacklinkNote;
   final VoidCallback onShowEmojiPicker;
   final VoidCallback onShowColorPicker;
@@ -26,6 +28,8 @@ class EditorZenCanvas extends StatelessWidget {
     required this.emojiIcon,
     required this.tags,
     required this.currentNote,
+    this.isLocked = false,
+    this.onUnlockVault,
     required this.onSelectBacklinkNote,
     required this.onShowEmojiPicker,
     required this.onShowColorPicker,
@@ -85,6 +89,7 @@ class EditorZenCanvas extends StatelessWidget {
           child: TextField(
             controller: titleController,
             focusNode: titleFocusNode,
+            readOnly: isLocked,
             textInputAction: TextInputAction.next,
             onSubmitted: (_) => contentFocusNode.requestFocus(),
             style: theme.textTheme.headlineMedium?.copyWith(
@@ -200,35 +205,91 @@ class EditorZenCanvas extends StatelessWidget {
         const SizedBox(height: 10),
 
         // The Smooth Continuous Canvas Body (No dividers, no boxes)
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 28),
-            child: TextField(
-              controller: contentController,
-              focusNode: contentFocusNode,
-              maxLines: null,
-              expands: true,
-              style: theme.textTheme.bodyLarge?.copyWith(
-                height: 1.7,
-                fontSize: 16.5,
-                letterSpacing: 0.1,
-              ),
-              cursorColor: theme.colorScheme.primary,
-              cursorWidth: 2.2,
-              cursorRadius: const Radius.circular(2),
-              decoration: InputDecoration(
-                hintText: 'Düşüncelerinizi buraya dökün...',
-                hintStyle: TextStyle(
-                  color: theme.disabledColor.withValues(alpha: 0.3),
-                  fontStyle: FontStyle.italic,
-                  fontSize: 16,
+        if (isLocked)
+          Expanded(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.lock_rounded,
+                        size: 56,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      'Bu Not Şifrelidir',
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'İçeriği görüntülemek ve düzenlemek için kasanın kilidini açın.',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    ElevatedButton.icon(
+                      onPressed: onUnlockVault,
+                      icon: const Icon(Icons.lock_open_rounded),
+                      label: const Text('Kasayı Aç'),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+          )
+        else
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 28),
+              child: TextField(
+                controller: contentController,
+                focusNode: contentFocusNode,
+                maxLines: null,
+                expands: true,
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  height: 1.7,
+                  fontSize: 16.5,
+                  letterSpacing: 0.1,
+                ),
+                cursorColor: theme.colorScheme.primary,
+                cursorWidth: 2.2,
+                cursorRadius: const Radius.circular(2),
+                decoration: InputDecoration(
+                  hintText: 'Düşüncelerinizi buraya dökün...',
+                  hintStyle: TextStyle(
+                    color: theme.disabledColor.withValues(alpha: 0.3),
+                    fontStyle: FontStyle.italic,
+                    fontSize: 16,
+                  ),
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.zero,
+                ),
               ),
             ),
           ),
-        ),
 
         // Backlinks Section
         EditorBacklinkSection(

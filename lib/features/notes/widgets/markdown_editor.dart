@@ -84,15 +84,19 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
   List<String> _tags = [];
   bool _hasSelection = false;
 
-  // Auto-save & dirty state tracking
+  // Auto-save, external sync & dirty state tracking
   static const Duration _autoSaveDelay = Duration(milliseconds: 1500);
   Timer? _autoSaveTimer;
+  NoteProvider? _watchedNoteProvider;
   int? _persistedNoteId;
   int _createdAt = 0;
   String _lastSavedTitle = '';
   String _lastSavedContent = '';
+  String _baselineDiskTitle = '';
+  String _baselineDiskContent = '';
   bool _isDirty = false;
   bool _isAutoSaving = false;
+  bool _isResolvingConflict = false;
   bool _allowPop = false;
 
   final VoiceNoteService _voiceNoteService = VoiceNoteService();
@@ -151,6 +155,8 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
 
     _lastSavedTitle = _titleController.text.trim();
     _lastSavedContent = _contentController.text;
+    _baselineDiskTitle = (widget.note?.title ?? '').trim();
+    _baselineDiskContent = widget.note?.content ?? '';
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -172,6 +178,75 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
     _vimHandler.attach();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final provider = Provider.of<NoteProvider?>(context, listen: false);
+    if (!identical(provider, _watchedNoteProvider)) {
+      _watchedNoteProvider?.removeListener(_handleExternalWorkspaceUpdate);
+      _watchedNoteProvider = provider;
+      _watchedNoteProvider?.addListener(_handleExternalWorkspaceUpdate);
+    }
+  }
+
+  Future<void> _handleExternalWorkspaceUpdate() async {
+    if (!mounted ||
+        _persistedNoteId == null ||
+        _isAutoSaving ||
+        _isLoading ||
+        _isResolvingConflict) {
+      return;
+    }
+
+    final provider = _watchedNoteProvider;
+    if (provider == null) return;
+
+    final diskNote = provider.getNoteById(_persistedNoteId!);
+    if (diskNote == null) return;
+
+    final diskTitle = diskNote.title.trim();
+    final diskChanged =
+        diskTitle != _baselineDiskTitle ||
+        diskNote.content != _baselineDiskContent;
+    if (!diskChanged) return;
+
+    _baselineDiskTitle = diskTitle;
+    _baselineDiskContent = diskNote.content;
+
+    if (!_isDirty) {
+      if (!diskNote.isEncrypted) {
+        _titleController.removeListener(_onEditorFieldChanged);
+        _contentController.removeListener(_onContentChanged);
+        _titleController.text = diskNote.title;
+        _contentController.text = diskNote.content;
+        _lastSavedTitle = diskTitle;
+        _lastSavedContent = diskNote.content;
+        _titleController.addListener(_onEditorFieldChanged);
+        _contentController.addListener(_onContentChanged);
+        if (mounted) setState(() {});
+      }
+      return;
+    }
+
+    // SRS Section 4.2 Conflict Resolution: editor buffer is dirty while an
+    // external sync tool modified the underlying .md file on disk. Preserve
+    // the external version as `<Başlık> (Çakışma Kopyası - YYYY-MM-DD-HHmm).md`
+    // and notify the user without overwriting their active edits.
+    _isResolvingConflict = true;
+    try {
+      final conflictCopy = await provider.saveExternalConflictCopy(diskNote);
+      if (mounted) {
+        _showSuccess(
+          'Harici değişiklik algılandı: "${conflictCopy.title}.md" olarak korundu',
+        );
+      }
+    } catch (e) {
+      debugPrint('Conflict copy creation failed: $e');
+    } finally {
+      _isResolvingConflict = false;
+    }
+  }
+
   void _onEditorFieldChanged() {
     if (!mounted) return;
     _checkDirtyAndScheduleAutoSave();
@@ -190,6 +265,9 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
   }
 
   void _checkDirtyAndScheduleAutoSave() {
+    if (_isEncrypted && !_isUnlocked) {
+      return;
+    }
     final currentTitle = _titleController.text.trim();
     final currentContent = _contentController.text;
     final dirty =
@@ -262,6 +340,11 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
       persistedNote = note;
     }
 
+    final latestStored = persistedNote.id != null
+        ? noteProvider.getNoteById(persistedNote.id!)
+        : null;
+    _baselineDiskTitle = (latestStored?.title ?? persistedNote.title).trim();
+    _baselineDiskContent = latestStored?.content ?? persistedNote.content;
     _lastSavedTitle = _titleController.text.trim();
     _lastSavedContent = _contentController.text;
     _isDirty = false;
@@ -338,6 +421,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
   @override
   void dispose() {
     _autoSaveTimer?.cancel();
+    _watchedNoteProvider?.removeListener(_handleExternalWorkspaceUpdate);
     _titleController.removeListener(_onEditorFieldChanged);
     _contentController.removeListener(_onContentChanged);
     _titleController.dispose();
@@ -438,6 +522,10 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
 
   Future<void> _saveNote() async {
     _autoSaveTimer?.cancel();
+    if (_isEncrypted && !_isUnlocked) {
+      _showError('Not kilitli. Değişiklik yapmak için önce kasayı açın.');
+      return;
+    }
     if (_titleController.text.trim().isEmpty) {
       _showError('Başlık gerekli');
       return;
@@ -522,8 +610,18 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
         if (canCheck) {
           final authenticated = await _biometricService.authenticate();
           if (!authenticated) {
-            _showError('Kimlik doğrulanamadı, kasa açılamadı');
-            return;
+            if (hasEnv) {
+              if (!mounted) return;
+              final unlocked =
+                  await EditorVaultDialogs.promptUnlockWithMasterPassword(
+                context,
+                _encryptionService,
+              );
+              if (!unlocked) return;
+            } else {
+              _showError('Kimlik doğrulanamadı, kasa açılamadı');
+              return;
+            }
           }
         } else if (hasEnv && !alreadyUnlockedInSession) {
           if (!mounted) return;
@@ -576,6 +674,10 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
   }
 
   void _showAiAssistantMenu() {
+    if (_isEncrypted && !_isUnlocked) {
+      _showError('Not kilitli. AI asistanını kullanmak için önce kasayı açın.');
+      return;
+    }
     final aiProvider = context.read<AiProvider>();
     final noteId = (_persistedNoteId ?? widget.note?.id)?.toString() ??
         _titleController.text.trim();
@@ -819,6 +921,8 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
                             emojiIcon: _emojiIcon,
                             tags: _tags,
                             currentNote: _buildCurrentNoteSnapshot(),
+                            isLocked: _isEncrypted && !_isUnlocked,
+                            onUnlockVault: _unlockVault,
                             onSelectBacklinkNote: (note) {
                               Navigator.of(context).pushNamed(
                                 '/note-editor',
@@ -834,7 +938,10 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
               ),
 
               // Mobile Floating Accessory Bar (Docked right above keyboard)
-              if (!_isFocusMode && !_isPreviewMode && (!isDesktop || keyboardHeight > 0))
+              if (!_isFocusMode &&
+                  !_isPreviewMode &&
+                  (!_isEncrypted || _isUnlocked) &&
+                  (!isDesktop || keyboardHeight > 0))
                 Positioned(
                   bottom: keyboardHeight > 0 ? keyboardHeight + 8 : 16,
                   left: 16,
