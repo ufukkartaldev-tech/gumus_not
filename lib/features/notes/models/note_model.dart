@@ -188,9 +188,19 @@ class Note {
   }
 
   List<String> extractLinks() {
-    final RegExp linkRegex = RegExp(r'\[\[([^\]]+)\]\]');
+    final RegExp linkRegex = RegExp(r'\[\[([^\[\]]+)\]\]');
     final matches = linkRegex.allMatches(content);
-    return matches.map((match) => match.group(1)!).toList();
+    final results = <String>[];
+    for (final match in matches) {
+      final raw = match.group(1);
+      if (raw == null || raw.isEmpty) continue;
+      final pipeIndex = raw.indexOf('|');
+      final target = (pipeIndex == -1 ? raw : raw.substring(0, pipeIndex)).trim();
+      if (target.isNotEmpty) {
+        results.add(target);
+      }
+    }
+    return results;
   }
 
   String get excerpt {

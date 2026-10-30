@@ -47,6 +47,7 @@ class NoteDependencyInjection {
             gitSyncService: context.read<GitSyncService>(),
             encryptionService: context.read<NoteEncryptionService>(),
             notesDirResolver: () => workspaceService.getNotesDirectory(),
+            onInternalWrite: workspaceService.markInternalWrite,
           );
         },
       ),

@@ -121,5 +121,34 @@ void main() {
       expect(hubs.length, equals(1));
       expect(hubs.first.id, equals(1));
     });
+
+    test('SRS 4.2 & 8.2: renameNoteLinks and extractLinks support [[Title|Alias]] syntax', () async {
+      final target = createNote(id: 1, title: 'Eski Kavram', content: 'Tanım');
+      final referrer = createNote(
+        id: 2,
+        title: 'Makale',
+        content: 'Bkz [[Eski Kavram|Kavram Özeti]] ve [[Eski Kavram]].',
+      );
+
+      await repository.addNote(target);
+      await repository.addNote(referrer);
+
+      expect(referrer.extractLinks(), equals(['Eski Kavram', 'Eski Kavram']));
+      final referring = await backlinkService.getReferringNotes(1);
+      expect(referring.map((n) => n.id), equals([2]));
+
+      final updatedCount = await backlinkService.renameNoteLinks(
+        oldTitle: 'Eski Kavram',
+        newTitle: 'Yeni Kavram',
+        excludeNoteId: 1,
+      );
+      expect(updatedCount, equals(1));
+
+      final updatedReferrer = await repository.getNoteById(2);
+      expect(
+        updatedReferrer?.content,
+        equals('Bkz [[Yeni Kavram|Kavram Özeti]] ve [[Yeni Kavram]].'),
+      );
+    });
   });
 }

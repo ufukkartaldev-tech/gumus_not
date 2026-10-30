@@ -8,6 +8,73 @@ class BacklinkService {
 
   BacklinkService(this._repository);
 
+  /// Rewrites `[[oldTitle]]` and `[[oldTitle|Alias]]` WikiLinks to point to
+  /// [newTitle] while preserving any display alias (SRS Sections 4.2 & 8.2).
+  static String rewriteTitleLinksInText(
+    String content,
+    String oldTitle,
+    String newTitle,
+  ) {
+    final oldTrimmed = oldTitle.trim();
+    final newTrimmed = newTitle.trim();
+    if (oldTrimmed.isEmpty ||
+        newTrimmed.isEmpty ||
+        oldTrimmed.toLowerCase() == newTrimmed.toLowerCase() ||
+        !content.contains('[[')) {
+      return content;
+    }
+
+    final linkPattern = RegExp(
+      r'\[\[\s*' + RegExp.escape(oldTrimmed) + r'\s*(\|[^\[\]]*)?\]\]',
+      caseSensitive: false,
+    );
+
+    return content.replaceAllMapped(
+      linkPattern,
+      (match) => '[[$newTrimmed${match.group(1) ?? ''}]]',
+    );
+  }
+
+  /// Updates all `[[oldTitle]]` WikiLink references across unencrypted notes in
+  /// the workspace to `[[newTitle]]` (SRS Section 4.2).
+  /// Returns the number of notes updated.
+  Future<int> renameNoteLinks({
+    required String oldTitle,
+    required String newTitle,
+    int? excludeNoteId,
+  }) async {
+    final oldTrimmed = oldTitle.trim();
+    final newTrimmed = newTitle.trim();
+    if (oldTrimmed.isEmpty ||
+        newTrimmed.isEmpty ||
+        oldTrimmed.toLowerCase() == newTrimmed.toLowerCase()) {
+      return 0;
+    }
+
+    final allNotes = await _repository.getAllNotes();
+    int updatedCount = 0;
+
+    for (final note in allNotes) {
+      if (note.id == excludeNoteId || note.isEncrypted) continue;
+      final rewritten = rewriteTitleLinksInText(
+        note.content,
+        oldTrimmed,
+        newTrimmed,
+      );
+      if (rewritten != note.content) {
+        await _repository.updateNote(
+          note.copyWith(
+            content: rewritten,
+            updatedAt: DateTime.now().millisecondsSinceEpoch,
+          ),
+        );
+        updatedCount++;
+      }
+    }
+
+    return updatedCount;
+  }
+
   /// Get all notes that link to the specified note (`O(N)` single pass)
   Future<List<Note>> getReferringNotes(int noteId) async {
     final allNotes = await _repository.getAllNotes();
