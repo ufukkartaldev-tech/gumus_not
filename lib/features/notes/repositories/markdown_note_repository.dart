@@ -7,7 +7,9 @@ import 'package:connected_notebook/core/security/note_encryption_service.dart';
 import 'package:connected_notebook/core/storage/note_markdown_codec.dart';
 import 'package:connected_notebook/features/notes/models/note_model.dart';
 import 'package:connected_notebook/features/notes/repositories/note_repository.dart';
+import 'package:connected_notebook/features/notes/services/backlink_service.dart';
 import 'package:connected_notebook/features/notes/services/git_sync_service.dart';
+import 'package:connected_notebook/features/notes/services/workspace_service.dart';
 
 class _CachedNoteEntry {
   const _CachedNoteEntry({
@@ -35,17 +37,20 @@ class MarkdownNoteRepository implements NoteRepository {
     NoteEncryptionService? encryptionService,
     bool enableGit = true,
     Future<Directory> Function()? notesDirResolver,
+    VoidCallback? onInternalWrite,
     Duration cacheTtl = const Duration(seconds: 2),
   })  : _gitSyncService = gitSyncService ?? GitSyncService(),
         _encryption = encryptionService ?? NoteEncryptionService(),
         _enableGit = enableGit,
         _notesDirResolver = notesDirResolver,
+        _onInternalWrite = onInternalWrite,
         _cacheTtl = cacheTtl;
 
   final GitSyncService _gitSyncService;
   final NoteEncryptionService _encryption;
   final bool _enableGit;
   final Future<Directory> Function()? _notesDirResolver;
+  final VoidCallback? _onInternalWrite;
   final Duration _cacheTtl;
 
   final Map<String, _CachedNoteEntry> _fileCache = {};
@@ -209,6 +214,7 @@ class MarkdownNoteRepository implements NoteRepository {
   /// [targetFile]. Prevents 0-byte or half-written markdown files on crash or
   /// sudden power loss.
   Future<void> _writeFileAtomically(File targetFile, String contents) async {
+    _onInternalWrite?.call();
     final parentDir = targetFile.parent;
     if (!await parentDir.exists()) {
       await parentDir.create(recursive: true);
@@ -218,7 +224,20 @@ class MarkdownNoteRepository implements NoteRepository {
     final tmpFile = File(tmpPath);
     try {
       await tmpFile.writeAsString(contents, flush: true);
-      await tmpFile.rename(targetFile.path);
+
+      // On Windows NTFS, file indexing or antivirus can momentarily lock a file.
+      // Retry rename up to 3 times with brief backoff before failing.
+      var attempts = 0;
+      while (true) {
+        try {
+          await tmpFile.rename(targetFile.path);
+          break;
+        } on FileSystemException catch (_) {
+          attempts++;
+          if (attempts >= 3) rethrow;
+          await Future.delayed(Duration(milliseconds: attempts * 30));
+        }
+      }
     } catch (e) {
       if (await tmpFile.exists()) {
         try {
@@ -244,6 +263,7 @@ class MarkdownNoteRepository implements NoteRepository {
         await existingFile.exists() &&
         existingFile.path != targetFile.path &&
         _normPath(existingFile.path) == _normPath(targetFile.path)) {
+      _onInternalWrite?.call();
       await existingFile.rename(targetFile.path);
     }
 
@@ -254,8 +274,31 @@ class MarkdownNoteRepository implements NoteRepository {
 
     if (existingFile != null &&
         _normPath(existingFile.path) != _normPath(targetFile.path)) {
+      // SRS Section 4.2 Data Integrity Rule: verify target file exists, is
+      // non-empty, and deserializes with matching id & content BEFORE deleting
+      // the previous file on a title rename.
+      final exists = await targetFile.exists();
+      final stat = exists ? await targetFile.stat() : null;
+      if (!exists || stat == null || stat.size == 0) {
+        throw FileSystemException(
+          'Target note file verification failed prior to old file cleanup',
+          targetFile.path,
+        );
+      }
+      final verified = await NoteMarkdownCodec.deserializeFromFileAsync(
+        targetFile,
+      );
+      if (verified.id != noteToSave.id ||
+          verified.content != noteToSave.content) {
+        throw FileSystemException(
+          'Deserialized target note content mismatch prior to old file cleanup',
+          targetFile.path,
+        );
+      }
+
       _evictFilePath(existingFile.path);
       if (await existingFile.exists()) {
+        _onInternalWrite?.call();
         await existingFile.delete();
       }
     }
@@ -371,20 +414,16 @@ class MarkdownNoteRepository implements NoteRepository {
     }
 
     await _syncCacheWithDisk(dir);
-    final linkPattern = RegExp(
-      r'\[\[\s*' + RegExp.escape(oldTrimmed) + r'\s*\]\]',
-      caseSensitive: false,
-    );
 
     final entries = _fileCache.entries.toList();
     for (final entry in entries) {
       final candidate = entry.value.note;
       if (candidate.id == renamedNoteId || candidate.isEncrypted) continue;
-      if (!linkPattern.hasMatch(candidate.content)) continue;
 
-      final updatedContent = candidate.content.replaceAll(
-        linkPattern,
-        '[[$newTrimmed]]',
+      final updatedContent = BacklinkService.rewriteTitleLinksInText(
+        candidate.content,
+        oldTrimmed,
+        newTrimmed,
       );
       if (updatedContent == candidate.content) continue;
 
@@ -470,6 +509,33 @@ class MarkdownNoteRepository implements NoteRepository {
     await _commit('Update note: ${note.title}');
   }
 
+  /// Persists an external synchronization conflict copy as
+  /// `<Başlık> (Çakışma Kopyası - YYYY-MM-DD-HHmm).md` without overwriting the
+  /// user's active dirty editor buffer (SRS Section 4.2).
+  Future<Note> saveConflictCopy(
+    Note conflictingNote, {
+    DateTime? timestamp,
+  }) async {
+    final now = timestamp ?? DateTime.now();
+    final conflictTitle = WorkspaceService.formatConflictTitle(
+      conflictingNote.title,
+      now,
+    );
+    final draftCopy = Note(
+      title: conflictTitle,
+      content: conflictingNote.content,
+      createdAt: now.millisecondsSinceEpoch,
+      updatedAt: now.millisecondsSinceEpoch,
+      isEncrypted: conflictingNote.isEncrypted,
+      tags: List<String>.from(conflictingNote.tags),
+      color: conflictingNote.color,
+      folderName: conflictingNote.folderName,
+      emojiIcon: conflictingNote.emojiIcon,
+    );
+    final assignedId = await addNote(draftCopy);
+    return draftCopy.copyWith(id: assignedId);
+  }
+
   @override
   Future<void> deleteNote(int id) async {
     if (!_isAvailable) return;
@@ -477,6 +543,7 @@ class MarkdownNoteRepository implements NoteRepository {
     final file = await _findFileById(dir, id);
     if (file != null && await file.exists()) {
       _evictFilePath(file.path);
+      _onInternalWrite?.call();
       await file.delete();
       await _commit('Delete note: $id');
     }

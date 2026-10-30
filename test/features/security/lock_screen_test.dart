@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:connected_notebook/core/security/note_encryption_service.dart';
 import 'package:connected_notebook/core/utils/shortcut_manager.dart';
 import 'package:connected_notebook/features/security/presentation/lock_screen.dart';
 

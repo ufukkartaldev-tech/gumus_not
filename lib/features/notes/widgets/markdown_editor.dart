@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:ui' show AppExitResponse;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,8 +9,10 @@ import 'package:share_plus/share_plus.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:connected_notebook/core/security/note_encryption_service.dart';
+import 'package:connected_notebook/core/storage/note_markdown_codec.dart';
 import 'package:connected_notebook/features/ai/providers/ai_provider.dart';
 import 'package:connected_notebook/features/export/presentation/latex_export_screen.dart';
 import 'package:connected_notebook/features/export/services/pdf_export_service.dart';
@@ -56,13 +60,90 @@ class MarkdownEditor extends StatefulWidget {
       );
 
   @override
-  State<MarkdownEditor> createState() => _MarkdownEditorState();
+  State<MarkdownEditor> createState() => MarkdownEditorState();
 }
 
-class _MarkdownEditorState extends State<MarkdownEditor> {
+class MarkdownEditorState extends State<MarkdownEditor> {
   late TextEditingController _titleController;
   late MarkdownLivePreviewController _contentController;
   late EditorVimHandler _vimHandler;
+  AppLifecycleListener? _lifecycleListener;
+
+  /// Returns whether the active editor has unsaved changes.
+  bool get isDirty => _isDirty;
+
+  /// Flushes any pending auto-save or dirty in-memory edits directly to disk.
+  /// Returns the persisted note instance, or null if note was not dirty/locked.
+  Future<Note?> flushPendingSave() async {
+    _autoSaveTimer?.cancel();
+    if (!_isDirty) return null;
+    if (_isEncrypted && !_isUnlocked) return null;
+    return await _persistNoteInternal(closeAfterSave: false);
+  }
+
+  Future<void> _writeEmergencyDraft() async {
+    if (_isEncrypted && !_isUnlocked) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final draftKey = 'crash_draft_${_persistedNoteId ?? 'new_$_createdAt'}';
+      final payload = jsonEncode({
+        'title': _titleController.text.trim(),
+        'content': _contentController.text,
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+      });
+      await prefs.setString(draftKey, payload);
+    } catch (_) {}
+  }
+
+  Future<void> _clearEmergencyDraft() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final draftKey = 'crash_draft_${_persistedNoteId ?? 'new_$_createdAt'}';
+      await prefs.remove(draftKey);
+    } catch (_) {}
+  }
+
+  Future<void> _checkEmergencyDraft() async {
+    if (_isEncrypted) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final draftKey = 'crash_draft_${_persistedNoteId ?? 'new_$_createdAt'}';
+      final raw = prefs.getString(draftKey);
+      if (raw == null) return;
+      final data = jsonDecode(raw) as Map<String, dynamic>;
+      final draftTime = data['timestamp'] as int? ?? 0;
+      final noteUpdated = widget.note?.updatedAt ?? 0;
+
+      if (draftTime > noteUpdated && mounted) {
+        final draftTitle = data['title'] as String? ?? '';
+        final draftContent = data['content'] as String? ?? '';
+        if (draftContent != _contentController.text ||
+            draftTitle != _titleController.text.trim()) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text(
+                'Beklenmeyen bir kapanma sonrası kurtarılabilir taslak bulundu.',
+              ),
+              duration: const Duration(seconds: 10),
+              action: SnackBarAction(
+                label: 'Kurtar',
+                onPressed: () {
+                  setState(() {
+                    if (draftTitle.isNotEmpty) {
+                      _titleController.text = draftTitle;
+                    }
+                    _contentController.text = draftContent;
+                    _isDirty = true;
+                  });
+                  _scheduleAutoSave();
+                },
+              ),
+            ),
+          );
+        }
+      }
+    } catch (_) {}
+  }
 
   bool _isPreviewMode = false;
   bool _isFocusMode = false;
@@ -161,8 +242,22 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         context.read<NoteEditorProvider>().initialize(widget.note);
+        _checkEmergencyDraft();
       }
     });
+
+    _lifecycleListener = AppLifecycleListener(
+      onExitRequested: () async {
+        if (_isDirty && (!_isEncrypted || _isUnlocked)) {
+          try {
+            await flushPendingSave();
+          } catch (e) {
+            debugPrint('Error flushing note on exit: $e');
+          }
+        }
+        return AppExitResponse.exit;
+      },
+    );
 
     _titleController.addListener(_onEditorFieldChanged);
     _contentController.addListener(_onContentChanged);
@@ -279,7 +374,8 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
       });
     }
 
-    if (dirty && currentTitle.isNotEmpty && !_isAiLoading) {
+    if (dirty && !_isAiLoading) {
+      _writeEmergencyDraft();
       _scheduleAutoSave();
     } else if (!dirty) {
       _autoSaveTimer?.cancel();
@@ -293,14 +389,18 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
 
   Future<void> _performAutoSave() async {
     if (!mounted || !_isDirty || _isLoading || _isAutoSaving) return;
-    final currentTitle = _titleController.text.trim();
-    if (currentTitle.isEmpty) return;
+    if (_isEncrypted && !_isUnlocked) return;
 
     setState(() => _isAutoSaving = true);
     try {
       await _persistNoteInternal(closeAfterSave: false);
     } catch (e) {
       debugPrint('Auto-save error: $e');
+      if (mounted) {
+        _isDirty = true;
+        _scheduleAutoSave();
+        _showError('Otomatik kayıt başarısız oldu: $e');
+      }
     } finally {
       if (mounted) {
         setState(() => _isAutoSaving = false);
@@ -314,9 +414,14 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
         ? _storedEncryptedContent
         : _contentController.text;
 
+    String effectiveTitle = _titleController.text.trim();
+    if (effectiveTitle.isEmpty) {
+      effectiveTitle = NoteMarkdownCodec.deriveTitleFromContent(content);
+    }
+
     return Note(
       id: _persistedNoteId,
-      title: _titleController.text.trim(),
+      title: effectiveTitle,
       content: content,
       createdAt: _createdAt,
       updatedAt: DateTime.now().millisecondsSinceEpoch,
@@ -330,6 +435,9 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
 
   Future<Note> _persistNoteInternal({required bool closeAfterSave}) async {
     final note = _buildCurrentNoteSnapshot();
+    final snapshotTitle = _titleController.text.trim();
+    final snapshotContent = _contentController.text;
+
     final noteProvider = Provider.of<NoteProvider>(context, listen: false);
     final Note persistedNote;
     if (note.id == null) {
@@ -345,9 +453,21 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
         : null;
     _baselineDiskTitle = (latestStored?.title ?? persistedNote.title).trim();
     _baselineDiskContent = latestStored?.content ?? persistedNote.content;
-    _lastSavedTitle = _titleController.text.trim();
-    _lastSavedContent = _contentController.text;
-    _isDirty = false;
+    _lastSavedTitle = snapshotTitle;
+    _lastSavedContent = snapshotContent;
+
+    // Check if user continued typing while the save was in-flight
+    final currentTitle = _titleController.text.trim();
+    final currentContent = _contentController.text;
+    final isStillDirty =
+        (currentTitle != _lastSavedTitle || currentContent != _lastSavedContent);
+    _isDirty = isStillDirty;
+
+    if (isStillDirty) {
+      _scheduleAutoSave();
+    } else {
+      await _clearEmergencyDraft();
+    }
 
     if (closeAfterSave) {
       _allowPop = true;
@@ -368,7 +488,8 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
       return;
     }
 
-    final canSave = _titleController.text.trim().isNotEmpty;
+    final canSave = _titleController.text.trim().isNotEmpty ||
+        _contentController.text.trim().isNotEmpty;
     final decision = await showDialog<String>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -377,7 +498,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
         content: Text(
           canSave
               ? 'Notunuzda henüz kaydedilmemiş değişiklikler bulunuyor. Çıkmadan önce kaydetmek ister misiniz?'
-              : 'Başlık girilmediği için not henüz kaydedilemedi. Çıkarsanız yazdığınız içerik kaybolacak.',
+              : 'Yazdığınız değişiklikler kaydedilmedi. Çıkmak istiyor musunuz?',
         ),
         actions: [
           TextButton(
@@ -420,6 +541,7 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
 
   @override
   void dispose() {
+    _lifecycleListener?.dispose();
     _autoSaveTimer?.cancel();
     _watchedNoteProvider?.removeListener(_handleExternalWorkspaceUpdate);
     _titleController.removeListener(_onEditorFieldChanged);
@@ -527,8 +649,13 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
       return;
     }
     if (_titleController.text.trim().isEmpty) {
-      _showError('Başlık gerekli');
-      return;
+      final derived =
+          NoteMarkdownCodec.deriveTitleFromContent(_contentController.text);
+      if (derived.isNotEmpty) {
+        _titleController.text = derived;
+      } else {
+        _titleController.text = 'Başlıksız Not';
+      }
     }
     setState(() => _isLoading = true);
     try {
@@ -1016,6 +1143,16 @@ class _MarkdownEditorState extends State<MarkdownEditor> {
                             child: SingleChildScrollView(
                               child: CrossReferenceTracker(
                                 currentNote: _buildCurrentNoteSnapshot(),
+                                onAddTag: (tag) {
+                                  if (!_tags.contains(tag)) {
+                                    setState(() {
+                                      _tags.add(tag);
+                                      _isDirty = true;
+                                    });
+                                    _writeEmergencyDraft();
+                                    _scheduleAutoSave();
+                                  }
+                                },
                               ),
                             ),
                           ),

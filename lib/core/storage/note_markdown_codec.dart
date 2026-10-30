@@ -55,6 +55,40 @@ class NoteMarkdownCodec {
     return '$id.md';
   }
 
+  /// Extracts the first meaningful line of text from markdown [content] to use
+  /// as an automatic note title when the user does not specify one.
+  ///
+  /// Strips markdown headings (`#`), list bullets (`-`, `*`, `1.`), blockquotes (`>`),
+  /// and todo checkboxes (`[ ]`). Falls back to [defaultTitle] if content has no
+  /// readable text.
+  static String deriveTitleFromContent(
+    String content, {
+    String defaultTitle = 'Başlıksız Not',
+  }) {
+    if (content.trim().isEmpty) return defaultTitle;
+
+    final lines = content.split('\n');
+    for (final rawLine in lines) {
+      var line = rawLine.trim();
+      if (line.isEmpty) continue;
+      // Strip markdown headers
+      line = line.replaceFirst(RegExp(r'^#+\s*'), '').trim();
+      // Strip blockquotes
+      line = line.replaceFirst(RegExp(r'^\>+\s*'), '').trim();
+      // Strip list markers and checkboxes
+      line = line.replaceFirst(RegExp(r'^([-*+]|\d+\.)\s*'), '').trim();
+      line = line.replaceFirst(RegExp(r'^\[[\sxX]\]\s*'), '').trim();
+
+      if (line.isNotEmpty) {
+        if (line.length > 60) {
+          return '${line.substring(0, 60).trim()}...';
+        }
+        return line;
+      }
+    }
+    return defaultTitle;
+  }
+
   /// Picks an available `.md` file in [dir] for [note] based on its title.
   /// If `<Başlık>.md` is already taken by another note, tries
   /// `<Başlık> (2).md`, `<Başlık> (3).md`, etc.

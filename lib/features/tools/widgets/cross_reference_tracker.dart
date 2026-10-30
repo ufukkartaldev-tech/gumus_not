@@ -7,10 +7,12 @@ import 'package:connected_notebook/features/notes/providers/note_provider.dart';
 
 class CrossReferenceTracker extends StatefulWidget {
   final Note currentNote;
+  final ValueChanged<String>? onAddTag;
 
   const CrossReferenceTracker({
     super.key,
     required this.currentNote,
+    this.onAddTag,
   });
 
   @override
@@ -608,14 +610,17 @@ class _CrossReferenceTrackerState extends State<CrossReferenceTracker> {
   }
 
   void _addTag(String tag) {
-    // Add tag to current note
-    final noteProvider = Provider.of<NoteProvider>(context, listen: false);
-    final updatedNote = widget.currentNote.copyWith(
-      tags: [...widget.currentNote.tags, tag],
-      updatedAt: DateTime.now().millisecondsSinceEpoch,
-    );
-    
-    noteProvider.updateNote(updatedNote);
+    if (widget.onAddTag != null) {
+      widget.onAddTag!(tag);
+    } else {
+      // Fallback for standalone usage
+      final noteProvider = Provider.of<NoteProvider>(context, listen: false);
+      final updatedNote = widget.currentNote.copyWith(
+        tags: [...widget.currentNote.tags, tag],
+        updatedAt: DateTime.now().millisecondsSinceEpoch,
+      );
+      noteProvider.updateNote(updatedNote);
+    }
     
     // Remove from suggestions
     setState(() {

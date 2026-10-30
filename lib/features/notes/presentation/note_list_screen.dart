@@ -47,6 +47,16 @@ class _NoteListScreenState extends State<NoteListScreen> {
   // For split view
   Note? _selectedNote;
   bool _isCreatingNewNote = false;
+  GlobalKey<MarkdownEditorState> _desktopEditorKey =
+      GlobalKey<MarkdownEditorState>();
+
+  Future<void> _flushDesktopEditor() async {
+    try {
+      await _desktopEditorKey.currentState?.flushPendingSave();
+    } catch (e) {
+      debugPrint('Error flushing desktop editor before note switch: $e');
+    }
+  }
 
   final List<String> _quotes = [
     "Düşünmek, ruhun kendi kendine konuşmasıdır. - Platon",
@@ -354,7 +364,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
   Widget _buildDesktopEditorPanel() {
     if (_selectedNote != null || _isCreatingNewNote) {
       return MarkdownEditor(
-        key: ValueKey(_selectedNote?.id ?? 'new_note'),
+        key: _desktopEditorKey,
         note: _selectedNote,
         onSave: (savedNote) {
           if (mounted) {
@@ -888,9 +898,12 @@ class _NoteListScreenState extends State<NoteListScreen> {
     );
 
     if (width >= 800) {
+      await _flushDesktopEditor();
+      if (!mounted) return;
       setState(() {
         _selectedNote = newNote; // Split view için şablonlu notu set et
         _isCreatingNewNote = true;
+        _desktopEditorKey = GlobalKey<MarkdownEditorState>();
       });
     } else {
       Navigator.of(context).push(
@@ -917,12 +930,16 @@ class _NoteListScreenState extends State<NoteListScreen> {
     _openEditor(note);
   }
 
-  void _openEditor(Note note) {
+  Future<void> _openEditor(Note note) async {
+    if (_selectedNote?.id == note.id && !_isCreatingNewNote) return;
     final width = MediaQuery.of(context).size.width;
     if (width >= 800) {
+      await _flushDesktopEditor();
+      if (!mounted) return;
       setState(() {
         _selectedNote = note;
         _isCreatingNewNote = false;
+        _desktopEditorKey = GlobalKey<MarkdownEditorState>();
       });
     } else {
       Navigator.of(context).push(

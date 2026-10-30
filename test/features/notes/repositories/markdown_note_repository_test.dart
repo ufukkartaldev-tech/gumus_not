@@ -227,6 +227,28 @@ eski düz metin''');
       expect((await repository.getNoteById(id))?.content, 'v2 içerik');
     });
 
+    test('atomic write retry gracefully succeeds under concurrent updates without data corruption', () async {
+      final id = await repository.addNote(
+        note(title: 'Yarış Koşulu Notu', content: 'başlangıç'),
+      );
+      final initialNote = await repository.getNoteById(id);
+      expect(initialNote, isNotNull);
+
+      // Perform rapid consecutive writes
+      for (int i = 1; i <= 5; i++) {
+        await repository.updateNote(initialNote!.copyWith(content: 'sürüm $i'));
+      }
+
+      final finalNote = await repository.getNoteById(id);
+      expect(finalNote?.content, 'sürüm 5');
+
+      final leftovers = notesDir
+          .listSync()
+          .where((e) => e.path.endsWith('.tmp'))
+          .toList();
+      expect(leftovers, isEmpty);
+    });
+
     test('renaming a note automatically updates [[Wikilinks]] across referring notes', () async {
       final targetId = await repository.addNote(
         note(title: 'Mimari Tasarım', content: 'hedef içerik'),

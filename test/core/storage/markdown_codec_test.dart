@@ -98,6 +98,54 @@ void main() {
       expect(restored.id, id);
       expect(restored.title, 'my daily journal');
     });
+
+    group('deriveTitleFromContent', () {
+      test('extracts first line from markdown heading', () {
+        expect(
+          NoteMarkdownCodec.deriveTitleFromContent('# Proje Mimarisi\nDetaylar burada.'),
+          'Proje Mimarisi',
+        );
+        expect(
+          NoteMarkdownCodec.deriveTitleFromContent('### Alt Başlık\nİçerik'),
+          'Alt Başlık',
+        );
+      });
+
+      test('strips list markers and blockquotes', () {
+        expect(
+          NoteMarkdownCodec.deriveTitleFromContent('- Yapılacaklar listesi madde 1\n- madde 2'),
+          'Yapılacaklar listesi madde 1',
+        );
+        expect(
+          NoteMarkdownCodec.deriveTitleFromContent('* Yıldızlı liste maddesi'),
+          'Yıldızlı liste maddesi',
+        );
+        expect(
+          NoteMarkdownCodec.deriveTitleFromContent('> Bu bir alıntıdır\nDevamı'),
+          'Bu bir alıntıdır',
+        );
+        expect(
+          NoteMarkdownCodec.deriveTitleFromContent('- [x] Tamamlanan görev başlığı'),
+          'Tamamlanan görev başlığı',
+        );
+      });
+
+      test('truncates very long first lines cleanly', () {
+        final longLine = 'A' * 100;
+        final derived = NoteMarkdownCodec.deriveTitleFromContent(longLine);
+        expect(derived.length, 63);
+        expect(derived, '${'A' * 60}...');
+      });
+
+      test('falls back to default title when content is empty or whitespace', () {
+        expect(NoteMarkdownCodec.deriveTitleFromContent(''), 'Başlıksız Not');
+        expect(NoteMarkdownCodec.deriveTitleFromContent('   \n\n\t  '), 'Başlıksız Not');
+        expect(
+          NoteMarkdownCodec.deriveTitleFromContent('', defaultTitle: 'Özel Başlık'),
+          'Özel Başlık',
+        );
+      });
+    });
   });
 }
 

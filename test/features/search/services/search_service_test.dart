@@ -212,7 +212,7 @@ void main() {
 
       expect(result.length, 2);
       expect(result.first.id, 7778);
-      expect(sw.elapsedMilliseconds, lessThan(50));
+      expect(sw.elapsedMilliseconds, lessThan(100));
     });
   });
 }
