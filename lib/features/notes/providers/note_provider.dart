@@ -137,27 +137,65 @@ class NoteProvider with ChangeNotifier {
   /// Add a new note and return the persisted instance with its assigned ID
   Future<Note> addNote(Note note) async {
     try {
+      _workspaceService?.markInternalWrite();
       final id = await _repository.addNote(note);
-      final newNote = note.copyWith(id: id);
+      // Ensure the in-memory note matches repository state (persisting ciphertext for encrypted notes)
+      final persisted = await _repository.getNoteById(id) ?? note.copyWith(id: id);
 
       // Update backlinks
-      await _repository.updateBacklinks(newNote, _notes);
+      await _repository.updateBacklinks(persisted, _notes);
 
       // Update local state
-      _notes.insert(0, newNote);
+      _notes.insert(0, persisted);
       _invalidateDerivedCaches();
       await _performSearch(_searchQuery); // Update search results
       _notifyOnce();
-      return newNote;
+      return persisted;
     } catch (e) {
       debugPrint('Error adding note: $e');
       rethrow;
     }
   }
 
+  /// Preserves an externally modified disk version as
+  /// `<Başlık> (Çakışma Kopyası - YYYY-MM-DD-HHmm).md` when the active editor
+  /// holds unsaved (`dirty`) changes (SRS Section 4.2).
+  Future<Note> saveExternalConflictCopy(
+    Note externalNote, {
+    DateTime? timestamp,
+  }) async {
+    _workspaceService?.markInternalWrite();
+    final repo = _repository;
+    if (repo is MarkdownNoteRepository) {
+      final savedCopy = await repo.saveConflictCopy(
+        externalNote,
+        timestamp: timestamp,
+      );
+      _notes.insert(0, savedCopy);
+      _invalidateDerivedCaches();
+      await _performSearch(_searchQuery);
+      _notifyOnce();
+      return savedCopy;
+    }
+
+    final fallbackCopy = Note(
+      title: WorkspaceService.formatConflictTitle(externalNote.title, timestamp),
+      content: externalNote.content,
+      createdAt: (timestamp ?? DateTime.now()).millisecondsSinceEpoch,
+      updatedAt: (timestamp ?? DateTime.now()).millisecondsSinceEpoch,
+      isEncrypted: externalNote.isEncrypted,
+      tags: List<String>.from(externalNote.tags),
+      color: externalNote.color,
+      folderName: externalNote.folderName,
+      emojiIcon: externalNote.emojiIcon,
+    );
+    return addNote(fallbackCopy);
+  }
+
   /// Update an existing note (and refresh in-memory list in case title rename propagated wikilinks)
   Future<void> updateNote(Note note) async {
     try {
+      _workspaceService?.markInternalWrite();
       await _repository.updateNote(note);
 
       // Update backlinks
@@ -187,6 +225,7 @@ class NoteProvider with ChangeNotifier {
   /// Delete a note by ID
   Future<void> deleteNote(int noteId) async {
     try {
+      _workspaceService?.markInternalWrite();
       await _repository.deleteNote(noteId);
 
       // Update local state

@@ -47,6 +47,9 @@ void main() {
       // Arrange
       final newNote = Note(title: 'New Note', content: 'New Content', createdAt: 1, updatedAt: 1);
       when(mockRepository.addNote(any)).thenAnswer((_) async => 3);
+      when(mockRepository.getNoteById(3)).thenAnswer(
+        (_) async => Note(id: 3, title: 'New Note', content: 'New Content', createdAt: 1, updatedAt: 1),
+      );
 
       // Act
       await noteProvider.addNote(newNote);
@@ -55,6 +58,30 @@ void main() {
       expect(noteProvider.notes.length, 1);
       expect(noteProvider.notes.first.id, 3);
       verify(mockRepository.addNote(any)).called(1);
+    });
+
+    test('Should store encrypted ciphertext in state instead of plaintext when adding encrypted note', () async {
+      // Arrange
+      final plainEncryptedNote = Note(
+        title: 'Gizli',
+        content: 'Hassas metin',
+        isEncrypted: true,
+        createdAt: 1,
+        updatedAt: 1,
+      );
+      const ciphertext = 'enc:v1:YWJjZGVmZ2hpamtsbW5vcA==:MTIzNDU2Nzg5MA==';
+      when(mockRepository.addNote(any)).thenAnswer((_) async => 4);
+      when(mockRepository.getNoteById(4)).thenAnswer(
+        (_) async => plainEncryptedNote.copyWith(id: 4, content: ciphertext),
+      );
+
+      // Act
+      final added = await noteProvider.addNote(plainEncryptedNote);
+
+      // Assert
+      expect(added.content, ciphertext);
+      expect(noteProvider.notes.first.content, ciphertext);
+      expect(noteProvider.notes.first.content, isNot(contains('Hassas metin')));
     });
 
     test('Should delete note and remove from state', () async {
