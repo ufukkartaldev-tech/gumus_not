@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:googleapis/drive/v3.dart' as drive;
@@ -44,8 +43,6 @@ class GoogleAuthClient extends http.BaseClient {
 /// so existing user backups on Google Drive remain restorable.
 class CloudSyncService {
   static const String _backupFileName = 'gumusnot_secure_backup.enc';
-  static const List<int> _v2MagicHeader = [0x47, 0x4E, 0x43, 0x42, 0x02]; // "GNCB\x02"
-  static const int _saltLength = 16;
   static const int _ivLength = 16;
 
   final GoogleSignIn _googleSignIn = GoogleSignIn.instance;

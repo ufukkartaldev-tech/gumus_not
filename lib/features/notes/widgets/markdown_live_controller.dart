@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 /// An intelligent [TextEditingController] that provides live in-line markdown preview

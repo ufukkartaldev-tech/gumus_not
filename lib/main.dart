@@ -11,7 +11,6 @@ import 'package:connected_notebook/features/notes/presentation/note_list_screen.
 import 'package:connected_notebook/features/graph/presentation/graph_view_screen.dart';
 import 'package:connected_notebook/features/settings/presentation/settings_screen.dart';
 import 'package:connected_notebook/features/splash/presentation/splash_screen.dart';
-import 'package:connected_notebook/features/notes/providers/note_provider.dart';
 import 'package:connected_notebook/features/notes/presentation/main_screen.dart';
 import 'package:connected_notebook/features/home_widget/presentation/widget_screen.dart';
 import 'package:connected_notebook/features/notes/widgets/markdown_editor.dart';

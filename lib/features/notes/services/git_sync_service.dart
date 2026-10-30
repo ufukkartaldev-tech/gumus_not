@@ -43,8 +43,9 @@ class GitSyncService {
   }
 
   Future<String> getRepoPath() async {
-    if (_repoPathResolver != null) {
-      final custom = await _repoPathResolver!();
+    final resolver = _repoPathResolver;
+    if (resolver != null) {
+      final custom = await resolver();
       final dir = Directory(custom);
       if (!await dir.exists()) {
         await dir.create(recursive: true);

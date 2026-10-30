@@ -1,0 +1,47 @@
+name: Windows Release Build
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    name: Build Windows 1.0 Release (.exe)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Enable Windows desktop support
+        run: flutter config --enable-windows-desktop
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Run automated test suite
+        run: flutter test
+
+      - name: Build Windows Release Executable
+        run: flutter build windows --release
+
+      - name: Compress Release Artifact
+        run: |
+          Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath GumusNot-Windows-Release.zip
+
+      - name: Upload Release Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: GumusNot-Windows-Release
+          path: GumusNot-Windows-Release.zip
+          retention-days: 14

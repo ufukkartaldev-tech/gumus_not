@@ -106,8 +106,9 @@ class NoteProvider with ChangeNotifier {
     if (ws != null && !ws.isWatching) {
       ws.startWatching(onExternalChange: () async {
         debugPrint('External file system change detected in workspace. Refreshing notes...');
-        if (_repository is MarkdownNoteRepository) {
-          (_repository as MarkdownNoteRepository).invalidateCache();
+        final repo = _repository;
+        if (repo is MarkdownNoteRepository) {
+          repo.invalidateCache();
         }
         await loadNotes();
       });
