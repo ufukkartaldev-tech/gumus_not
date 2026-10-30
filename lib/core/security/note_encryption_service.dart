@@ -417,7 +417,6 @@ class NoteEncryptionService {
   }
 
   /// Standard PBKDF2-HMAC-SHA256 implementation (RFC 8018).
-  @visibleForTesting
   static Uint8List pbkdf2Sha256({
     required String password,
     required List<int> salt,

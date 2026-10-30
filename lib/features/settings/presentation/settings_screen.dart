@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:connected_notebook/features/backup/presentation/backup_screen.dart';
 import 'package:connected_notebook/features/settings/presentation/about_screen.dart';
 import 'package:connected_notebook/features/home_widget/presentation/widget_screen.dart';
 import 'package:connected_notebook/core/utils/shortcut_manager.dart';
@@ -174,6 +175,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _buildSecuritySection(),
           const SizedBox(height: 24),
           _buildWorkspaceSection(),
+          const SizedBox(height: 24),
+          _buildBackupSection(),
           const SizedBox(height: 24),
           _buildAiSection(),
           const SizedBox(height: 24),
@@ -547,6 +550,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildBackupSection() {
+    return Card(
+      child: ListTile(
+        leading: const Icon(Icons.shield_outlined, color: Colors.teal),
+        title: const Text(
+          'Yedekleme ve Geri Yükleme',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        subtitle: const Text('Şifreli yerel yedek (.enc) ve taşınabilir arşiv (.zip)'),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const BackupScreen()),
+          );
+        },
       ),
     );
   }

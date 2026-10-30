@@ -47,7 +47,6 @@ class CloudSyncService {
   static const List<int> _v2MagicHeader = [0x47, 0x4E, 0x43, 0x42, 0x02]; // "GNCB\x02"
   static const int _saltLength = 16;
   static const int _ivLength = 16;
-  static const int _v2HeaderTotalLength = 5 + 4 + _saltLength + _ivLength; // 41 bytes
 
   final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
   final int pbkdf2Iterations;
@@ -68,34 +67,11 @@ class CloudSyncService {
   /// fresh 128-bit random salt and **AES-256-GCM** authenticated encryption.
   @visibleForTesting
   Uint8List encryptBackupPayload(List<int> zipBytes, String password) {
-    if (password.isEmpty) {
-      throw ArgumentError('Yedekleme parolası boş olamaz.');
-    }
-
-    final salt = enc.IV.fromSecureRandom(_saltLength).bytes;
-    final iv = enc.IV.fromSecureRandom(_ivLength);
-    final keyBytes = NoteEncryptionService.pbkdf2Sha256(
-      password: password,
-      salt: salt,
-      iterations: pbkdf2Iterations,
-      keyLength: 32,
+    return MarkdownBackupUtils.encryptBackupPayload(
+      zipBytes,
+      password,
+      pbkdf2Iterations: pbkdf2Iterations,
     );
-
-    final encrypter = enc.Encrypter(
-      enc.AES(enc.Key(keyBytes), mode: enc.AESMode.gcm),
-    );
-    final encrypted = encrypter.encryptBytes(zipBytes, iv: iv);
-
-    final iterBytes = ByteData(4)..setUint32(0, pbkdf2Iterations, Endian.big);
-
-    final builder = BytesBuilder(copy: false)
-      ..add(_v2MagicHeader)
-      ..add(iterBytes.buffer.asUint8List())
-      ..add(salt)
-      ..add(iv.bytes)
-      ..add(encrypted.bytes);
-
-    return builder.toBytes();
   }
 
   /// Decrypts [payloadBytes] produced by [encryptBackupPayload] (v2 AES-256-GCM
@@ -103,53 +79,7 @@ class CloudSyncService {
   /// if the payload does not start with the v2 magic header.
   @visibleForTesting
   List<int> decryptBackupPayload(List<int> payloadBytes, String password) {
-    if (_hasV2Header(payloadBytes)) {
-      if (payloadBytes.length <= _v2HeaderTotalLength + 16) {
-        throw const FormatException('Yedek dosyası bozuk veya eksik (v2).');
-      }
-
-      final data = Uint8List.fromList(payloadBytes);
-      final iterations = ByteData.sublistView(data, 5, 9).getUint32(0, Endian.big);
-      if (iterations < 1000 || iterations > 5000000) {
-        throw const FormatException('Geçersiz PBKDF2 iterasyon sayısı.');
-      }
-
-      final salt = Uint8List.sublistView(data, 9, 9 + _saltLength);
-      final ivBytes = Uint8List.sublistView(
-        data,
-        9 + _saltLength,
-        9 + _saltLength + _ivLength,
-      );
-      final ciphertext = Uint8List.sublistView(data, _v2HeaderTotalLength);
-
-      final keyBytes = NoteEncryptionService.pbkdf2Sha256(
-        password: password,
-        salt: salt,
-        iterations: iterations,
-        keyLength: 32,
-      );
-
-      final encrypter = enc.Encrypter(
-        enc.AES(enc.Key(keyBytes), mode: enc.AESMode.gcm),
-      );
-      return encrypter.decryptBytes(
-        enc.Encrypted(ciphertext),
-        iv: enc.IV(ivBytes),
-      );
-    }
-
-    // Legacy v1 fallback: [16-byte IV][AES-256 default SIC/CTR ciphertext]
-    if (payloadBytes.length <= _ivLength) {
-      throw const FormatException('Yedek dosyası bozuk.');
-    }
-
-    final key = _generateLegacyV1Key(password);
-    final ivBytes = Uint8List.fromList(payloadBytes.sublist(0, _ivLength));
-    final encryptedBytes = Uint8List.fromList(payloadBytes.sublist(_ivLength));
-
-    final iv = enc.IV(ivBytes);
-    final encrypter = enc.Encrypter(enc.AES(key));
-    return encrypter.decryptBytes(enc.Encrypted(encryptedBytes), iv: iv);
+    return MarkdownBackupUtils.decryptBackupPayload(payloadBytes, password);
   }
 
   /// Helper for testing legacy v1 payload creation.
@@ -160,14 +90,6 @@ class CloudSyncService {
     final encrypter = enc.Encrypter(enc.AES(key));
     final encrypted = encrypter.encryptBytes(zipBytes, iv: iv);
     return Uint8List.fromList(<int>[...iv.bytes, ...encrypted.bytes]);
-  }
-
-  static bool _hasV2Header(List<int> bytes) {
-    if (bytes.length < _v2MagicHeader.length) return false;
-    for (var i = 0; i < _v2MagicHeader.length; i++) {
-      if (bytes[i] != _v2MagicHeader[i]) return false;
-    }
-    return true;
   }
 
   /// Google ile giriş yapıp yetkilendirilmiş Drive API istemcisi döner

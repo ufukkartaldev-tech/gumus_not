@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:connected_notebook/core/theme/theme_provider.dart';
 import 'package:connected_notebook/features/notes/models/note_model.dart';
 import 'package:connected_notebook/features/notes/providers/note_provider.dart';
+import 'package:connected_notebook/features/backup/presentation/backup_screen.dart';
 import 'package:connected_notebook/features/export/presentation/batch_export_screen.dart';
 import 'package:connected_notebook/features/notes/presentation/tag_management_screen.dart';
 import 'package:connected_notebook/features/search/presentation/advanced_search_screen.dart';
@@ -351,6 +352,19 @@ class _CommandPaletteState extends State<CommandPalette> {
             ),
           );
         },
+      ),
+
+      // Backup & Restore
+      PaletteItem(
+        id: 'backup_restore',
+        title: 'Yedekleme ve Geri Yükleme',
+        subtitle: 'Şifreli yerel yedek (.enc) ve taşınabilir arşiv (.zip)',
+        icon: Icons.shield_outlined,
+        iconColor: Colors.teal,
+        category: 'SİSTEM',
+        action: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (context) => const BackupScreen()),
+        ),
       ),
 
       // Settings
