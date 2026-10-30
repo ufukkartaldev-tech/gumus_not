@@ -23,6 +23,27 @@ import 'package:connected_notebook/features/ai/providers/ai_provider.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
+/// Tracks active route to ensure security-critical screens (like /lock or /splash)
+/// are not bypassed via global application shortcuts or actions.
+class AppLockRouteObserver extends NavigatorObserver {
+  static String? currentRoute;
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    currentRoute = route.settings.name;
+  }
+
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
+    currentRoute = newRoute?.settings.name;
+  }
+
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    currentRoute = previousRoute?.settings.name;
+  }
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -155,6 +176,10 @@ class ConnectedNotebookApp extends StatelessWidget {
               actions: {
                 CommandPaletteIntent: CallbackAction<CommandPaletteIntent>(
                   onInvoke: (intent) {
+                    final route = AppLockRouteObserver.currentRoute;
+                    if (route == '/lock' || route == '/splash') {
+                      return null;
+                    }
                     final context = navigatorKey.currentContext;
                     if (context != null) {
                       CommandPalette.show(context);
@@ -164,6 +189,10 @@ class ConnectedNotebookApp extends StatelessWidget {
                 ),
                 NewNoteIntent: CallbackAction<NewNoteIntent>(
                   onInvoke: (intent) {
+                    final route = AppLockRouteObserver.currentRoute;
+                    if (route == '/lock' || route == '/splash') {
+                      return null;
+                    }
                     final context = navigatorKey.currentContext;
                     if (context != null) {
                       Navigator.of(context).pushNamed('/note-editor');
@@ -175,6 +204,7 @@ class ConnectedNotebookApp extends StatelessWidget {
               child: MaterialApp(
                 title: 'GümüşNot',
                 navigatorKey: navigatorKey,
+                navigatorObservers: [AppLockRouteObserver()],
                 debugShowCheckedModeBanner: false,
                 theme: themeProvider.lightTheme,
                 darkTheme: themeProvider.darkTheme,
