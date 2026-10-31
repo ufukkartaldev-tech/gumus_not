@@ -33,7 +33,15 @@ jobs:
         run: flutter test
 
       - name: Build Windows Release Executable
-        run: flutter build windows --release
+        run: flutter build windows --release -v
+
+      - name: Dump build error log on failure
+        if: failure()
+        run: |
+          if (Test-Path build\windows\x64\CMakeFiles\CMakeError.log) {
+            Write-Host "=== CMakeError.log ==="
+            Get-Content build\windows\x64\CMakeFiles\CMakeError.log -Tail 100
+          }
 
       - name: Compress Release Artifact
         run: |

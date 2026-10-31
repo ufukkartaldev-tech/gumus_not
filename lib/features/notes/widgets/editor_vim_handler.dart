@@ -102,7 +102,6 @@ class EditorVimHandler {
 
   /// Computes the target cursor offset when moving vertically (`j` = down, `k` = up)
   /// across newline boundaries while preserving the current column index.
-  @visibleForTesting
   static int computeVerticalLineOffset(
     String text,
     int currentOffset, {
