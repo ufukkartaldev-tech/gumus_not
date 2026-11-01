@@ -1032,34 +1032,39 @@ class MarkdownEditorState extends State<MarkdownEditor> {
         body: SafeArea(
           child: Stack(
             children: [
-              // Zen Mode Paper Canvas
+              // Zen Mode Paper Canvas (Centered reading column on desktop)
               Positioned.fill(
                 child: Hero(
                   tag: 'note_${_persistedNoteId ?? widget.note?.id ?? 'new_$_createdAt'}',
                   child: Material(
                     color: Colors.transparent,
-                    child: _isPreviewMode
-                        ? _buildPreview()
-                        : EditorZenCanvas(
-                            titleController: _titleController,
-                            titleFocusNode: _titleFocusNode,
-                            contentController: _contentController,
-                            contentFocusNode: _contentFocusNode,
-                            emojiIcon: _emojiIcon,
-                            tags: _tags,
-                            currentNote: _buildCurrentNoteSnapshot(),
-                            isLocked: _isEncrypted && !_isUnlocked,
-                            onUnlockVault: _unlockVault,
-                            onSelectBacklinkNote: (note) {
-                              Navigator.of(context).pushNamed(
-                                '/note-editor',
-                                arguments: note,
-                              );
-                            },
-                            onShowEmojiPicker: _showEmojiPicker,
-                            onShowColorPicker: _showColorPicker,
-                            onShowTagSheet: _showTagAndMoodSheet,
-                          ),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 860),
+                        child: _isPreviewMode
+                            ? _buildPreview()
+                            : EditorZenCanvas(
+                                titleController: _titleController,
+                                titleFocusNode: _titleFocusNode,
+                                contentController: _contentController,
+                                contentFocusNode: _contentFocusNode,
+                                emojiIcon: _emojiIcon,
+                                tags: _tags,
+                                currentNote: _buildCurrentNoteSnapshot(),
+                                isLocked: _isEncrypted && !_isUnlocked,
+                                onUnlockVault: _unlockVault,
+                                onSelectBacklinkNote: (note) {
+                                  Navigator.of(context).pushNamed(
+                                    '/note-editor',
+                                    arguments: note,
+                                  );
+                                },
+                                onShowEmojiPicker: _showEmojiPicker,
+                                onShowColorPicker: _showColorPicker,
+                                onShowTagSheet: _showTagAndMoodSheet,
+                              ),
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -1169,9 +1174,94 @@ class MarkdownEditorState extends State<MarkdownEditor> {
                     ),
                   ),
                 ),
+
+              // Desktop Minimal Status Bar (Word & Char counter, Vault state)
+              if (isDesktop && (!_isEncrypted || _isUnlocked))
+                Positioned(
+                  bottom: 12,
+                  right: 20,
+                  child: _buildEditorStatusBar(Theme.of(context)),
+                ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildEditorStatusBar(ThemeData theme) {
+    final text = _contentController.text;
+    final wordCount = text.trim().isEmpty ? 0 : text.trim().split(RegExp(r'\s+')).length;
+    final charCount = text.length;
+    final readingTime = (wordCount / 200).ceil();
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: (isDark ? const Color(0xFF1E1F24) : Colors.white).withValues(alpha: 0.9),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: theme.dividerColor.withValues(alpha: isDark ? 0.15 : 0.25),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (_isEncrypted) ...[
+            Icon(
+              _isUnlocked ? Icons.lock_open_rounded : Icons.lock_rounded,
+              size: 13,
+              color: Colors.orange,
+            ),
+            const SizedBox(width: 5),
+            Text(
+              _isUnlocked ? 'Kasa Açık' : 'Kilitli',
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: Colors.orange,
+              ),
+            ),
+            Container(
+              height: 10,
+              width: 1,
+              color: theme.dividerColor.withValues(alpha: 0.3),
+              margin: const EdgeInsets.symmetric(horizontal: 8),
+            ),
+          ],
+          Text(
+            '$wordCount kelime  •  $charCount karakter',
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w500,
+              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
+            ),
+          ),
+          if (wordCount >= 60) ...[
+            Container(
+              height: 10,
+              width: 1,
+              color: theme.dividerColor.withValues(alpha: 0.3),
+              margin: const EdgeInsets.symmetric(horizontal: 8),
+            ),
+            Text(
+              '~$readingTime dk okuma',
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w500,
+                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

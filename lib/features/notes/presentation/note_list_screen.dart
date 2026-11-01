@@ -15,6 +15,7 @@ import 'package:connected_notebook/features/tools/widgets/activity_heatmap.dart'
 import 'package:connected_notebook/features/tools/widgets/command_palette.dart';
 import 'package:connected_notebook/features/notes/widgets/tag_cloud_widget.dart';
 import 'package:connected_notebook/features/notes/widgets/note_desktop_sidebar.dart';
+import 'package:connected_notebook/features/notes/widgets/desktop_note_tile.dart';
 import 'package:connected_notebook/features/notes/widgets/note_navigation_drawer.dart';
 import 'package:connected_notebook/features/notes/widgets/note_timeline_sliver.dart';
 
@@ -41,6 +42,8 @@ class _NoteListScreenState extends State<NoteListScreen> {
   String _selectedFolder = ''; // 'Genel' vs. Empty means Show All (or use 'Tümü')
   bool _showFavoritesOnly = false; // Filter pinned / favorite notes
   bool _isSidebarCollapsed = false; // Collapsible desktop sidebar state
+  bool _isNoteListCollapsed = false; // Collapsible middle note list panel
+  bool _isZenMode = false; // Fullscreen Zen / Focus Mode
   bool _isGridView = true; // Default to modern grid view
   bool _isTimelineView = false; // New Timeline View Mode
 
@@ -100,15 +103,58 @@ class _NoteListScreenState extends State<NoteListScreen> {
     CommandPalette.show(context);
   }
 
+  void _toggleSidebar() {
+    setState(() {
+      _isSidebarCollapsed = !_isSidebarCollapsed;
+    });
+  }
+
+  void _toggleNoteList() {
+    setState(() {
+      _isNoteListCollapsed = !_isNoteListCollapsed;
+    });
+  }
+
+  void _toggleZenMode() {
+    setState(() {
+      _isZenMode = !_isZenMode;
+    });
+  }
+
+  void _duplicateNote(Note note) {
+    final noteProvider = Provider.of<NoteProvider>(context, listen: false);
+    final nowMillis = DateTime.now().millisecondsSinceEpoch;
+    final duplicated = note.copyWith(
+      id: null,
+      title: note.title.isEmpty ? 'Kopya Not' : '${note.title} (Kopya)',
+      createdAt: nowMillis,
+      updatedAt: nowMillis,
+    );
+    noteProvider.addNote(duplicated);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Not çoğaltıldı'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Add Keyboard Shortcut Support
     return CallbackShortcuts(
       bindings: {
         const SingleActivator(LogicalKeyboardKey.keyK, control: true): _showCommandPalette,
-        // Also support Cmd+K for potential macOS users if needed, though 'control' maps to Cmd on web usually.
-        // For strict desktop, might need meta.
         const SingleActivator(LogicalKeyboardKey.keyK, meta: true): _showCommandPalette,
+        const SingleActivator(LogicalKeyboardKey.keyB, control: true): _toggleSidebar,
+        const SingleActivator(LogicalKeyboardKey.keyB, meta: true): _toggleSidebar,
+        const SingleActivator(LogicalKeyboardKey.keyL, control: true, shift: true): _toggleNoteList,
+        const SingleActivator(LogicalKeyboardKey.keyL, meta: true, shift: true): _toggleNoteList,
+        const SingleActivator(LogicalKeyboardKey.keyF, control: true, shift: true): _toggleZenMode,
+        const SingleActivator(LogicalKeyboardKey.keyF, meta: true, shift: true): _toggleZenMode,
+        const SingleActivator(LogicalKeyboardKey.f11): _toggleZenMode,
+        const SingleActivator(LogicalKeyboardKey.keyN, control: true): _createNote,
+        const SingleActivator(LogicalKeyboardKey.keyN, meta: true): _createNote,
       },
       child: Focus(
         autofocus: true,
@@ -156,21 +202,77 @@ class _NoteListScreenState extends State<NoteListScreen> {
 
   Widget _buildDesktopWorkbench() {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
-      body: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      body: Stack(
         children: [
-          // 1. Left Collapsible Sidebar (Slack/Obsidian/VS Code style)
-          _buildDesktopSidebar(),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // 1. Left Collapsible Sidebar (Slack/Obsidian/VS Code style)
+              if (!_isZenMode) _buildDesktopSidebar(),
 
-          // 2. Middle Panel: Note List (width ~360px)
-          _buildDesktopNoteListPanel(),
+              // 2. Middle Panel: Note List (width ~330px or collapsed strip)
+              if (!_isZenMode) _buildDesktopNoteListPanel(),
 
-          // 3. Right Panel: Wide Editor Workspace
-          Expanded(
-            child: _buildDesktopEditorPanel(),
+              // 3. Right Panel: Wide Editor Workspace
+              Expanded(
+                child: _buildDesktopEditorPanel(),
+              ),
+            ],
           ),
+
+          // Zen mode exit floating button
+          if (_isZenMode)
+            Positioned(
+              top: 14,
+              right: 20,
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: _toggleZenMode,
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surface.withValues(alpha: 0.9),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: theme.dividerColor.withValues(alpha: isDark ? 0.2 : 0.35),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.12),
+                          blurRadius: 10,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.fullscreen_exit_rounded,
+                          size: 16,
+                          color: theme.colorScheme.primary,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Zen Modundan Çık (F11)',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: theme.colorScheme.onSurface,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -182,11 +284,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
       showFavoritesOnly: _showFavoritesOnly,
       selectedFolder: _selectedFolder,
       selectedTag: _selectedTag,
-      onToggleCollapse: () {
-        setState(() {
-          _isSidebarCollapsed = !_isSidebarCollapsed;
-        });
-      },
+      onToggleCollapse: _toggleSidebar,
       onSelectAllNotes: () {
         setState(() {
           _showFavoritesOnly = false;
@@ -223,14 +321,52 @@ class _NoteListScreenState extends State<NoteListScreen> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
+    // Collapsed strip view
+    if (_isNoteListCollapsed) {
+      return Container(
+        width: 44,
+        decoration: BoxDecoration(
+          color: theme.scaffoldBackgroundColor,
+          border: Border(
+            right: BorderSide(
+              color: theme.dividerColor.withValues(alpha: isDark ? 0.08 : 0.12),
+            ),
+          ),
+        ),
+        child: Column(
+          children: [
+            const SizedBox(height: 12),
+            IconButton(
+              icon: const Icon(Icons.last_page_rounded, size: 20),
+              tooltip: 'Not Listesini Göster (Ctrl+Shift+L)',
+              onPressed: _toggleNoteList,
+            ),
+            const SizedBox(height: 16),
+            RotatedBox(
+              quarterTurns: 3,
+              child: Text(
+                'NOTLAR',
+                style: TextStyle(
+                  fontSize: 11,
+                  letterSpacing: 2,
+                  fontWeight: FontWeight.w700,
+                  color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     // Determine current active filter label
     String filterLabel = 'Tüm Notlar';
     bool hasActiveFilter = false;
     if (_showFavoritesOnly) {
-      filterLabel = 'Sabitlenen Notlar';
+      filterLabel = 'Sabitlenenler';
       hasActiveFilter = true;
     } else if (_selectedFolder.isNotEmpty) {
-      filterLabel = '📁 $_selectedFolder';
+      filterLabel = _selectedFolder;
       hasActiveFilter = true;
     } else if (_selectedTag.isNotEmpty) {
       filterLabel = '#$_selectedTag';
@@ -238,7 +374,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
     }
 
     return Container(
-      width: 360,
+      width: 320,
       decoration: BoxDecoration(
         color: theme.scaffoldBackgroundColor,
         border: Border(
@@ -251,7 +387,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
         children: [
           // Middle panel header
           Container(
-            padding: const EdgeInsets.fromLTRB(16, 14, 12, 10),
+            padding: const EdgeInsets.fromLTRB(14, 12, 10, 8),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -266,8 +402,9 @@ class _NoteListScreenState extends State<NoteListScreen> {
                               filterLabel,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
-                                fontSize: 16,
+                                fontSize: 15,
                                 fontWeight: FontWeight.w700,
+                                letterSpacing: -0.2,
                               ),
                             ),
                           ),
@@ -288,7 +425,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
                                   color: theme.dividerColor.withValues(alpha: 0.15),
                                   shape: BoxShape.circle,
                                 ),
-                                child: const Icon(Icons.close, size: 14),
+                                child: const Icon(Icons.close, size: 13),
                               ),
                             ),
                           ],
@@ -296,50 +433,47 @@ class _NoteListScreenState extends State<NoteListScreen> {
                       ),
                     ),
                     IconButton(
-                      icon: Icon(_isGridView ? Icons.view_list_rounded : Icons.grid_view_rounded),
-                      tooltip: _isGridView ? 'Liste Görünümü' : 'Izgara Görünümü',
-                      onPressed: () {
-                        setState(() {
-                          _isGridView = !_isGridView;
-                        });
-                      },
+                      icon: const Icon(Icons.center_focus_strong_outlined, size: 18),
+                      tooltip: 'Zen Odak Modu (F11)',
+                      onPressed: _toggleZenMode,
                       visualDensity: VisualDensity.compact,
                     ),
                     IconButton(
-                      icon: const Icon(Icons.search),
-                      tooltip: 'Komut Paleti (Ctrl+K)',
-                      onPressed: _showCommandPalette,
+                      icon: const Icon(Icons.first_page_rounded, size: 20),
+                      tooltip: 'Listeyi Daralt (Ctrl+Shift+L)',
+                      onPressed: _toggleNoteList,
                       visualDensity: VisualDensity.compact,
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 CustomSearchBar(
-                  hintText: 'Notlarda ara...',
+                  hintText: 'Notlarda ara... (Ctrl+K)',
                   controller: _searchController,
                   onChanged: _onSearchChanged,
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
                 Row(
                   children: [
                     Expanded(
                       child: ElevatedButton.icon(
                         onPressed: () => _createNote(),
-                        icon: const Icon(Icons.add, size: 18),
-                        label: const Text('Yeni Not'),
+                        icon: const Icon(Icons.add, size: 16),
+                        label: const Text('Yeni Not', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                         style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 6),
                     IconButton(
-                      icon: const Icon(Icons.today, size: 20),
+                      icon: const Icon(Icons.today, size: 18),
                       tooltip: 'Bugünün Notu',
                       style: IconButton.styleFrom(
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(8),
                           side: BorderSide(color: theme.dividerColor.withValues(alpha: 0.2)),
                         ),
                       ),
@@ -350,7 +484,10 @@ class _NoteListScreenState extends State<NoteListScreen> {
               ],
             ),
           ),
-          const Divider(height: 1),
+          Divider(
+            height: 1,
+            color: theme.dividerColor.withValues(alpha: isDark ? 0.08 : 0.12),
+          ),
 
           // Note list content
           Expanded(
@@ -734,7 +871,29 @@ class _NoteListScreenState extends State<NoteListScreen> {
                 ),
               ),
 
-            if (_isTimelineView)
+            if (isSidebar)
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final note = sortedNotes[index];
+                      final isSelected = _selectedNote?.id == note.id;
+                      return DesktopNoteTile(
+                        note: note,
+                        isSelected: isSelected,
+                        onTap: () => _selectNote(note),
+                        onTogglePin: () => _togglePin(note),
+                        onDelete: () => _deleteNoteWithUndo(note),
+                        onDuplicate: () => _duplicateNote(note),
+                        onExport: () => _showExportOptions(note),
+                      );
+                    },
+                    childCount: sortedNotes.length,
+                  ),
+                ),
+              )
+            else if (_isTimelineView)
               _buildTimelineSliver(sortedNotes)
             else
               SliverPadding(
